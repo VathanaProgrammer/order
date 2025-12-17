@@ -17,7 +17,7 @@ export default function ProductPage() {
   ];
 
   return (
-    <div className="h-full overflow-y-auto hide-scrollbar">
+    <div className="flex flex-col flex-1 hide-scrollbar">
 
       <RewardSection />
 

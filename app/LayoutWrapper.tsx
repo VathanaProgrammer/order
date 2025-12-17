@@ -34,10 +34,10 @@ export default function LayoutWrapper({
 
   return (
     <IconProvider value={{ width: 32, height: 32, color: "blue" }}>
-      <div className="flex justify-center items-center m-0 p-0 min-h-screen bg-gray-200">
-        <div className="relative p-6 w-full max-w-[430px] aspect-[430/932] bg-white shadow-xl rounded-[30px] overflow-hidden flex flex-col m-2">
+      <div className="flex justify-center items-center h-full bg-gray-200 m-0 p-0">
+        <div className="relative p-6 w-full h-full max-w-[430px] bg-white shadow-xl overflow-hidden flex flex-col">
           {!hideTopBar && <TopNav />}
-          <main className="flex-1 my-2 hide-scrollbar">
+          <main className="flex-1 hide-scrollbar">
             {children}
           </main>
           {!hideBottomBar && <BottomNav />}
