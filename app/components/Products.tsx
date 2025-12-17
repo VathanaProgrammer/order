@@ -69,7 +69,6 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
           id={item.product.id}
           title={item.product.name}
           price={Number(item.product.price)}
-          // ✅ Use default image if null, undefined, or empty string
           image={item.product.image_url && item.product.image_url.trim() !== "" ? item.product.image_url : "/img/default.png"}
           onAdd={(id, qty) =>
             addToCart(

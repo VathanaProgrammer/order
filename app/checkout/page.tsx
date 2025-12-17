@@ -92,7 +92,7 @@ const CombinedCheckoutPage = () => {
             className="flex items-center justify-between border-b border-gray-500 p-3 gap-3"
           >
             <img
-              src={IMAGE_URL + item.image}
+              src={item.image && item.image.trim() !== "" ? IMAGE_URL + item.image : "/img/default.png"}
               alt={item.title}
               className="w-16 h-16 object-cover rounded"
             />
