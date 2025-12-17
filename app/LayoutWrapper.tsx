@@ -37,7 +37,7 @@ export default function LayoutWrapper({
       <div className="flex justify-center items-center m-0 p-0 min-h-screen bg-gray-200">
         <div className="relative p-6 w-full max-w-[430px] aspect-[430/932] bg-white shadow-xl rounded-[30px] overflow-hidden flex flex-col m-2">
           {!hideTopBar && <TopNav />}
-          <main className="flex-1 overflow-y-auto my-2 hide-scrollbar">
+          <main className="flex-1 my-2 hide-scrollbar">
             {children}
           </main>
           {!hideBottomBar && <BottomNav />}
