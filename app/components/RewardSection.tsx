@@ -20,10 +20,12 @@ const RewardSection: React.FC = () => {
     async function fetchRewardProducts() {
       setLoading(true);
       try {
-        // Replace with your API endpoint for reward products
-        const res = await api.get<{ status: string; data: RewardProduct[] }>("/product/reward/all");
-        console.log(res.data)
-        setProducts(res.data.data);
+        const res = await api.get<{
+          status: string;
+          data: RewardProduct[];
+        }>("/product/reward/all");
+
+        setProducts(res.data.data ?? []);
       } catch (err) {
         console.error(err);
         toast.error("Failed to load reward products");
@@ -35,12 +37,15 @@ const RewardSection: React.FC = () => {
     fetchRewardProducts();
   }, [setLoading]);
 
+  // Nothing to show → render nothing
+  if (products.length === 0) return null;
+
   return (
     <section className="mt-4">
-      {/* Header */}
-      <h2 className="text-xl font-bold text-gray-700 mb-2">Redeem Your Rewards</h2>
+      <h2 className="text-xl font-bold text-gray-700 mb-2">
+        Redeem Your Rewards
+      </h2>
 
-      {/* Reward Cards Grid */}
       <div className="grid grid-cols-2 gap-4 mt-2">
         {products.map((item) => (
           <RewardCard key={item.id} product={item} />

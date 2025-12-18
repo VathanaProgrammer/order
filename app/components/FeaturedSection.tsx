@@ -20,18 +20,23 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({ products, onAdd }) =>
     <section className="mt-4">
       <h2 className="text-xl font-bold text-gray-700 mb-2">Featured Products</h2>
       <div className="grid grid-cols-2 gap-4">
-        {products.map((item) => (
-          <Product
-            key={item.id}
-            id={item.id}
-            title={item.name}
-            price={item.price}
-            image={item.image_url}
-            onAdd={(id, qty) =>
-              onAdd?.({ id: item.id, title: item.name, price: item.price }, qty)
-            }
-          />
-        ))}
+        {products.length > 0 ? (
+          products.map((item) => (
+            <Product
+              key={item.id}
+              id={item.id}
+              title={item.name}
+              price={item.price}
+              image={item.image_url}
+              onAdd={(id, qty) =>
+                onAdd?.({ id: item.id, title: item.name, price: item.price }, qty)
+              }
+            />
+          ))
+        ) : (
+          <p className="text-gray-400 col-span-2 text-center">No featured products</p>
+        )}
+
       </div>
     </section>
   );
