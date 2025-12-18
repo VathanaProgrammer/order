@@ -91,7 +91,7 @@ export default function ShippingAddressPage() {
   };
 
   return (
-    <div className="flex flex-col h-full gap-6 p-4">
+    <div className="flex flex-col h-full gap-6">
       <Header title="Shipping Address" />
 
       {/* Saved Addresses */}
