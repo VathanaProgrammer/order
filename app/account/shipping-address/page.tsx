@@ -66,16 +66,22 @@ export default function ShippingAddressPage() {
       return;
     }
 
-    console.log(newAddress);
-
     try {
       const res = await api.post("/addresses", newAddress);
-      // replace with your actual API
-      const saved: Address = res.data;
 
-      setSavedAddresses([...savedAddresses, saved]);
+      const saved: Address = res.data.data; // ✅ FIX
+
+      setSavedAddresses(prev => [...prev, saved]);
       setSelectedAddress(saved.id ?? null);
-      setNewAddress({ label: "", phone: "", details: "", api_user_id: user?.id || undefined, coordinates: undefined });
+
+      setNewAddress({
+        label: "",
+        phone: "",
+        details: "",
+        api_user_id: user?.id,
+        coordinates: undefined,
+      });
+
       setIsAdding(false);
       setShowMap(false);
     } catch (err) {
