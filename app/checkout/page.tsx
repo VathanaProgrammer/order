@@ -83,7 +83,7 @@ const CombinedCheckoutPage = () => {
       <Header title="Checkout" />
 
       {/* ===== Order Summary ===== */}
-      <section className="flex flex-col gap-3 px-4">
+      <section className="flex flex-col gap-3">
         <h2 className="text-2xl font-semibold text-gray-800">Order Summary</h2>
         {cart.length === 0 && <p>Your cart is empty</p>}
         {cart.map((item) => (
@@ -122,7 +122,7 @@ const CombinedCheckoutPage = () => {
       </section>
 
       {/* Shipping Address & Payment */}
-      <section className="flex flex-col gap-3 px-4 mt-6">
+      <section className="flex flex-col gap-3 mt-6">
         <h2 className="text-2xl font-semibold text-gray-800">Shipping Address</h2>
 
         {savedAddresses.map((addr) => (
@@ -192,7 +192,7 @@ const CombinedCheckoutPage = () => {
       </section>
 
       {/* Payment */}
-      <section className="flex flex-col gap-3 px-4 mt-6">
+      <section className="flex flex-col gap-3 mt-6">
         <h2 className="text-2xl font-semibold text-gray-800">Payment Method</h2>
         {paymentMethods.map((method) => {
           const isSelected = paymentMethod === method.name;
