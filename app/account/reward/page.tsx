@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import Header from "@/components/layouts/Header";
 import api from "@/api/api";
 import RewardSection from "@/components/RewardSection";
-import ProtectedRoute from "../../components/ProtectedRoute";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 interface RewardItem {
   date: string;
