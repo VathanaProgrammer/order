@@ -115,18 +115,14 @@ const TopNav = () => {
         </div>
 
         <div
-          onClick={() => router.push("/account")}
-          className="p-2 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
+          onClick={() => router.push("/account/reward")}
+          className="p-2 flex flex-row items-center min-w-[75px] rounded-[10px] bg-linear-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
         >
-          <Icon
-            className="text-white"
-            icon="vaadin:database"
-            width={20}
-            height={20}
-          />
-          <p className="text-[16px] font-medium ml-1">{user?.reward_points?.available || 0}</p>
+          <div className="ml-1 w-8 h-8 bg-linear-to-br from-yellow-300 to-yellow-500 rounded-full flex items-center justify-center shadow-2xl border-4 border-white z-10">
+          <span className="text-white font-bold text-2xl">★</span>
         </div>
-
+          <p className="text-[16px] font-medium ml-2">{user?.reward_points?.available || 0}</p>
+        </div>
       </div>
 
       {error && <p className="text-red-500 text-[12px]">{error}</p>}
