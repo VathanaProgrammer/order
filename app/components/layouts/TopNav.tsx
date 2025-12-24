@@ -61,7 +61,7 @@ const TopNav = () => {
     <section className="flex flex-col gap-2">
       <div className="flex flex-row justify-between items-center">
         {/* Logo */}
-        <h1 className="text-[32px] font-bold main-text">LUXE</h1>
+        <h1 className="text-[32px] font-bold main-text">SOB</h1>
 
         <div className="flex flex-row gap-2">
           <div
