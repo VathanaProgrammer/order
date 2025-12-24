@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import Header from "@/components/layouts/Header";
 import api from "@/api/api";
 import RewardSection from "@/components/RewardSection";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 interface RewardItem {
   date: string;
@@ -30,6 +31,7 @@ const Reward: React.FC = () => {
   // }, []);
 
   return (
+    <ProtectedRoute>
     <div className="flex flex-col h-full gap-6">
       <Header title="Your Reward" />
       <div className="flex flex-col items-center my-10">
@@ -43,6 +45,7 @@ const Reward: React.FC = () => {
       </div>
       <RewardSection />
     </div>
+    </ProtectedRoute>
   );
 };
 
