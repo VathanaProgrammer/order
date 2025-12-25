@@ -7,6 +7,7 @@ import api from "@/api/api";
 
 const OtpPage = () => {
   const router = useRouter();
+  const { refreshUser } = useAuth();
   const searchParams = useSearchParams();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
@@ -74,15 +75,18 @@ const OtpPage = () => {
       // Simulate verifying OTP
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // ✅ After verification, fetch user from backend
-      const res = await api.get("/user", { withCredentials: true });
-      console.log("User after OTP verify:", res.data);
+      // // ✅ After verification, fetch user from backend
+      // const res = await api.get("/user", { withCredentials: true });
+      // console.log("User after OTP verify:", res.data);
 
-      if (res.data) {
-        router.push("/");
-      } else {
-        setError("Unable to fetch user after OTP verification");
-      }
+      // if (res.data) {
+      //   router.push("/");
+      // } else {
+      //   setError("Unable to fetch user after OTP verification");
+      // }
+      await refreshUser();
+
+      router.replace("/");
     } catch (err) {
       setError("Server error. Try again.");
     } finally {

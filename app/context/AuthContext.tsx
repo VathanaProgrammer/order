@@ -12,13 +12,13 @@ import { useRouter } from "next/navigation";
 interface User {
   id: number;
   name: string;
-  phone?: string | null;        
-  image_url?: string | null;    
+  phone?: string | null;
+  image_url?: string | null;
   reward_points: {
-    total: number;              
-    used: number;              
-    expired: number;            
-    available: number;          
+    total: number;
+    used: number;
+    expired: number;
+    available: number;
   };
 }
 
@@ -28,6 +28,7 @@ interface AuthContextType {
   loading: boolean;
   login: (phone: string, username: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -57,6 +58,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     fetchUser();
   }, []);
+
+  const refreshUser = async () => {
+    try {
+      const res = await api.get("/user", { withCredentials: true });
+      if (res.data?.success) {
+        setUser(res.data.user);
+      }
+    } catch {
+      setUser(null);
+    }
+  };
+
 
   // 🔹 Login and set cookie
   const login = async (phone: string, username: string) => {
@@ -95,7 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser  }}>
       {children}
     </AuthContext.Provider>
   );
