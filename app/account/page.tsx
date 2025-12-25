@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
 const Page: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, loading } = useAuth();
   const router = useRouter();
   const [profileImage, setProfileImage] = useState<string>(
     user?.image_url ||
@@ -76,10 +76,21 @@ const Page: React.FC = () => {
 
   useEffect(() => {
     if (user?.image_url) {
-      const timeout = setTimeout(() => setProfileImage(user.image_url || "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg"), 0);
-      return () => clearTimeout(timeout);
+      setProfileImage(
+        user.image_url ||
+        "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg"
+      );
     }
   }, [user?.image_url]);
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-500">Loading account...</p>
+      </div>
+    );
+  }
+  
 
   return (
     <div className="flex flex-col items-center min-h-screen">
@@ -123,15 +134,9 @@ const Page: React.FC = () => {
           </div>
 
           <div className="mt-3 text-center">
-            {user ? (
-              <>
                 <p className="font-semibold text-lg text-gray-900">
-                  {user.name}
+                  {user?.name}
                 </p>
-              </>
-            ) : (
-              <p className="text-gray-500 text-sm">Guest</p>
-            )}
           </div>
         </div>
 
