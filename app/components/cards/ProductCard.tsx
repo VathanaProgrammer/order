@@ -10,15 +10,9 @@ type ProductProps = {
   title: string;
   price: number;
   image?: string;
-  onAdd?: (product: {
-    id: number;
-    title: string;
-    price: number;
-    image?: string;
-  }, qty: number) => void;
 };
 
-const Product: React.FC<ProductProps> = ({ id, title, price, image, onAdd }) => {
+const Product: React.FC<ProductProps> = ({ id, title, price, image }) => {
   const { cart, addToCart } = useCheckout();
   
   const cartItem = cart.find(item => item.id === id);
@@ -30,9 +24,6 @@ const Product: React.FC<ProductProps> = ({ id, title, price, image, onAdd }) => 
     
     // Update context
     addToCart(product, 1);
-    
-    // Call onAdd callback
-    onAdd?.(product, 1);
   };
 
   const handleDecrement = () => {
@@ -42,9 +33,6 @@ const Product: React.FC<ProductProps> = ({ id, title, price, image, onAdd }) => 
     
     // Update context
     addToCart(product, -1);
-    
-    // Call onAdd callback
-    onAdd?.(product, -1);
   };
 
   const displayImage =
