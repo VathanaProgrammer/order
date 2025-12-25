@@ -4,6 +4,7 @@ import Header from "@/components/layouts/Header";
 import api from "@/api/api";
 import RewardSection from "@/components/RewardSection";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useAuth } from "@/context/AuthContext";
 
 interface RewardItem {
   date: string;
@@ -30,6 +31,8 @@ const Reward: React.FC = () => {
   //     .finally(() => setLoading(false));
   // }, []);
 
+  const { user } = useAuth();
+
   return (
     <ProtectedRoute>
     <div className="flex flex-col h-full gap-6">
@@ -40,7 +43,7 @@ const Reward: React.FC = () => {
           <span className="text-white font-bold text-2xl">★</span>
         </div>
 
-        <span className="text-white font-bold text-2xl mt-6">Point:</span>
+        <span className="text-white font-bold text-2xl mt-6">Point: {user?.reward_points?.available || 0}</span>
       </div>
       </div>
       <RewardSection />
