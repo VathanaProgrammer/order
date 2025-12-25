@@ -31,6 +31,16 @@ const Page = () => {
 
   return (
     <div className="h-full flex justify-center w-full">
+       <div className="w-full max-w-md">
+      {/* Back button at the top */}
+      <button 
+        type="button"
+        onClick={() => router.back()}
+        className="mb-4 text-gray-600 hover:text-gray-800 flex items-center gap-2"
+      >
+        <span className="text-xl">←</span>
+        <span>Back</span>
+      </button>
       <form onSubmit={handleSignIn} className="mt-18 w-full">
         <h1 onClick={() => router.push('/')} className="text-2xl font-bold text-center text-gray-800">SOB</h1>
         <h2 className="text-lg font-medium text-center text-gray-600 mb-6">
@@ -95,13 +105,8 @@ const Page = () => {
             </span>
           </p>
         </div>
-          <button 
-          onClick={() => router.push('/')}
-          className="text-blue-500"
-          >
-          ← Go Back
-        </button>
       </form>
+    </div>
     </div>
   );
 };
