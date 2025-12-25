@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { usePathname } from "next/navigation";
 import { toast } from "react-toastify";
+import axios from "axios";
 
 const BottomNav: React.FC = () => {
   const router = useRouter();
@@ -66,6 +67,25 @@ const BottomNav: React.FC = () => {
     }
   };
 
+  const handleChatRedirect = async () => {
+    try {
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/https://t.me/telegram-link`,
+        { withCredentials: true }
+      );
+  
+      if (res.data?.telegram_link) {
+        // External redirect → use window.location
+        window.location.href = res.data.telegram_link;
+      } else {
+        toast.error("Telegram link not found!");
+      }
+    } catch (error) {
+      toast.error("Failed to open Telegram chat");
+    }
+  };
+  
+
   const iconColor = (page: "home" | "chat" | "order") =>
     activePage === page ? "#1E40AF" : "#6B7280";
 
@@ -76,6 +96,10 @@ const BottomNav: React.FC = () => {
           <div
             key={page}
             onClick={() => {
+              if (page === "chat") {
+                handleChatRedirect();
+                return;
+              }
               router.push(`/${page === "home" ? "" : page}`);
               setActivePage(page as "home" | "chat" | "order");
             }}
