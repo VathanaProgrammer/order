@@ -31,8 +31,9 @@ const Page: React.FC = () => {
     {
       icon: "mdi:account",
       title: "Profile Information",
-      desc: "Manage your name, email, and phone number.",
+      desc: "Manage your name, and phone number.",
       action: "Edit Profile",
+      route: '/account/edit-profile'
     },
     {
       icon: "mdi:map-marker",
@@ -54,18 +55,18 @@ const Page: React.FC = () => {
       action: "View Rewards",
       route: '/account/reward'
     },
-    {
-      icon: "mdi:lock-outline",
-      title: "Security",
-      desc: "Change password or review login activity.",
-      action: "Update Password",
-    },
-    {
-      icon: "mdi:bell-outline",
-      title: "Notifications",
-      desc: "Choose what alerts and messages you want to receive.",
-      action: "Manage Preferences",
-    },
+    // {
+    //   icon: "mdi:lock-outline",
+    //   title: "Security",
+    //   desc: "Change password or review login activity.",
+    //   action: "Update Password",
+    // },
+    // {
+    //   icon: "mdi:bell-outline",
+    //   title: "Notifications",
+    //   desc: "Choose what alerts and messages you want to receive.",
+    //   action: "Manage Preferences",
+    // },
     {
       icon: "mdi:cog-outline",
       title: "Account Settings",
