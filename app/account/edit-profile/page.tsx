@@ -48,9 +48,9 @@ const EditProfileForm = () => {
 
     // Phone validation (accepts various formats)
     const cleanedPhone = formData.phone.replace(/[\s\-()]/g, "");
-    const phoneRegex = /^\+?[0-9]{10,15}$/;
+    const phoneRegex = /^\+?[0-9]{3,15}$/;
     if (!phoneRegex.test(cleanedPhone)) {
-      setError("Please enter a valid phone number (10-15 digits)");
+      setError("Please enter a valid phone number (3-15 digits)");
       return false;
     }
 
@@ -212,12 +212,9 @@ const EditProfileForm = () => {
             onChange={handleInputChange}
             disabled={isLoading}
             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed"
-            placeholder="e.g., +1 (555) 123-4567"
+            placeholder="e.g., 01234567890"
             required
           />
-          <p className="mt-1.5 text-xs text-gray-500">
-            Enter your phone number with country code
-          </p>
         </div>
 
         {/* Action Buttons */}
