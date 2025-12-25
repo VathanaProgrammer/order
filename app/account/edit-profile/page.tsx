@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/api/api";
+import { redirect } from "next/navigation";
 
 const EditProfileForm = () => {
   const { user, refreshUser } = useAuth();
@@ -100,6 +101,7 @@ const EditProfileForm = () => {
       );
     } finally {
       setIsLoading(false);
+      redirect("/account");
     }
   };
 
