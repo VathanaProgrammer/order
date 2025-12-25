@@ -1,32 +1,50 @@
+// components/cards/ProductCard.tsx
 "use client";
-import React, { useState } from "react";
+import React from "react";
 import Image from "next/image";
-import { useCheckout } from "@/context/CheckOutContext"; // Import your context
+import { useCheckout } from "@/context/CheckOutContext";
 
+// Add onAdd to the ProductProps type
 type ProductProps = {
   id: number;
   title: string;
   price: number;
   image?: string;
-  // Remove onAdd prop since we'll use context directly
+  onAdd?: (product: {
+    id: number;
+    title: string;
+    price: number;
+    image?: string;
+  }, qty: number) => void;
 };
 
-const Product: React.FC<ProductProps> = ({ id, title, price, image }) => {
+const Product: React.FC<ProductProps> = ({ id, title, price, image, onAdd }) => {
   const { cart, addToCart } = useCheckout();
   
-  // Get quantity from cart context
   const cartItem = cart.find(item => item.id === id);
   const qty = cartItem?.qty || 0;
 
   const handleIncrement = () => {
     const imageFile = image ? image.split("/").pop() : undefined;
-    addToCart({ id, title, price, image: imageFile }, 1);
+    const product = { id, title, price, image: imageFile };
+    
+    // Update context
+    addToCart(product, 1);
+    
+    // Call onAdd callback
+    onAdd?.(product, 1);
   };
 
   const handleDecrement = () => {
     if (qty === 0) return;
     const imageFile = image ? image.split("/").pop() : undefined;
-    addToCart({ id, title, price, image: imageFile }, -1);
+    const product = { id, title, price, image: imageFile };
+    
+    // Update context
+    addToCart(product, -1);
+    
+    // Call onAdd callback
+    onAdd?.(product, -1);
   };
 
   const displayImage =
