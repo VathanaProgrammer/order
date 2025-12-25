@@ -16,7 +16,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   useEffect(() => {
     if (!loading && !user) {
       window.history.pushState(null, '', window.location.pathname);
-      router.push("/sign-in");
+      router.replace("/sign-in");
     }
   }, [user, loading, router]);
 
