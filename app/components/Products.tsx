@@ -70,12 +70,6 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
           title={item.product.name}
           price={Number(item.product.price)}
           image={item.product.image_url && item.product.image_url.trim() !== "" ? item.product.image_url : "/img/default.png"}
-          onAdd={(id, qty) =>
-            addToCart(
-              { id: item.product.id, title: item.product.name, price: Number(item.product.price) },
-              qty
-            )
-          }
         />
 
       ))}
