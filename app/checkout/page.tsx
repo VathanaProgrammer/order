@@ -90,8 +90,7 @@ const CombinedCheckoutPage = () => {
   // Handle QR code download
   const handleDownloadQR = () => {
     try {
-      // Replace with your actual QR image path
-      const qrImageUrl = "/qr-code.png"; // Update this to your actual QR image path
+      const qrImageUrl = "/qr.jpg";
       const link = document.createElement("a");
       link.download = "payment-qr-code.png";
       link.href = qrImageUrl;
@@ -262,10 +261,9 @@ const CombinedCheckoutPage = () => {
             </div>
             
             <div className="text-center mb-6">
-              {/* Replace with your actual QR image */}
               <div className="mb-4 p-4 border rounded-lg bg-white inline-block">
                 <img 
-                  src="/qr-code.png" // Update this path to your actual QR image
+                  src="/qr.jpg"
                   alt="Payment QR Code"
                   className="w-64 h-64 mx-auto"
                 />
