@@ -95,13 +95,13 @@ const Page = () => {
             </span>
           </p>
         </div>
+          <button 
+          onClick={() => router.push('/')}
+          className="text-blue-500"
+          >
+          ← Go Back
+        </button>
       </form>
-      <button 
-        onClick={() => router.push('/')}
-        className="text-blue-500 flex justify-center items-center"
-      >
-        ← Go Back
-      </button>
     </div>
   );
 };
