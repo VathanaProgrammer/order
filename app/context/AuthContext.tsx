@@ -86,6 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (res.data.success) {
         setUser(res.data.user);
+        await refreshUser();
         router.push("/");
       } else {
         throw new Error(res.data.message || "Login failed");

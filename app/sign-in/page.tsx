@@ -10,6 +10,7 @@ const Page = () => {
   const [phone, setPh] = useState("");
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
+  const { refreshUser } = useAuth();
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
