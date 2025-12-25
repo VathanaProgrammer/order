@@ -35,7 +35,7 @@ const Page = () => {
       {/* Back button at the top */}
       <button 
         type="button"
-        onClick={() => router.back()}
+        onClick={() => router.push('/')}
         className="mb-4 text-gray-600 hover:text-gray-800 flex items-center gap-2"
       >
         <span className="text-xl">←</span>
