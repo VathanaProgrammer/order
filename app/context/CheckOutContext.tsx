@@ -228,7 +228,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         toast.success("Order placed successfully!");
         setCart([]);
         setTotal(0);
-        router.push(`/checkout/order-success`);
+        router.push(`/checkout/order-success/${encodeURIComponent(res.data.telegram_start_link)}`);
       }
     } catch (err: any) {
       toast.error("Order failed. Please try again.");
