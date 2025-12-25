@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { usePathname } from "next/navigation";
 import { toast } from "react-toastify";
 import axios from "axios";
+import api from "@/api/api";
 
 const BottomNav: React.FC = () => {
   const router = useRouter();
@@ -101,7 +102,7 @@ const BottomNav: React.FC = () => {
                 return;
               }
               router.push(`/${page === "home" ? "" : page}`);
-              setActivePage(page as "home" | "chat" | "order");
+              setActivePage(page as "home" | "chat");
             }}
             className="flex flex-col items-center justify-center cursor-pointer"
           >
@@ -115,11 +116,11 @@ const BottomNav: React.FC = () => {
               }
               width={24}
               height={24}
-              style={{ color: iconColor(page as "home" | "chat" | "order") }}
+              style={{ color: iconColor(page as "home" | "chat") }}
             />
             <p
               className="text-[13px] font-medium"
-              style={{ color: iconColor(page as "home" | "chat" | "order") }}
+              style={{ color: iconColor(page as "home" | "chat") }}
             >
               {page.charAt(0).toUpperCase() + page.slice(1)}
             </p>
