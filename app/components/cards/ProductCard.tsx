@@ -1,52 +1,41 @@
 "use client";
 import React, { useState } from "react";
 import Image from "next/image";
+import { useCheckout } from "@/context/CheckOutContext"; // Import your context
 
 type ProductProps = {
   id: number;
   title: string;
   price: number;
   image?: string;
-  onAdd?: (
-    product: {
-      id: number;
-      title: string;
-      price: number;
-      image?: string;
-    },
-    qty: number
-  ) => void;
+  // Remove onAdd prop since we'll use context directly
 };
 
-const Product: React.FC<ProductProps> = ({ id, title, price, image, onAdd }) => {
-  const [qty, setQty] = useState(0);
-
-  // ✅ Extract only the filename (e.g. "1761268367_images-1.jpg")
-  const imageFile = image ? image.split("/").pop() : undefined;
+const Product: React.FC<ProductProps> = ({ id, title, price, image }) => {
+  const { cart, addToCart } = useCheckout();
+  
+  // Get quantity from cart context
+  const cartItem = cart.find(item => item.id === id);
+  const qty = cartItem?.qty || 0;
 
   const handleIncrement = () => {
-    const newQty = qty + 1;
-    setQty(newQty);
-    // ✅ Pass only the filename
-    onAdd?.({ id, title, price, image: imageFile }, 1);
+    const imageFile = image ? image.split("/").pop() : undefined;
+    addToCart({ id, title, price, image: imageFile }, 1);
   };
 
   const handleDecrement = () => {
     if (qty === 0) return;
-    const newQty = qty - 1;
-    setQty(newQty);
-    // ✅ Pass only the filename
-    onAdd?.({ id, title, price, image: imageFile }, -1);
+    const imageFile = image ? image.split("/").pop() : undefined;
+    addToCart({ id, title, price, image: imageFile }, -1);
   };
 
   const displayImage =
     image && image.trim() !== ""
       ? image
-      : "/images/default-product.png"; // fallback image in /public/images/
+      : "/images/default-product.png";
 
   return (
     <div className="w-full rounded-xl bg-gray-50 border border-gray-200 shadow-md flex flex-col overflow-hidden transition hover:shadow-lg">
-      {/* Product Image */}
       <div className="relative w-full h-44">
         <Image
           src={displayImage}
@@ -58,17 +47,20 @@ const Product: React.FC<ProductProps> = ({ id, title, price, image, onAdd }) => 
         />
       </div>
 
-      {/* Product Info */}
       <div className="p-3 flex flex-col flex-1">
         <h2 className="font-semibold text-gray-800 text-sm truncate">{title}</h2>
         <p className="text-gray-900 font-bold text-base mt-1">${price.toFixed(2)}</p>
       </div>
 
-      {/* Quantity Controls */}
       <div className="flex items-center justify-between px-3 pb-3">
         <button
           onClick={handleDecrement}
-          className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 text-gray-700"
+          disabled={qty === 0}
+          className={`w-8 h-8 flex items-center justify-center rounded text-gray-700 ${
+            qty === 0 
+              ? "bg-gray-100 cursor-not-allowed" 
+              : "bg-gray-200 hover:bg-gray-300"
+          }`}
         >
           -
         </button>
