@@ -21,7 +21,7 @@ const BottomNav: React.FC = () => {
     paymentMethod,
     selectedAddress,
   } = useCheckout();
-  const [activePage, setActivePage] = useState<"home" | "chat" | "order">("home");
+  const [activePage, setActivePage] = useState<"home" | "chat">("home");
 
   const { user } = useAuth();
   const pathname = usePathname();
@@ -87,13 +87,13 @@ const BottomNav: React.FC = () => {
   };
   
 
-  const iconColor = (page: "home" | "chat" | "order") =>
+  const iconColor = (page: "home" | "chat") =>
     activePage === page ? "#1E40AF" : "#6B7280";
 
   return (
     <section className="flex items-center justify-between my-2">
       <div className="flex items-center gap-4">
-        {["home", "chat", "order"].map((page) => (
+        {["home", "chat"].map((page) => (
           <div
             key={page}
             onClick={() => {
