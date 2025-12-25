@@ -8,7 +8,6 @@ import { useAuth } from "@/context/AuthContext";
 import { usePathname } from "next/navigation";
 import { toast } from "react-toastify";
 import axios from "axios";
-import api from "@/api/api";
 
 const BottomNav: React.FC = () => {
   const router = useRouter();

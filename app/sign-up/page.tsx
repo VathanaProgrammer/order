@@ -48,7 +48,7 @@ export default function Signup() {
   return (
     <div className="h-full flex justify-center items-center w-full">
       <form onSubmit={handleSignup} className="mt-4 w-full max-w-md">
-        <h1 onClick={() => router.push('/')} className="text-2xl font-bold text-center text-gray-800">LUXE</h1>
+        <h1 onClick={() => router.push('/')} className="text-2xl font-bold text-center text-gray-800">SOB</h1>
         <h2 className="text-lg font-medium text-center text-gray-600 mb-6">
           Fill your details to continue with us
         </h2>
