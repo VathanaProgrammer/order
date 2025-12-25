@@ -70,7 +70,7 @@ const BottomNav: React.FC = () => {
   const handleChatRedirect = async () => {
     try {
       const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/https://t.me/telegram-link`,
+        `${process.env.NEXT_PUBLIC_API_URL}/telegram-link`,
         { withCredentials: true }
       );
   
