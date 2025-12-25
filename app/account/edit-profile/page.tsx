@@ -9,7 +9,7 @@ const EditProfileForm = () => {
   const { user, refreshUser } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
-    phone: "",
+    mobile: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +20,7 @@ const EditProfileForm = () => {
     if (user) {
       setFormData({
         name: user.name || "",
-        phone: user.phone || "",
+        mobile: user.phone || "",
       });
     }
   }, [user]);
@@ -42,15 +42,15 @@ const EditProfileForm = () => {
       return false;
     }
 
-    if (!formData.phone.trim()) {
+    if (!formData.mobile.trim()) {
       setError("Phone number is required");
       return false;
     }
 
-    // Phone validation (accepts various formats)
-    const cleanedPhone = formData.phone.replace(/[\s\-()]/g, "");
-    const phoneRegex = /^\+?[0-9]{3,15}$/;
-    if (!phoneRegex.test(cleanedPhone)) {
+    // mobile validation (accepts various formats)
+    const cleanedmobile = formData.mobile.replace(/[\s\-()]/g, "");
+    const mobileRegex = /^\+?[0-9]{3,15}$/;
+    if (!mobileRegex.test(cleanedmobile)) {
       setError("Please enter a valid phone number (3-15 digits)");
       return false;
     }
@@ -74,7 +74,7 @@ const EditProfileForm = () => {
         "/user/profile",
         {
           name: formData.name.trim(),
-          phone: formData.phone.trim(),
+          mobile: formData.mobile.trim(),
         },
         { withCredentials: true }
       );
@@ -109,7 +109,7 @@ const EditProfileForm = () => {
     if (user) {
       setFormData({
         name: user.name || "",
-        phone: user.phone || "",
+        mobile: user.phone || "",
       });
     }
     setError(null);
@@ -203,14 +203,14 @@ const EditProfileForm = () => {
         </div>
 
         <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="mobile" className="block text-sm font-medium text-gray-700 mb-1">
             Phone Number *
           </label>
           <input
             type="tel"
-            id="phone"
-            name="phone"
-            value={formData.phone}
+            id="mobile"
+            name="mobile"
+            value={formData.mobile}
             onChange={handleInputChange}
             disabled={isLoading}
             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed"

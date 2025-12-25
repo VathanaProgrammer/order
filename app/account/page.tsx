@@ -42,12 +42,12 @@ const Page: React.FC = () => {
       action: "Manage Addresses",
       route: '/account/shipping-address'
     },
-    {
-      icon: "mdi:package-variant-closed",
-      title: "My Orders",
-      desc: "Track your recent orders, deliveries, and returns.",
-      action: "View Orders",
-    },
+    // {
+    //   icon: "mdi:package-variant-closed",
+    //   title: "My Orders",
+    //   desc: "Track your recent orders, deliveries, and returns.",
+    //   action: "View Orders",
+    // },
     {
       icon: "lucide:database",
       title: "Rewards",
