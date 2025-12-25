@@ -97,8 +97,8 @@ const Page = () => {
         </div>
       </form>
       <button 
-        onClick={() => window.history.back()} 
-        className="text-blue-500"
+        onClick={() => router.push('/')}
+        className="text-blue-500 flex justify-center items-center"
       >
         ← Go Back
       </button>
