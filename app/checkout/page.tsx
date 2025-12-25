@@ -244,31 +244,6 @@ const CombinedCheckoutPage = () => {
         ))}
       </section>
 
-      {/* Checkout Button */}
-      <div className="sticky bottom-0 bg-white border-t p-4">
-        <div className="flex justify-between items-center mb-4">
-          <span className="text-lg font-semibold">Total:</span>
-          <span className="text-2xl font-bold text-blue-600">${total.toFixed(2)}</span>
-        </div>
-        <button
-          onClick={() => {
-            if (!currentSelectedAddress) {
-              toast.error("Please select a shipping address");
-              return;
-            }
-            if (!paymentMethod) {
-              toast.error("Please select a payment method");
-              return;
-            }
-            // Handle checkout logic here
-            toast.success("Order placed successfully!");
-          }}
-          className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700"
-        >
-          Place Order
-        </button>
-      </div>
-
       {/* QR Popup Modal */}
       {showQRPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
