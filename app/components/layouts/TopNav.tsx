@@ -86,7 +86,7 @@ const TopNav = () => {
               height={26}
             />
           </div> */}
-          <div
+          {/* <div
             onClick={() => router.push("/notifications")}
             className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
           >
@@ -96,7 +96,7 @@ const TopNav = () => {
               width={26}
               height={26}
             />
-          </div>
+          </div> */}
         </div>
       </div>
 
