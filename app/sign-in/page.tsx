@@ -96,6 +96,12 @@ const Page = () => {
           </p>
         </div>
       </form>
+      <button 
+        onClick={() => window.history.back()} 
+        className="text-blue-500"
+      >
+        ← Go Back
+      </button>
     </div>
   );
 };
