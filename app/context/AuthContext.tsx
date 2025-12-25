@@ -13,6 +13,7 @@ interface User {
   id: number;
   name: string;
   phone?: string | null;
+  mobile?: string | null;
   image_url?: string | null;
   reward_points: {
     total: number;
