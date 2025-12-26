@@ -124,27 +124,27 @@ export default function ShippingAddressPage() {
         <div className="border rounded-xl p-4 flex flex-col gap-3 bg-white shadow-md mt-4">
           <input
             type="text"
-            placeholder="Label (Home, Work)"
+            placeholder={t.labelHomeWork}
             className="bg-gray-50 border border-gray-300 rounded-lg p-2 w-full"
             value={newAddress.label}
             onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
           />
           <input
             type="text"
-            placeholder="Phone"
+            placeholder={t.phone}
             className="bg-gray-50 border border-gray-300 rounded-lg p-2 w-full"
             value={newAddress.phone}
             onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
           />
           <textarea
-            placeholder="Details"
+            placeholder={t.details}
             className="bg-gray-50 border border-gray-300 rounded-lg p-2 w-full"
             value={newAddress.details}
             onChange={(e) => setNewAddress({ ...newAddress, details: e.target.value })}
           />
           <input
             type="text"
-            placeholder="Click to select location on map"
+            placeholder={t.clickToSelectLocation}
             className="bg-gray-50 border border-gray-300 rounded-lg p-2 w-full cursor-pointer"
             readOnly
             value={

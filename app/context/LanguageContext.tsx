@@ -79,6 +79,9 @@ const translations = {
     select: "Select",
     points: "Point",
     yourReward: "Your Reward",
+    labelHomeWork: "Label (Home, Work)",
+    clickToSelectLocation: "Click to select location on map",
+    currentLocation: "Current Location"
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -144,6 +147,9 @@ const translations = {
     select: "ជ្រើសរើស",
     points: "ពិន្ទុ",
     yourReward: "រង្វាន់របស់អ្នក",
+    labelHomeWork: "ឈ្មោះកន្លែង (ផ្ទះ, ការងារ)",
+    clickToSelectLocation: "ចុចដើម្បីជ្រើសរើសទឺតាំងនៅលើផែនទី",
+    currentLocation: "ទីតាំងបច្ចុប្បន្ន"
   },
 };
 

@@ -39,12 +39,15 @@ const CombinedCheckoutPage = () => {
     details: "",
     coordinates: { lat: 11.567, lng: 104.928 },
   });
-  const [showQRPopup, setShowQRPopup] = useState(false); // New state for QR popup
+  const [showQRPopup, setShowQRPopup] = useState(false);
   const { t } = useLanguage();
 
   const IMAGE_URL = process.env.NEXT_PUBLIC_IMAGE_URL!;
-  const currentSelectedAddress =
-    selectedAddress === "current" ? currentAddress : selectedAddress;
+  
+  // Determine the current selected address
+  const currentSelectedAddress = selectedAddress === "current" 
+    ? currentAddress 
+    : selectedAddress;
 
   // Fetch saved addresses
   useEffect(() => {
@@ -68,24 +71,54 @@ const CombinedCheckoutPage = () => {
     setIsAdding(false);
   };
 
-  const handleSelectCurrentAddress = () => {
+  // NEW: Handle selecting current location as address
+  const handleSelectCurrentLocation = () => {
+    setSelectedAddress("current");
+    setIsAdding(false);
+  };
+
+  // NEW: Save new address to backend
+  const handleSaveNewAddress = async () => {
     if (!tempAddress.label || !tempAddress.phone || !tempAddress.details) {
       toast.error("Please fill all fields and select a location.");
       return;
     }
-    const shortAddress = `${tempAddress.details}, ${tempAddress.coordinates!.lat.toFixed(
-      5
-    )}, ${tempAddress.coordinates!.lng.toFixed(5)}`;
-    setCurrentAddress({ ...tempAddress, short_address: shortAddress });
-    setSelectedAddress("current");
-    setIsAdding(false);
+
+    setLoading(true);
+    try {
+      // Save address to backend
+      const res = await api.post("/addresses/save", tempAddress);
+      
+      // Update saved addresses list
+      const newAddress = res.data?.data;
+      setSavedAddresses(prev => [...prev, newAddress]);
+      
+      // Select the newly saved address
+      setSelectedAddress(newAddress);
+      setIsAdding(false);
+      
+      // Reset temp address
+      setTempAddress({
+        label: "",
+        phone: "",
+        details: "",
+        coordinates: { lat: 11.567, lng: 104.928 },
+      });
+      
+      toast.success("Address saved successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save address");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle payment method selection
   const handlePaymentMethodSelect = (methodName: string) => {
     setPaymentMethod(methodName);
     if (methodName === "QR") {
-      setShowQRPopup(true); // Show QR popup when QR is selected
+      setShowQRPopup(true);
     }
   };
 
@@ -153,6 +186,23 @@ const CombinedCheckoutPage = () => {
       <section className="flex flex-col gap-3 mt-6">
         <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
 
+        {/* Current Location Option */}
+        {currentAddress && (
+          <div
+            onClick={handleSelectCurrentLocation}
+            className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${
+              selectedAddress === "current"
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-200"
+            }`}
+          >
+            <p className="font-semibold">📍 {t.currentLocation}</p>
+            <p className="text-sm text-gray-600">{currentAddress.details}</p>
+            <p className="text-sm text-gray-600">{t.phone}: {currentAddress.phone}</p>
+          </div>
+        )}
+
+        {/* Saved Addresses */}
         {savedAddresses.map((addr) => (
           <div
             key={addr.id}
@@ -169,27 +219,29 @@ const CombinedCheckoutPage = () => {
           </div>
         ))}
 
-        {isAdding && (
-          <div className="bg-white flex flex-col gap-2">
+        {/* Add New Address Form */}
+        {isAdding ? (
+          <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
             <input
               type="text"
               placeholder={t.label}
               value={tempAddress.label}
               onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
-              className="w-full p-2 border rounded"
+              className="w-full p-3 border rounded-lg"
             />
             <input
               type="text"
               placeholder={t.phone}
               value={tempAddress.phone}
               onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
-              className="w-full p-2 border rounded"
+              className="w-full p-3 border rounded-lg"
             />
             <textarea
               placeholder={t.details}
               value={tempAddress.details}
               onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
-              className="w-full p-2 border rounded"
+              className="w-full p-3 border rounded-lg"
+              rows={3}
             />
             <input
               type="text"
@@ -198,23 +250,38 @@ const CombinedCheckoutPage = () => {
                 5
               )}, Lng: ${tempAddress.coordinates!.lng.toFixed(5)}`}
               onClick={() => setShowMap(true)}
-              className="w-full p-2 border rounded cursor-pointer"
+              className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50"
             />
-            <button
-              onClick={handleSelectCurrentAddress}
-              className="w-full py-3 bg-blue-600 text-white rounded"
-            >
-              {t.useThisAddress}
-            </button>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={handleSaveNewAddress}
+                className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                {t.saveAddress}
+              </button>
+              <button
+                onClick={() => {
+                  setIsAdding(false);
+                  setTempAddress({
+                    label: "",
+                    phone: "",
+                    details: "",
+                    coordinates: { lat: 11.567, lng: 104.928 },
+                  });
+                }}
+                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                {t.cancel}
+              </button>
+            </div>
           </div>
-        )}
-
-        {!isAdding && (
+        ) : (
           <button
             onClick={() => setIsAdding(true)}
-            className="mt-2 w-full py-3 bg-gray-200 rounded"
+            className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50"
           >
-            + {t.addOrUse}
+            + {t.addNewAddress}
           </button>
         )}
       </section>

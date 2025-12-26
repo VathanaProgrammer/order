@@ -254,7 +254,7 @@ const EditProfileForm = () => {
           <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
             {t.phoneNumber} *
             <span className="ml-2 text-xs text-gray-500">
-              Current: {displayPhone}
+              {t.current}: {displayPhone}
             </span>
           </label>
           <input
