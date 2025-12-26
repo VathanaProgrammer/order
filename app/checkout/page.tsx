@@ -87,7 +87,7 @@ const CombinedCheckoutPage = () => {
     setLoading(true);
     try {
       // Save address to backend
-      const res = await api.post("/addresses/save", tempAddress);
+      const res = await api.post("/addresses", tempAddress);
       
       // Update saved addresses list
       const newAddress = res.data?.data;
