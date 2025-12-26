@@ -108,7 +108,7 @@ const CombinedCheckoutPage = () => {
 
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar">
-      <Header title="Checkout" />
+      <Header title={t.checkout} />
 
       {/* ===== Order Summary ===== */}
       <section className="flex flex-col gap-3">
@@ -151,7 +151,7 @@ const CombinedCheckoutPage = () => {
 
       {/* Shipping Address & Payment */}
       <section className="flex flex-col gap-3 mt-6">
-        <h2 className="text-2xl font-semibold text-gray-800">Shipping Address</h2>
+        <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
 
         {savedAddresses.map((addr) => (
           <div

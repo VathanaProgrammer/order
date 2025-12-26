@@ -133,7 +133,7 @@ const translations = {
     YouWillPayWithCashUponDelivery: "អ្នកនឹងទូទាត់ប្រាក់សុទ្ធក្នុងពេលទទួលទំនិញ",
     scanQRCode: "ស្គែនQRកូដ",
     scanWithYourBankingApp: "ស្គែនជាមួយកម្មវិធីធនាគាររបស់អ្នក",
-    amount: "ចំនួនប្រាក់",
+    amount: "ចំនួនទឹកប្រាក់",
     downloadQR: "ទាញយក QR",
     close: "បិទ",
     youHaveUnsavedChanges: "អ្នកមានការផ្លាស់ប្តូរ",

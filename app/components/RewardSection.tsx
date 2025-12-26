@@ -4,6 +4,7 @@ import RewardCard from "./cards/RewardCard";
 import api from "@/api/api";
 import { toast } from "react-toastify";
 import { useLoading } from "@/context/LoadingContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 export interface RewardProduct {
   id: number;
@@ -15,6 +16,7 @@ export interface RewardProduct {
 const RewardSection: React.FC = () => {
   const [products, setProducts] = useState<RewardProduct[]>([]);
   const { setLoading } = useLoading();
+  const { t } = useLanguage();
 
   useEffect(() => {
     async function fetchRewardProducts() {
@@ -43,7 +45,7 @@ const RewardSection: React.FC = () => {
   return (
     <section className="mt-4">
       <h2 className="text-xl font-bold text-gray-700 mb-2">
-        Redeem Your Rewards
+        {t.redeemYourRewards}
       </h2>
 
       <div className="grid grid-cols-2 gap-4 mt-2">
