@@ -89,6 +89,13 @@ const translations = {
     longtitude: "Longitude",
     pleaseSelectALocationOnTheMap: "Please select a location on the map",
     clear: "Clear",
+    fillYourDetails: "Fill your details to continue with us",
+    username: "Username",
+    enterYourUsername: "Enter your username",
+    enterYourPhoneNumber: "Enter your phone number",
+    signUp: "Sign Up",
+    alreadyHaveAnAccount: "Already have an account?",
+    logInToYourAccount: "Log in to your account",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -163,7 +170,13 @@ const translations = {
     latitude: "រយៈទទឹង",
     longtitude: "រយៈបណ្តោយ",
     pleaseSelectALocationOnTheMap: "សូមជ្រើសរើសទីតាំងមួយលើផែនទី",
-    clear: "សម្អាត"
+    clear: "សម្អាត",
+    username: "ឈ្មោះអ្នកប្រើ",
+    enterYourUsername: "បញ្ចូលឈ្មោះអ្នកប្រើរបស់អ្នក",
+    enterYourPhoneNumber: "បញ្ចូលលេខទូរស័ព្ទរបស់អ្នក",
+    signUp: "ចុះឈ្មោះ",
+    alreadyHaveAnAccount: "មានគណនីរួចរាល់មែនទេ?",
+    logInToYourAccount: "ចូលទៅកាន់គណនីរបស់អ្នក",
   },
 };
 

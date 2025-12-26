@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { AxiosError } from "axios";
 import api from "@/api/api";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function Signup() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function Signup() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const { t } = useLanguage();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,17 +52,17 @@ export default function Signup() {
       <form onSubmit={handleSignup} className="mt-4 w-full max-w-md">
         <h1 onClick={() => router.push('/')} className="text-2xl font-bold text-center text-gray-800">SOB</h1>
         <h2 className="text-lg font-medium text-center text-gray-600 mb-6">
-          Fill your details to continue with us
+          {t.fillYourDetails}
         </h2>
 
         {/* First Name */}
         <div className="w-full mt-4">
           <label className="text-[16px] font-medium text-gray-700">
-            Username
+            {t.username}
           </label>
           <input
             type="text"
-            placeholder="Enter your username"
+            placeholder={t.enterYourUsername}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             className="w-full px-4 min-h-[45px] py-2 border focus:outline-0 rounded-[5px] focus:border-blue-600 mt-2"
@@ -71,11 +73,11 @@ export default function Signup() {
         {/* Phone */}
         <div className="w-full mt-4">
           <label className="text-[16px] font-medium text-gray-700">
-            Phone Number
+            {t.phoneNumber}
           </label>
           <input
             type="text"
-            placeholder="Enter your phone number"
+            placeholder={t.enterYourPhoneNumber}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             className="w-full px-4 min-h-[45px] py-2 border focus:outline-0 rounded-[5px] focus:border-blue-600 mt-2"
@@ -112,12 +114,12 @@ export default function Signup() {
 
         <div className="mt-2 w-full">
           <p className="text-center text-[14px] font-medium">
-            Already have an account?{" "}
+            {t.alreadyHaveAnAccount} {""}
             <span
               onClick={() => router.push("/sign-in")}
               className="text-blue-600 cursor-pointer"
             >
-              Login to your account
+              {t.logInToYourAccount}
             </span>
           </p>
         </div>
