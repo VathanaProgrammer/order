@@ -271,7 +271,7 @@ const CombinedCheckoutPage = () => {
         <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
 
         {/* Current Location Option */}
-        {currentAddress && (
+        {/* {currentAddress && (
           <div
             onClick={handleSelectCurrentLocation}
             className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${
@@ -289,7 +289,7 @@ const CombinedCheckoutPage = () => {
               <p className="text-sm text-gray-600 mt-1">{t.phone}: {currentAddress.phone}</p>
             )}
           </div>
-        )}
+        )} */}
 
         {/* Saved Addresses */}
         {savedAddresses.map((addr) => (
@@ -315,7 +315,7 @@ const CombinedCheckoutPage = () => {
           <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.label || "Label"} *
+                {t.label} *
               </label>
               <input
                 type="text"
@@ -328,7 +328,7 @@ const CombinedCheckoutPage = () => {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.phone || "Phone"} *
+                {t.phone} *
               </label>
               <input
                 type="text"
@@ -396,7 +396,7 @@ const CombinedCheckoutPage = () => {
                 }}
                 className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
               >
-                {t.cancel || "Cancel"}
+                {t.cancel}
               </button>
             </div>
           </div>
