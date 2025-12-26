@@ -25,11 +25,6 @@ type ExtendedAddress = ContextAddress & {
   api_user_id?: number;
 };
 
-const paymentMethods = [
-  { name: "QR", image: "/qr.jpg" },
-  { name: "Cash", image: "/cash.jpg" },
-];
-
 const containerStyle = { width: "100%", height: "400px" };
 
 const CombinedCheckoutPage = () => {
@@ -60,6 +55,11 @@ const CombinedCheckoutPage = () => {
   });
   const [showQRPopup, setShowQRPopup] = useState(false);
   const { t } = useLanguage();
+
+  const paymentMethods = [
+    { name: t.QR, image: "/qr.jpg" },
+    { name: t.cash, image: "/cash.jpg" },
+  ];
 
   const IMAGE_URL = process.env.NEXT_PUBLIC_IMAGE_URL!;
   
@@ -191,10 +191,10 @@ const CombinedCheckoutPage = () => {
         api_user_id: user?.id,
       });
       
-      toast.success("Address saved successfully!");
+      //toast.success("Address saved successfully!");
     } catch (err: any) {
       console.error("Save address error:", err);
-      toast.error(err.response?.data?.message || "Failed to save address");
+      //toast.error(err.response?.data?.message || "Failed to save address");
     } finally {
       setLoading(false);
     }
@@ -216,7 +216,7 @@ const CombinedCheckoutPage = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("QR code downloaded successfully!");
+      //toast.success("QR code downloaded successfully!");
     } catch (error) {
       console.error("Download failed:", error);
       toast.error("Failed to download QR code");
@@ -332,7 +332,7 @@ const CombinedCheckoutPage = () => {
               </label>
               <input
                 type="text"
-                placeholder="Phone number"
+                placeholder={t.phone}
                 value={tempAddress.phone || ""}
                 onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -344,7 +344,7 @@ const CombinedCheckoutPage = () => {
                 {t.details || "Address Details"} *
               </label>
               <textarea
-                placeholder="Full address details"
+                placeholder={t.details}
                 value={tempAddress.details || ""}
                 onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -366,11 +366,11 @@ const CombinedCheckoutPage = () => {
                 }
                 onClick={() => setShowMap(true)}
                 className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                placeholder="Click to open map and select location"
+                placeholder={t.clickToSelectLocation}
               />
               {!tempAddress.coordinates && (
                 <p className="text-sm text-red-500 mt-1">
-                  Please select a location on the map
+                  {t.pleaseSelectALocationOnTheMap}
                 </p>
               )}
             </div>
@@ -381,7 +381,7 @@ const CombinedCheckoutPage = () => {
                 className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
                 disabled={!tempAddress.label?.trim() || !tempAddress.phone?.trim() || !tempAddress.details?.trim() || !tempAddress.coordinates}
               >
-                {t.saveAddress || "Save Address"}
+                {t.saveAddress}
               </button>
               <button
                 onClick={() => {
@@ -405,7 +405,7 @@ const CombinedCheckoutPage = () => {
             onClick={() => setIsAdding(true)}
             className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium"
           >
-            + {t.addNewAddress || "Add New Address"}
+            + {t.addNewAddress}
           </button>
         )}
       </section>
@@ -416,7 +416,7 @@ const CombinedCheckoutPage = () => {
           <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg max-h-[90vh] overflow-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">
-                {t.selectLocation || "Select Location"}
+                {t.selectLocation}
               </h3>
               <button
                 onClick={() => setShowMap(false)}
@@ -443,17 +443,17 @@ const CombinedCheckoutPage = () => {
 
             <div className="mt-4 p-3 bg-gray-50 rounded-lg">
               <p className="text-sm font-medium text-gray-700">
-                Selected Coordinates:
+                {t.selectedCoordinates}:
               </p>
               {tempAddress.coordinates ? (
                 <p className="text-sm text-gray-600 mt-1">
-                  Latitude: {tempAddress.coordinates.lat.toFixed(6)}
+                  {t.latitude}: {tempAddress.coordinates.lat.toFixed(6)}
                   <br />
-                  Longitude: {tempAddress.coordinates.lng.toFixed(6)}
+                  {t.longitude}: {tempAddress.coordinates.lng.toFixed(6)}
                 </p>
               ) : (
                 <p className="text-sm text-gray-500 mt-1">
-                  Click on the map to select a location
+                  {t.clickToSelectLocation}
                 </p>
               )}
             </div>

@@ -82,7 +82,12 @@ const translations = {
     labelHomeWork: "Label (Home, Work)",
     clickToSelectLocation: "Click to select location on map",
     currentLocation: "Current Location",
-    yourCurrentLocationIs: "Your current location is"
+    yourCurrentLocationIs: "Your current location is",
+    selectLocation: "Select Location",
+    selectedCoordinates: "Selected Coordinates",
+    latitude: "Latitude",
+    longtitude: "Longitude",
+    pleaseSelectALocationOnTheMap: "Please select a location on the map"
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -151,7 +156,12 @@ const translations = {
     labelHomeWork: "ឈ្មោះកន្លែង (ផ្ទះ, ការងារ)",
     clickToSelectLocation: "ចុចដើម្បីជ្រើសរើសទឺតាំងនៅលើផែនទី",
     currentLocation: "ទីតាំងបច្ចុប្បន្ន",
-    yourCurrentLocationIs: "ទីតាំងបច្ចុប្បន្នរបស់អ្នកគឺ"
+    yourCurrentLocationIs: "ទីតាំងបច្ចុប្បន្នរបស់អ្នកគឺ",
+    selectLocation: "ជ្រើសរើសទីតាំង",
+    selectedCoordinates: "កូអរដោនេដែលបានជ្រើសរើស",
+    latitude: "រយៈទទឹង",
+    longtitude: "រយៈបណ្តោយ",
+    pleaseSelectALocationOnTheMap: "សូមជ្រើសរើសទីតាំងមួយលើផែនទី"
   },
 };
 
