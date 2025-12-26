@@ -449,7 +449,7 @@ const CombinedCheckoutPage = () => {
                 <p className="text-sm text-gray-600 mt-1">
                   {t.latitude}: {tempAddress.coordinates.lat.toFixed(6)}
                   <br />
-                  {t.longitude}: {tempAddress.coordinates.lng.toFixed(6)}
+                  {t.longtitude}: {tempAddress.coordinates.lng.toFixed(6)}
                 </p>
               ) : (
                 <p className="text-sm text-gray-500 mt-1">
@@ -468,13 +468,13 @@ const CombinedCheckoutPage = () => {
                 }}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
               >
-                {t.clear || "Clear"}
+                {t.clear}
               </button>
               <button
                 onClick={() => setShowMap(false)}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
-                {t.select || "Select"}
+                {t.select}
               </button>
             </div>
           </div>

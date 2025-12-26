@@ -183,7 +183,7 @@ export default function ShippingAddressPage() {
       {showMap && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
           <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg">
-            <h3 className="text-lg font-semibold mb-2">Select Location</h3>
+            <h3 className="text-lg font-semibold mb-2">{t.selectLocation}</h3>
             <GoogleMap
               mapContainerStyle={containerStyle}
               center={newAddress.coordinates || { lat: 11.567, lng: 104.928 }}

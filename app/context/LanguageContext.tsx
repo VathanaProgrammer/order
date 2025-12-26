@@ -87,7 +87,8 @@ const translations = {
     selectedCoordinates: "Selected Coordinates",
     latitude: "Latitude",
     longtitude: "Longitude",
-    pleaseSelectALocationOnTheMap: "Please select a location on the map"
+    pleaseSelectALocationOnTheMap: "Please select a location on the map",
+    clear: "Clear",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -161,7 +162,8 @@ const translations = {
     selectedCoordinates: "កូអរដោនេដែលបានជ្រើសរើស",
     latitude: "រយៈទទឹង",
     longtitude: "រយៈបណ្តោយ",
-    pleaseSelectALocationOnTheMap: "សូមជ្រើសរើសទីតាំងមួយលើផែនទី"
+    pleaseSelectALocationOnTheMap: "សូមជ្រើសរើសទីតាំងមួយលើផែនទី",
+    clear: "សម្អាត"
   },
 };
 
