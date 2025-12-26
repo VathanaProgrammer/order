@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Header from "@/components/layouts/Header";
+import { GoogleMap, Marker } from "@react-google-maps/api";
 import { useCheckout, Address as ContextAddress } from "@/context/CheckOutContext";
 import { useAuth } from "@/context/AuthContext";
 import { useLoading } from "@/context/LoadingContext";
@@ -29,6 +30,8 @@ const paymentMethods = [
   { name: "Cash", image: "/cash.jpg" },
 ];
 
+const containerStyle = { width: "100%", height: "400px" };
+
 const CombinedCheckoutPage = () => {
   const { user } = useAuth();
   const {
@@ -47,6 +50,7 @@ const CombinedCheckoutPage = () => {
 
   const [savedAddresses, setSavedAddresses] = useState<ExtendedAddress[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [showMap, setShowMap] = useState(false);
   const [tempAddress, setTempAddress] = useState<Partial<APIAddress>>({
     label: "",
     phone: "",
@@ -107,10 +111,35 @@ const CombinedCheckoutPage = () => {
     setIsAdding(false);
   };
 
+  // Handle map click to select coordinates
+  const handleMapClick = (e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      setTempAddress({
+        ...tempAddress,
+        coordinates: { lat: e.latLng.lat(), lng: e.latLng.lng() },
+      });
+    }
+  };
+
+  // Handle marker drag
+  const handleMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      setTempAddress({
+        ...tempAddress,
+        coordinates: { lat: e.latLng.lat(), lng: e.latLng.lng() },
+      });
+    }
+  };
+
   // Save new address to backend
   const handleSaveNewAddress = async () => {
     if (!tempAddress.label?.trim() || !tempAddress.phone?.trim() || !tempAddress.details?.trim()) {
       toast.error("Please fill all required fields");
+      return;
+    }
+
+    if (!tempAddress.coordinates) {
+      toast.error("Please select a location on the map");
       return;
     }
 
@@ -325,24 +354,32 @@ const CombinedCheckoutPage = () => {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Location Coordinates
+                {t.clickToSelectLocation || "Click to select location"} *
               </label>
               <input
                 type="text"
                 readOnly
-                value={`Lat: ${tempAddress.coordinates?.lat?.toFixed(5) || "11.56700"}, Lng: ${tempAddress.coordinates?.lng?.toFixed(5) || "104.92800"}`}
-                className="w-full p-3 border rounded-lg bg-gray-50 cursor-not-allowed"
+                value={
+                  tempAddress.coordinates
+                    ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
+                    : ""
+                }
+                onClick={() => setShowMap(true)}
+                className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                placeholder="Click to open map and select location"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Note: Location selection not implemented in this view
-              </p>
+              {!tempAddress.coordinates && (
+                <p className="text-sm text-red-500 mt-1">
+                  Please select a location on the map
+                </p>
+              )}
             </div>
             
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleSaveNewAddress}
                 className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={!tempAddress.label?.trim() || !tempAddress.phone?.trim() || !tempAddress.details?.trim()}
+                disabled={!tempAddress.label?.trim() || !tempAddress.phone?.trim() || !tempAddress.details?.trim() || !tempAddress.coordinates}
               >
                 {t.saveAddress || "Save Address"}
               </button>
@@ -372,6 +409,77 @@ const CombinedCheckoutPage = () => {
           </button>
         )}
       </section>
+
+      {/* Map Modal */}
+      {showMap && (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg max-h-[90vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">
+                {t.selectLocation || "Select Location"}
+              </h3>
+              <button
+                onClick={() => setShowMap(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl p-1"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <GoogleMap
+              mapContainerStyle={containerStyle}
+              center={tempAddress.coordinates || { lat: 11.567, lng: 104.928 }}
+              zoom={15}
+              onClick={handleMapClick}
+            >
+              {tempAddress.coordinates && (
+                <Marker
+                  position={tempAddress.coordinates}
+                  draggable
+                  onDragEnd={handleMarkerDragEnd}
+                />
+              )}
+            </GoogleMap>
+
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm font-medium text-gray-700">
+                Selected Coordinates:
+              </p>
+              {tempAddress.coordinates ? (
+                <p className="text-sm text-gray-600 mt-1">
+                  Latitude: {tempAddress.coordinates.lat.toFixed(6)}
+                  <br />
+                  Longitude: {tempAddress.coordinates.lng.toFixed(6)}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 mt-1">
+                  Click on the map to select a location
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => {
+                  setTempAddress({
+                    ...tempAddress,
+                    coordinates: undefined,
+                  });
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+              >
+                {t.clear || "Clear"}
+              </button>
+              <button
+                onClick={() => setShowMap(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                {t.select || "Select"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payment Method */}
       <section className="flex flex-col gap-3 mt-6">

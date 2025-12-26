@@ -11,7 +11,7 @@ const TopNav = () => {
 
   const [location, setLocation] = useState<string>("Fetching location...");
   const [error, setError] = useState<string | null>(null);
-  const { language, toggleLanguage } = useLanguage();
+  const { language, toggleLanguage, t } = useLanguage();
 
   const handleProfileClick = () => {
     if (user) {
@@ -121,7 +121,7 @@ const TopNav = () => {
             className="text-gray-600"
           />
           <p className="text-[13px] font-medium text-gray-600">
-            Your current location is {location}
+            {t.yourCurrentLocationIs} {location}
           </p>
         </div>
 
