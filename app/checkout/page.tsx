@@ -319,7 +319,7 @@ const CombinedCheckoutPage = () => {
               </label>
               <input
                 type="text"
-                placeholder="Home, Office, etc."
+                placeholder={t.labelHomeWork}
                 value={tempAddress.label || ""}
                 onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
