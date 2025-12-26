@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLoading } from "@/context/LoadingContext";
 import api from "@/api/api";
 import { toast } from "react-toastify";
+import { useLanguage } from "@/context/LanguageContext";
 
 const paymentMethods = [
   { name: "QR", image: "/qr.jpg" },
@@ -39,6 +40,7 @@ const CombinedCheckoutPage = () => {
     coordinates: { lat: 11.567, lng: 104.928 },
   });
   const [showQRPopup, setShowQRPopup] = useState(false); // New state for QR popup
+  const { t } = useLanguage();
 
   const IMAGE_URL = process.env.NEXT_PUBLIC_IMAGE_URL!;
   const currentSelectedAddress =
@@ -110,8 +112,8 @@ const CombinedCheckoutPage = () => {
 
       {/* ===== Order Summary ===== */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-2xl font-semibold text-gray-800">Order Summary</h2>
-        {cart.length === 0 && <p>Your cart is empty</p>}
+        <h2 className="text-2xl font-semibold text-gray-800">{t.orderSummary}</h2>
+        {cart.length === 0 && <p>{t.yourCartIsEmpty}</p>}
         {cart.map((item) => (
           <div
             key={item.id}
@@ -163,7 +165,7 @@ const CombinedCheckoutPage = () => {
           >
             <p className="font-semibold">{addr.label}</p>
             <p className="text-sm text-gray-600">{addr.details}</p>
-            <p className="text-sm text-gray-600">Phone: {addr.phone}</p>
+            <p className="text-sm text-gray-600">{t.phone}: {addr.phone}</p>
           </div>
         ))}
 
@@ -171,20 +173,20 @@ const CombinedCheckoutPage = () => {
           <div className="bg-white flex flex-col gap-2">
             <input
               type="text"
-              placeholder="Label"
+              placeholder={t.label}
               value={tempAddress.label}
               onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
               className="w-full p-2 border rounded"
             />
             <input
               type="text"
-              placeholder="Phone"
+              placeholder={t.phone}
               value={tempAddress.phone}
               onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
               className="w-full p-2 border rounded"
             />
             <textarea
-              placeholder="Details"
+              placeholder={t.details}
               value={tempAddress.details}
               onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
               className="w-full p-2 border rounded"
@@ -202,7 +204,7 @@ const CombinedCheckoutPage = () => {
               onClick={handleSelectCurrentAddress}
               className="w-full py-3 bg-blue-600 text-white rounded"
             >
-              Use This Address
+              {t.useThisAddress}
             </button>
           </div>
         )}
@@ -212,14 +214,14 @@ const CombinedCheckoutPage = () => {
             onClick={() => setIsAdding(true)}
             className="mt-2 w-full py-3 bg-gray-200 rounded"
           >
-            + Add / Use Current Location
+            + {t.addOrUse}
           </button>
         )}
       </section>
 
       {/* Payment */}
       <section className="flex flex-col gap-3 mt-6">
-        <h2 className="text-2xl font-semibold text-gray-800">Payment Method</h2>
+        <h2 className="text-2xl font-semibold text-gray-800">{t.paymentMethod}</h2>
         {paymentMethods.map((method) => (
           <div
             key={method.name}
@@ -236,7 +238,7 @@ const CombinedCheckoutPage = () => {
             </div>
             {paymentMethod === method.name && method.name !== "QR" && (
               <p className="text-sm text-gray-500 mt-2">
-                You will pay with cash upon delivery.
+                {t.YouWillPayWithCashUponDelivery}
               </p>
             )}
           </div>
@@ -249,8 +251,8 @@ const CombinedCheckoutPage = () => {
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-xl font-semibold text-gray-800">Scan QR Code</h3>
-                <p className="text-sm text-gray-500">Scan with your banking app</p>
+                <h3 className="text-xl font-semibold text-gray-800">{t.scanQRCode}</h3>
+                <p className="text-sm text-gray-500">{t.scanWithYourBankApp}</p>
               </div>
               <button 
                 onClick={() => setShowQRPopup(false)}
@@ -267,7 +269,7 @@ const CombinedCheckoutPage = () => {
                   alt="Payment QR Code"
                   className="w-64 h-64 mx-auto"
                 />
-                <p className="text-xs text-gray-500 mt-2">Amount: ${total.toFixed(2)}</p>
+                <p className="text-xs text-gray-500 mt-2">{t.amount}: ${total.toFixed(2)}</p>
               </div>
               
               <div className="flex flex-col space-y-3">
@@ -279,7 +281,7 @@ const CombinedCheckoutPage = () => {
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Download QR
+                    {t.downloadQR}
                   </button>
                 </div>
               </div>
@@ -290,7 +292,7 @@ const CombinedCheckoutPage = () => {
                 onClick={() => setShowQRPopup(false)}
                 className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
-                Close
+                {t.close}
               </button>
             </div>
           </div>

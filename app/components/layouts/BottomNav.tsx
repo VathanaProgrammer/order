@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { usePathname } from "next/navigation";
 import { toast } from "react-toastify";
 import axios from "axios";
+import { useLanguage } from "@/context/LanguageContext";
 
 const BottomNav: React.FC = () => {
   const router = useRouter();
@@ -21,17 +22,11 @@ const BottomNav: React.FC = () => {
     selectedAddress,
   } = useCheckout();
   const [activePage, setActivePage] = useState<"home" | "chat">("home");
+  const { t } = useLanguage();
 
   const { user } = useAuth();
   const pathname = usePathname();
   const isCheckoutPage = pathname === "/checkout";
-
-  const checkoutButtonText =
-    isCheckoutPage
-      ? rewards.length > 0
-        ? "Reward Order"
-        : "Place Order"
-      : "Checkout";
 
   const isCartEmpty = cart.length === 0 && rewards.length === 0;
   const isPaymentMissing = !paymentMethod;
@@ -75,7 +70,6 @@ const BottomNav: React.FC = () => {
       );
   
       if (res.data?.telegram_link) {
-        // External redirect → use window.location
         window.location.href = res.data.telegram_link;
       } else {
         toast.error("Telegram link not found!");
@@ -84,10 +78,18 @@ const BottomNav: React.FC = () => {
       toast.error("Failed to open Telegram chat");
     }
   };
-  
 
   const iconColor = (page: "home" | "chat") =>
     activePage === page ? "#1E40AF" : "#6B7280";
+
+  // Page translations mapping
+  const getPageName = (page: string) => {
+    const pageTranslations: Record<string, string> = {
+      home: t.home || "Home",
+      chat: t.chat || "Chat",
+    };
+    return pageTranslations[page] || page.charAt(0).toUpperCase() + page.slice(1);
+  };
 
   return (
     <section className="flex items-center justify-between my-2">
@@ -121,7 +123,7 @@ const BottomNav: React.FC = () => {
               className="text-[13px] font-medium"
               style={{ color: iconColor(page as "home" | "chat") }}
             >
-              {page.charAt(0).toUpperCase() + page.slice(1)}
+              {getPageName(page)}
             </p>
           </div>
         ))}
@@ -129,14 +131,14 @@ const BottomNav: React.FC = () => {
 
       <div className="flex flex-col items-center justify-center">
         <p className="text-[17px] font-semibold leading-none">{formatPrice(total)}</p>
-        <p className="text-[13px] leading-none pt-1 text-gray-500">Total</p>
+        <p className="text-[13px] leading-none pt-1 text-gray-500">{t.total}</p>
       </div>
 
       <button
         onClick={handleClickCheckout}
         className="border rounded-[8px] px-6 py-3 font-semibold shadow-sm bg-[#1E40AF] text-white hover:opacity-80 active:scale-95 transition"
       >
-        {checkoutButtonText}
+        {t.checkout}
       </button>
     </section>
   );

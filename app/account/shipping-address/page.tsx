@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "react-toastify";
 import { useLoading } from "@/context/LoadingContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 export type Address = {
   id?: number;
@@ -32,6 +33,7 @@ export default function ShippingAddressPage() {
   const [selectedAddress, setSelectedAddress] = useState<number | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const { t } = useLanguage();
   async function fetchAddress() {
     setLoading(true);
     try {
@@ -92,7 +94,7 @@ export default function ShippingAddressPage() {
 
   return (
     <div className="flex flex-col h-full gap-6">
-      <Header title="Shipping Address" />
+      <Header title={t.shippingAddress} />
 
       {/* Saved Addresses */}
       <div className="flex flex-col gap-3">
@@ -106,7 +108,7 @@ export default function ShippingAddressPage() {
             <div>
               <p className="font-semibold text-lg">{addr.label}</p>
               <p className="text-gray-600 text-sm mt-1">{addr.details}</p>
-              <p className="text-gray-600 text-sm mt-1">Phone: {addr.phone}</p>
+              <p className="text-gray-600 text-sm mt-1">{t.phone}: {addr.phone}</p>
               {addr.coordinates && (
                 <p className="text-gray-500 text-xs mt-1">
                   Lat: {addr.coordinates.lat.toFixed(5)}, Lng: {addr.coordinates.lng.toFixed(5)}
@@ -158,13 +160,13 @@ export default function ShippingAddressPage() {
               onClick={() => setIsAdding(false)}
               className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
             >
-              Cancel
+              {t.cancel}
             </button>
             <button
               onClick={handleSaveAddress}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
-              Save Address
+              {t.saveAddress}
             </button>
           </div>
         </div>
@@ -173,7 +175,7 @@ export default function ShippingAddressPage() {
           onClick={() => setIsAdding(true)}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 w-full font-semibold"
         >
-          + Add New Address
+          + {t.addNewAddress}
         </button>
       )}
 
@@ -214,13 +216,13 @@ export default function ShippingAddressPage() {
                 onClick={() => setShowMap(false)}
                 className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
               >
-                Cancel
+                {t.cancel}
               </button>
               <button
                 onClick={() => setShowMap(false)}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
-                Select
+                {t.select}
               </button>
             </div>
           </div>

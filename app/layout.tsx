@@ -9,6 +9,7 @@ import { LoadingProvider } from "@/context/LoadingContext";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
+import { LanguageProvider } from "./context/LanguageContext";
 
 export const metadata: Metadata = {
   title: "SOB-Ecommerce",
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="h-full">
       <body className="h-full m-0">
+        <LanguageProvider>
         <GoogleMapsProvider>
           <AuthProvider>
             <CheckoutProvider>
@@ -40,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </CheckoutProvider>
           </AuthProvider>
         </GoogleMapsProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

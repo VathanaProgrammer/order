@@ -6,6 +6,7 @@ import Image from "next/image";
 import Icon from "@/components/Icon";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/context/LanguageContext";
 
 const Page: React.FC = () => {
   const { user, logout, loading } = useAuth();
@@ -14,6 +15,7 @@ const Page: React.FC = () => {
     user?.image_url ||
     "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg"
   );
+  const { t } = useLanguage();
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -30,16 +32,16 @@ const Page: React.FC = () => {
   const accountSections = [
     {
       icon: "mdi:account",
-      title: "Profile Information",
-      desc: "Manage your name, and phone number.",
-      action: "Edit Profile",
+      title: t.profileInformation,
+      desc: t.manageYourNameAndPhoneNumber,
+      action: t.editProfile,
       route: '/account/edit-profile'
     },
     {
       icon: "mdi:map-marker",
-      title: "Shipping Addresses",
-      desc: "View and update your shipping and billing addresses.",
-      action: "Manage Addresses",
+      title: t.shippingAddresses,
+      desc: t.viewAndUpdateYourShippingAndBillingAddresses,
+      action: t.manageAddresses,
       route: '/account/shipping-address'
     },
     // {
@@ -50,9 +52,9 @@ const Page: React.FC = () => {
     // },
     {
       icon: "lucide:database",
-      title: "Rewards",
-      desc: "Check available coupons and loyalty points.",
-      action: "View Rewards",
+      title: t.rewards,
+      desc: t.checkAvailableCoupons,
+      action: t.viewRewards,
       route: '/account/reward'
     },
     // {
@@ -67,12 +69,12 @@ const Page: React.FC = () => {
     //   desc: "Choose what alerts and messages you want to receive.",
     //   action: "Manage Preferences",
     // },
-    {
-      icon: "mdi:cog-outline",
-      title: "Account Settings",
-      desc: "Language, currency, and delete account options.",
-      action: "Open Settings",
-    },
+    // {
+    //   icon: "mdi:cog-outline",
+    //   title: "Account Settings",
+    //   desc: "Language, currency, and delete account options.",
+    //   action: "Open Settings",
+    // },
   ];
 
   useEffect(() => {
@@ -87,7 +89,7 @@ const Page: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-500">Loading account...</p>
+        <p className="text-gray-500">{t.loadingAccount}</p>
       </div>
     );
   }
@@ -96,7 +98,7 @@ const Page: React.FC = () => {
   return (
     <div className="flex flex-col items-center min-h-screen">
       <div className="w-full max-w-[440px] min-h-screen">
-        <Header title="My Account" />
+        <Header title={t.myAccount} />
 
         {/* Profile Section */}
         <div className="w-full mt-10 flex flex-col items-center justify-center">
@@ -168,7 +170,7 @@ const Page: React.FC = () => {
         {/* Logout */}
         <div className="pb-10">
           <button onClick={logout} className="w-full bg-red-500 text-white py-2 rounded-[5px] font-semibold hover:bg-red-600 transition">
-            Logout
+            {t.logout}
           </button>
         </div>
       </div>

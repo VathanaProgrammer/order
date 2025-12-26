@@ -4,6 +4,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/api/api";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/context/LanguageContext";
 
 const EditProfileForm = () => {
   const { user, refreshUser } = useAuth();
@@ -20,6 +21,7 @@ const EditProfileForm = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isChanged, setIsChanged] = useState(false);
+  const { t } = useLanguage();
 
   // Initialize form with current user data
   useEffect(() => {
@@ -156,15 +158,15 @@ const EditProfileForm = () => {
     <div className="max-w-md mx-auto my-8 p-6 bg-white rounded-xl shadow-lg">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Edit Profile</h2>
-          <p className="text-gray-600">Update your personal information</p>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.editProfile}</h2>
+          <p className="text-gray-600">{t.updateYourPersonalInformation}</p>
         </div>
-        <button
+        {/* <button
           onClick={handleDebug}
           className="text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
         >
           Debug
-        </button>
+        </button> */}
       </div>
 
       {/* Display current user info */}
@@ -186,17 +188,13 @@ const EditProfileForm = () => {
           <div>
             <p className="font-semibold text-gray-800">{user.name || "No name"}</p>
             <p className="text-sm text-gray-600">
-              Phone: {displayPhone}
-              <span className="ml-2 text-xs text-gray-500">
-                ({user.phone ? "phone" : user.mobile ? "mobile" : "none"})
-              </span>
+              {t.phone}: {displayPhone}
             </p>
-            <p className="text-xs text-gray-500">ID: {user.id}</p>
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-blue-100">
           <p className="text-sm text-gray-600">
-            Available Reward Points:{" "}
+            {t.availableRewardPoints}:{" "}
             <span className="font-bold text-green-600">
               {user.reward_points.available}
             </span>
@@ -224,7 +222,7 @@ const EditProfileForm = () => {
             </svg>
             <div>
               <p className="text-green-700 text-sm">{success}</p>
-              <p className="text-xs text-green-600 mt-1">Redirecting to account page...</p>
+              <p className="text-xs text-green-600 mt-1">{t.redirectingToAccountPage}</p>
             </div>
           </div>
         </div>
@@ -234,9 +232,9 @@ const EditProfileForm = () => {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-            Name *
+            {t.name} *
             <span className="ml-2 text-xs text-gray-500">
-              Current: {user.name || "Not set"}
+              {t.current}: {user.name || "Not set"}
             </span>
           </label>
           <input
@@ -254,7 +252,7 @@ const EditProfileForm = () => {
 
         <div>
           <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-            Phone Number *
+            {t.phoneNumber} *
             <span className="ml-2 text-xs text-gray-500">
               Current: {displayPhone}
             </span>
@@ -271,7 +269,7 @@ const EditProfileForm = () => {
             required
           />
           <p className="mt-1 text-xs text-gray-500">
-            Phone number will be normalized to digits-only format
+            {t.phoneNumberWillBeNormalizedToDigitsOnlyFormat}
           </p>
         </div>
 
@@ -282,7 +280,7 @@ const EditProfileForm = () => {
               <svg className="w-5 h-5 text-yellow-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              <p className="text-sm text-yellow-700">You have unsaved changes</p>
+              <p className="text-sm text-yellow-700">{t.youHaveUnsavedChanges}</p>
             </div>
           </div>
         )}
@@ -295,7 +293,7 @@ const EditProfileForm = () => {
             disabled={isLoading || !isChanged}
             className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Reset
+            {t.reset}
           </button>
           <button
             type="submit"
@@ -308,10 +306,10 @@ const EditProfileForm = () => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Updating...
+                {t.updating}
               </>
             ) : (
-              "Save Changes"
+              t.saveChanges
             )}
           </button>
         </div>
@@ -319,7 +317,7 @@ const EditProfileForm = () => {
         {/* Form Note */}
         <div className="mt-6 pt-4 border-t border-gray-200">
           <p className="text-xs text-gray-500">
-            * Required fields. Changes will be reflected immediately across your account.
+            * {t.requiredFields}
           </p>
         </div>
       </form>

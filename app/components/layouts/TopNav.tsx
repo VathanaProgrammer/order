@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import Icon from "../Icon";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 const TopNav = () => {
   const router = useRouter();
@@ -10,6 +11,7 @@ const TopNav = () => {
 
   const [location, setLocation] = useState<string>("Fetching location...");
   const [error, setError] = useState<string | null>(null);
+  const { language, toggleLanguage } = useLanguage();
 
   const handleProfileClick = () => {
     if (user) {
@@ -64,6 +66,15 @@ const TopNav = () => {
         <h1 className="text-[32px] font-bold main-text">SOB</h1>
 
         <div className="flex flex-row gap-2">
+              
+          {/* Language Toggle Button */}
+          <button
+          type="button"
+          onClick={toggleLanguage}
+          className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
+        >
+          {language === "en" ? "ភាសាខ្មែរ" : "English"}
+        </button>
           <div
             onClick={handleProfileClick}
             className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"

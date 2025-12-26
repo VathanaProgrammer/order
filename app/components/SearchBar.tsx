@@ -1,11 +1,13 @@
 import Icon from "@/components/Icon";
 import { ICONS } from "@/constants/icons";
+import { useLanguage } from "@/context/LanguageContext";
 
 type SearchBarProps = {
   onSearch: (query: string) => void;
 };
 
 const SearchBar: React.FC<SearchBarProps> = ({ onSearch }) => {
+  const { language, t } = useLanguage();
   return (
     <div className="relative w-full mt-4 rounded-[5px] bg-gray-500 h-[45px] flex items-center">
       <div className="absolute left-3">
@@ -13,7 +15,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch }) => {
       </div>
       <input
         type="search"
-        placeholder="Search..."
+        placeholder={t.search}
         onChange={(e) => onSearch(e.target.value)}
         className="w-full h-full pl-10 pr-3 bg-gray-500 text-white rounded-[5px] focus:outline-none"
       />
