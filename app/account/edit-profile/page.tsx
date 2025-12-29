@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import api from "@/api/api";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
+import Header from "@/components/layouts/Header";
 
 const EditProfileForm = () => {
   const { user, refreshUser } = useAuth();
@@ -155,6 +156,8 @@ const EditProfileForm = () => {
   const displayPhone = user.phone || user.mobile || "Not set";
 
   return (
+    <div className="flex flex-col h-full gap-6">
+      <Header title={t.editProfile} />
     <div className="max-w-md mx-auto my-8 p-6 bg-white rounded-xl shadow-lg">
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -321,6 +324,7 @@ const EditProfileForm = () => {
           </p>
         </div>
       </form>
+    </div>
     </div>
   );
 };
