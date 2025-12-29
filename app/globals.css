@@ -6,11 +6,11 @@
 /* Define theme with fonts */
 @theme {
   --font-sans: 'Inter', system-ui, sans-serif;
-  --font-koulen: 'Koulen', 'Khmer OS', sans-serif;
+  --font-koulen: 'Hanuman', 'Khmer OS', sans-serif;
   
   /* You can also add it to font families */
   --font-family-sans: var(--font-sans);
-  --font-family-koulen: var(--font-koulen);
+  --font-family-hanuman: var(--font-hanuman);
 }
 
 .main-text {
@@ -21,7 +21,7 @@
 }
 
 .khmer-text {
-  font-family: var(--font-koulen);
+  font-family: var(--font-hanuman);
   letter-spacing: normal;
   word-spacing: normal;
 }
@@ -38,7 +38,7 @@
   }
 
   .khmer-text {
-    font-family: var(--font-koulen);
+    font-family: var(--font-hanuman);
     letter-spacing: normal;
     word-spacing: normal;
   }
