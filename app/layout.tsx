@@ -21,7 +21,7 @@ const hanuman = Hanuman({
   weight: '400',
   subsets: ['khmer'],
   display: 'swap',
-  variable: '--font-koulen',
+  variable: '--font-hanuman',
 });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
