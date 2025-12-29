@@ -160,10 +160,10 @@ const EditProfileForm = () => {
       <Header title={t.editProfile} />
     <div className="max-w-md mx-auto my-8 p-6 bg-white rounded-xl shadow-lg">
       <div className="flex justify-between items-center mb-6">
-        <div>
+        {/* <div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.editProfile}</h2>
           <p className="text-gray-600">{t.updateYourPersonalInformation}</p>
-        </div>
+        </div> */}
         {/* <button
           onClick={handleDebug}
           className="text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
