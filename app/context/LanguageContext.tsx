@@ -194,7 +194,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     <LanguageContext.Provider value={{ language, toggleLanguage, t }}>
       {children}
     </LanguageContext.Provider>
-  );
+  ); 
 }
 
 export const useLanguage = () => {
