@@ -25,5 +25,5 @@ jobs:
             set -e 
             cd /var/www/order
             npm install
-            npm run build
+            npm run build 
             pm2 restart order-app
