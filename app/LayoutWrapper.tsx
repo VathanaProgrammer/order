@@ -24,12 +24,13 @@ export default function LayoutWrapper({
     "/checkout/address",
     '/account/shipping-address',
     '/checkout/order-success',
-    '/account/reward'
+    '/account/reward',
+    '/account/edit-profile'
   ];
 
   const hideTopBar = noTopBarRoutes.includes(pathname);
 
-  const noBottomBarRoutes = ["/verify-otp", "/sign-in", "/sign-up", "/edit-profile" ];
+  const noBottomBarRoutes = ["/verify-otp", "/sign-in", "/sign-up" ];
   const hideBottomBar = noBottomBarRoutes.includes(pathname);
 
   return (
