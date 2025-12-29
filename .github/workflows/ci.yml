@@ -1,24 +1,29 @@
-name: PR Build & Restart
+name: Build & Restart (Green Tick)
 
 on:
-  pull_request:
+  push:
     branches:
       - main
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: SSH and build
+      # This step guarantees the workflow runs and shows a check
+      - name: CI started
+        run: echo "CI is running"
+
+      # SSH into your server and deploy
+      - name: SSH build and restart
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            set -e
             cd /var/www/order
-            git pull origin main
             npm install
             npm run build
             pm2 restart order-app
