@@ -44,7 +44,7 @@ const RewardSection: React.FC = () => {
 
   return (
     <section className="mt-4">
-      <h2 className="text-xl font-bold text-gray-700 mb-2">
+      <h2 className="text-xl font-bold text-gray-700 mb-2 khmer-text">
         {t.redeemYourRewards}
       </h2>
 

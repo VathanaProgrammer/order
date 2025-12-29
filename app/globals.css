@@ -3,12 +3,29 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Define theme with fonts */
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-koulen: 'Koulen', 'Khmer OS', sans-serif;
+  
+  /* You can also add it to font families */
+  --font-family-sans: var(--font-sans);
+  --font-family-koulen: var(--font-koulen);
+}
+
 .main-text {
   color: #111827;
 }
 .secoud-text {
   color: #6b7280;
 }
+
+.khmer-text {
+  font-family: var(--font-koulen);
+  letter-spacing: normal;
+  word-spacing: normal;
+}
+
 
 @layer utilities {
   .hide-scrollbar {
@@ -18,6 +35,12 @@
 
   .hide-scrollbar::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Edge */
+  }
+
+  .khmer-text {
+    font-family: var(--font-koulen);
+    letter-spacing: normal;
+    word-spacing: normal;
   }
 }
 

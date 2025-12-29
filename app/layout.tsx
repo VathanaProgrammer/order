@@ -10,15 +10,23 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
 import { LanguageProvider } from "./context/LanguageContext";
+import { Koulen } from 'next/font/google';
 
 export const metadata: Metadata = {
   title: "SOB-Ecommerce",
   description: "Best online shop for all products",
 };
 
+const koulen = Koulen({
+  weight: '400',
+  subsets: ['khmer'],
+  display: 'swap',
+  variable: '--font-koulen',
+});
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="km" className={`h-full ${koulen.variable}`}>
       <body className="h-full m-0">
         <LanguageProvider>
         <GoogleMapsProvider>
