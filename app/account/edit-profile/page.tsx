@@ -158,7 +158,7 @@ const EditProfileForm = () => {
   return (
     <div className="flex flex-col h-full gap-6">
       <Header title={t.editProfile} />
-    <div className="max-w-md mx-auto my-8 p-6 bg-white rounded-xl shadow-lg">
+    <div className="max-w-md mx-auto my-8 p-3 bg-white rounded-xl shadow-lg">
       <div className="flex justify-between items-center mb-6">
         {/* <div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.editProfile}</h2>
