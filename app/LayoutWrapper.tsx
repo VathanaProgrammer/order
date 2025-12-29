@@ -29,7 +29,7 @@ export default function LayoutWrapper({
 
   const hideTopBar = noTopBarRoutes.includes(pathname);
 
-  const noBottomBarRoutes = ["/verify-otp", "/sign-in", "/sign-up", ];
+  const noBottomBarRoutes = ["/verify-otp", "/sign-in", "/sign-up", "/edit-profile" ];
   const hideBottomBar = noBottomBarRoutes.includes(pathname);
 
   return (
