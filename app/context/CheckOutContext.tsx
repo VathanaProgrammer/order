@@ -48,6 +48,7 @@ type CheckoutContextType = {
   setSelectedAddress: (addr: Address | "current") => void;
   currentAddress: Address;
   setCurrentAddress: (addr: Address) => void;
+  detectCurrentLocation: () => Promise<Address>;
 
   paymentMethod: string;
   setPaymentMethod: (method: string) => void;
@@ -269,6 +270,64 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const detectCurrentLocation = async () => {
+    return new Promise<Address>((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported by your browser"));
+        return;
+      }
+  
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          const coordinates = { lat: latitude, lng: longitude };
+  
+          try {
+            // Get human-readable short address using your existing utility
+            const short_address = await getShortAddress(latitude, longitude);
+  
+            const currentAddr: Address = {
+              label: "Current Location",
+              details: short_address || "Your current position",
+              phone: "", // User can edit if needed, or prompt later
+              coordinates,
+              short_address,
+            };
+  
+            setCurrentAddress(currentAddr);
+            resolve(currentAddr);
+          } catch (err) {
+            // Fallback if reverse geocoding fails
+            const fallbackAddr: Address = {
+              label: "Current Location",
+              details: "Detected location",
+              phone: "",
+              coordinates,
+            };
+            setCurrentAddress(fallbackAddr);
+            resolve(fallbackAddr);
+          }
+        },
+        (error) => {
+          let message = "Unable to retrieve your location";
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              message = "Location access denied. Please enable it in browser settings.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              message = "Location information unavailable.";
+              break;
+            case error.TIMEOUT:
+              message = "Location request timed out.";
+              break;
+          }
+          reject(new Error(message));
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      );
+    });
+  };
+
   return (
     <CheckoutContext.Provider
       value={{
@@ -286,6 +345,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         setSelectedAddress,
         currentAddress,
         setCurrentAddress,
+        detectCurrentLocation,
         paymentMethod,
         setPaymentMethod,
         placeOrder,

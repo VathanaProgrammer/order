@@ -37,6 +37,7 @@ const CombinedCheckoutPage = () => {
     currentAddress,
     setSelectedAddress,
     setCurrentAddress,
+    detectCurrentLocation,
     paymentMethod,
     setPaymentMethod,
   } = useCheckout();
@@ -100,6 +101,19 @@ const CombinedCheckoutPage = () => {
       }));
     }
   }, [user]);
+
+  const handleUseCurrentLocation = async () => {
+    setLoading(true);
+    try {
+      await detectCurrentLocation();
+      setSelectedAddress("current");
+      toast.success("Current location detected and selected!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to get current location");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSelectSavedAddress = (addr: ExtendedAddress) => {
     setSelectedAddress(addr);
@@ -271,7 +285,7 @@ const CombinedCheckoutPage = () => {
         <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
 
         {/* Current Location Option */}
-        {/* {currentAddress && (
+        {currentAddress && (
           <div
             onClick={handleSelectCurrentLocation}
             className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${
@@ -289,7 +303,7 @@ const CombinedCheckoutPage = () => {
               <p className="text-sm text-gray-600 mt-1">{t.phone}: {currentAddress.phone}</p>
             )}
           </div>
-        )} */}
+        )}
 
         {/* Saved Addresses */}
         {savedAddresses.map((addr) => (
@@ -400,13 +414,22 @@ const CombinedCheckoutPage = () => {
               </button>
             </div>
           </div>
-        ) : (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium"
-          >
-            + {t.addNewAddress}
-          </button>
+        ) : ( 
+
+          <div>
+            <button
+              onClick={handleUseCurrentLocation}
+              className="mt-4 w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-medium flex items-center justify-center gap-2"
+            >
+              📍 {t.useMyCurrentLocation || "Use My Current Location"}
+            </button>
+            <button
+              onClick={() => setIsAdding(true)}
+              className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium"
+            >
+              + {t.addNewAddress}
+            </button>
+          </div>
         )}
       </section>
 
