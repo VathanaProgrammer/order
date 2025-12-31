@@ -51,11 +51,11 @@ const CombinedCheckoutPage = () => {
     label: "",
     phone: "",
     details: "",
-    coordinates: undefined,
+    coordinates: { lat: 11.567, lng: 104.928 },
     api_user_id: user?.id,
   });
   const [showQRPopup, setShowQRPopup] = useState(false);
-  const [currentLocationError, setCurrentLocationError] = useState<string | null>(null);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const { t } = useLanguage();
 
   const paymentMethods = [
@@ -75,8 +75,10 @@ const CombinedCheckoutPage = () => {
       setLoading(true);
       try {
         const res = await api.get("/addresses/all");
+        // Map API response to ExtendedAddress type
         const addresses: ExtendedAddress[] = res.data?.data.map((addr: any) => ({
           ...addr,
+          // Add any missing properties needed by ContextAddress
         })) || [];
         setSavedAddresses(addresses);
       } catch (err) {
@@ -92,6 +94,7 @@ const CombinedCheckoutPage = () => {
   }, [setLoading, user]);
 
   useEffect(() => {
+    // Update tempAddress with user ID when user is available
     if (user && !tempAddress.api_user_id) {
       setTempAddress(prev => ({
         ...prev,
@@ -100,58 +103,16 @@ const CombinedCheckoutPage = () => {
     }
   }, [user]);
 
-  // Initialize with default coordinates if no current location
-  useEffect(() => {
-    if (!currentAddress?.coordinates && !tempAddress.coordinates) {
-      // Default to Phnom Penh or get from browser if available
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setTempAddress(prev => ({
-            ...prev,
-            coordinates: {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            }
-          }));
-        },
-        () => {
-          // Fallback to Phnom Penh coordinates
-          setTempAddress(prev => ({
-            ...prev,
-            coordinates: { lat: 11.567, lng: 104.928 }
-          }));
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-      );
-    }
-  }, []);
-
-  const handleUseCurrentLocation = async () => {
-    setLoading(true);
-    setCurrentLocationError(null);
+  const handleDetectCurrentLocation = async () => {
+    setIsDetectingLocation(true);
     try {
       await detectCurrentLocation();
       setSelectedAddress("current");
-      toast.success("Current location detected and selected!");
+      toast.success("Current location detected!");
     } catch (err: any) {
-      console.error("Current location error:", err);
-      
-      // Handle specific error cases
-      if (err.code === 1) {
-        setCurrentLocationError("Location permission denied. Please enable location services in your browser settings.");
-        toast.error("Location permission denied");
-      } else if (err.code === 2) {
-        setCurrentLocationError("Location unavailable. Please check your internet connection or GPS.");
-        toast.error("Location unavailable");
-      } else if (err.code === 3) {
-        setCurrentLocationError("Location request timed out. Please try again.");
-        toast.error("Location request timed out");
-      } else {
-        setCurrentLocationError(err.message || "Failed to get current location");
-        toast.error(err.message || "Failed to get current location");
-      }
+      toast.error(err.message || "Failed to detect location");
     } finally {
-      setLoading(false);
+      setIsDetectingLocation(false);
     }
   };
 
@@ -243,14 +204,14 @@ const CombinedCheckoutPage = () => {
         label: "",
         phone: "",
         details: "",
-        coordinates: undefined,
+        coordinates: { lat: 11.567, lng: 104.928 },
         api_user_id: user?.id,
       });
       
-      toast.success("Address saved successfully!");
+      //toast.success("Address saved successfully!");
     } catch (err: any) {
       console.error("Save address error:", err);
-      toast.error(err.response?.data?.message || "Failed to save address");
+      //toast.error(err.response?.data?.message || "Failed to save address");
     } finally {
       setLoading(false);
     }
@@ -272,37 +233,10 @@ const CombinedCheckoutPage = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("QR code downloaded successfully!");
+      //toast.success("QR code downloaded successfully!");
     } catch (error) {
       console.error("Download failed:", error);
       toast.error("Failed to download QR code");
-    }
-  };
-
-  // Function to manually set coordinates for testing
-  const handleManualLocationSet = () => {
-    const lat = prompt("Enter latitude (e.g., 11.567):");
-    const lng = prompt("Enter longitude (e.g., 104.928):");
-    
-    if (lat && lng) {
-      const latNum = parseFloat(lat);
-      const lngNum = parseFloat(lng);
-      
-      if (!isNaN(latNum) && !isNaN(lngNum)) {
-        const newAddress: ExtendedAddress = {
-          id: Date.now(), // Temporary ID
-          label: "Manual Location",
-          details: `Manual coordinates: ${latNum.toFixed(6)}, ${lngNum.toFixed(6)}`,
-          coordinates: { lat: latNum, lng: lngNum },
-          api_user_id: user?.id,
-        };
-        
-        setSelectedAddress("current");
-        setCurrentAddress(newAddress);
-        toast.success("Manual location set!");
-      } else {
-        toast.error("Invalid coordinates");
-      }
     }
   };
 
@@ -353,107 +287,107 @@ const CombinedCheckoutPage = () => {
       <section className="flex flex-col gap-3 mt-6">
         <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
 
-        {/* Current Location Error Display */}
-        {currentLocationError && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-3">
-            <p className="text-red-600 text-sm">{currentLocationError}</p>
-            <button
-              onClick={() => setCurrentLocationError(null)}
-              className="text-red-500 text-xs mt-1 hover:text-red-700"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
         {/* Current Location Option */}
-        <div
-          onClick={handleSelectCurrentLocation}
-          className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${
-            selectedAddress === "current" && currentAddress
-              ? "border-blue-500 bg-blue-50"
-              : "border-gray-200 hover:bg-gray-50"
-          } ${!currentAddress ? "opacity-70" : ""}`}
-          title={!currentAddress ? "No current location detected" : ""}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-blue-500">📍</span>
-              <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
+        <div className="flex flex-col gap-3">
+          {/* Current Location Button */}
+          <div
+            onClick={handleDetectCurrentLocation}
+            className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${
+              selectedAddress === "current"
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-200 hover:bg-gray-50"
+            } ${isDetectingLocation ? "opacity-70" : ""}`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-blue-500 text-xl">📍</span>
+              <div>
+                <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
+                <p className="text-sm text-gray-500">
+                  {isDetectingLocation 
+                    ? "Detecting your location..." 
+                    : currentAddress 
+                    ? "Click to use your current location"
+                    : "Detect your current location"}
+                </p>
+              </div>
             </div>
-            {!currentAddress && (
-              <span className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">
-                Not detected
-              </span>
+            {isDetectingLocation && (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
             )}
           </div>
-          
-          {currentAddress ? (
-            <>
-              <p className="text-sm text-gray-600 mt-1">{currentAddress.details}</p>
-              {currentAddress.phone && (
-                <p className="text-sm text-gray-600 mt-1">{t.phone}: {currentAddress.phone}</p>
-              )}
+
+          {/* Current Location Details (if selected) */}
+          {selectedAddress === "current" && currentAddress && (
+            <div className="bg-white p-4 border rounded-xl border-blue-500">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-blue-500">📍</span>
+                <p className="font-semibold">Current Location Selected</p>
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.label}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Home, Work, etc."
+                    value={currentAddress.label || ""}
+                    onChange={(e) =>
+                      setCurrentAddress({
+                        ...currentAddress,
+                        label: e.target.value,
+                      })
+                    }
+                    className="w-full p-3 border rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.phone}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={t.phone}
+                    value={currentAddress.phone || ""}
+                    onChange={(e) =>
+                      setCurrentAddress({
+                        ...currentAddress,
+                        phone: e.target.value,
+                      })
+                    }
+                    className="w-full p-3 border rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.details || "Address Details"}
+                  </label>
+                  <textarea
+                    placeholder={t.details}
+                    value={currentAddress.details || ""}
+                    onChange={(e) =>
+                      setCurrentAddress({
+                        ...currentAddress,
+                        details: e.target.value,
+                      })
+                    }
+                    className="w-full p-3 border rounded-lg"
+                    rows={3}
+                  />
+                </div>
+              </div>
+              
               {currentAddress.coordinates && (
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-400 mt-3">
                   Coordinates: {currentAddress.coordinates.lat.toFixed(6)}, {currentAddress.coordinates.lng.toFixed(6)}
                 </p>
               )}
-            </>
-          ) : (
-            <p className="text-sm text-gray-500 mt-1 italic">
-              Click "Use My Current Location" to detect your location
-            </p>
+            </div>
           )}
         </div>
-
-        {/* Current Location Additional Info */}
-        {selectedAddress === "current" && currentAddress && (
-          <div className="mt-3 bg-white p-4 border rounded-xl">
-            <h4 className="font-semibold mb-2">
-              {t.additionalInfo || "Additional Information"}
-            </h4>
-
-            <input
-              type="text"
-              placeholder={t.label}
-              value={currentAddress.label || ""}
-              onChange={(e) =>
-                setCurrentAddress({
-                  ...currentAddress,
-                  label: e.target.value,
-                })
-              }
-              className="w-full p-3 border rounded-lg mb-2"
-            />
-
-            <input
-              type="text"
-              placeholder={t.phone}
-              value={currentAddress.phone || ""}
-              onChange={(e) =>
-                setCurrentAddress({
-                  ...currentAddress,
-                  phone: e.target.value,
-                })
-              }
-              className="w-full p-3 border rounded-lg mb-2"
-            />
-
-            <textarea
-              placeholder={t.details}
-              value={currentAddress.details || ""}
-              onChange={(e) =>
-                setCurrentAddress({
-                  ...currentAddress,
-                  details: e.target.value,
-                })
-              }
-              className="w-full p-3 border rounded-lg"
-              rows={3}
-            />
-          </div>
-        )}
 
         {/* Saved Addresses */}
         {savedAddresses.map((addr) => (
@@ -466,11 +400,16 @@ const CombinedCheckoutPage = () => {
                 : "border-gray-200 hover:bg-gray-50"
             }`}
           >
-            <p className="font-semibold">{addr.label}</p>
-            <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
-            {addr.phone && (
-              <p className="text-sm text-gray-600 mt-1">{t.phone}: {addr.phone}</p>
-            )}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold">{addr.label}</p>
+                <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
+                {addr.phone && (
+                  <p className="text-sm text-gray-600 mt-1">{t.phone}: {addr.phone}</p>
+                )}
+              </div>
+              <span className="text-blue-500 text-lg">📍</span>
+            </div>
           </div>
         ))}
 
@@ -526,42 +465,17 @@ const CombinedCheckoutPage = () => {
                 value={
                   tempAddress.coordinates
                     ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
-                    : "Not selected"
+                    : ""
                 }
                 onClick={() => setShowMap(true)}
                 className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
                 placeholder={t.clickToSelectLocation}
               />
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => setShowMap(true)}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  📍 Select on Map
-                </button>
-                <button
-                  onClick={() => {
-                    navigator.geolocation.getCurrentPosition(
-                      (position) => {
-                        setTempAddress({
-                          ...tempAddress,
-                          coordinates: {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                          }
-                        });
-                        toast.success("Current location set!");
-                      },
-                      (error) => {
-                        toast.error("Failed to get current location");
-                      }
-                    );
-                  }}
-                  className="text-sm text-green-600 hover:text-green-800"
-                >
-                  📍 Use My Current Location
-                </button>
-              </div>
+              {!tempAddress.coordinates && (
+                <p className="text-sm text-red-500 mt-1">
+                  {t.pleaseSelectALocationOnTheMap}
+                </p>
+              )}
             </div>
             
             <div className="flex gap-3 pt-2">
@@ -579,7 +493,7 @@ const CombinedCheckoutPage = () => {
                     label: "",
                     phone: "",
                     details: "",
-                    coordinates: undefined,
+                    coordinates: { lat: 11.567, lng: 104.928 },
                     api_user_id: user?.id,
                   });
                 }}
@@ -590,29 +504,13 @@ const CombinedCheckoutPage = () => {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={handleUseCurrentLocation}
-              className="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-medium flex items-center justify-center gap-2"
-            >
-              📍 {t.useMyCurrentLocation || "Use My Current Location"}
-            </button>
-            
-            {/* Optional: Manual location set button for testing */}
-            <button
-              onClick={handleManualLocationSet}
-              className="w-full py-2 bg-gray-100 border border-gray-300 rounded-xl hover:bg-gray-200 text-sm"
-            >
-              📍 Set Manual Location (for testing)
-            </button>
-            
-            <button
-              onClick={() => setIsAdding(true)}
-              className="w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium"
-            >
-              + {t.addNewAddress}
-            </button>
-          </div>
+          <button
+            onClick={() => setIsAdding(true)}
+            className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
+          >
+            <span className="text-xl">+</span>
+            {t.addNewAddress}
+          </button>
         )}
       </section>
 
@@ -653,9 +551,9 @@ const CombinedCheckoutPage = () => {
               </p>
               {tempAddress.coordinates ? (
                 <p className="text-sm text-gray-600 mt-1">
-                  Latitude: {tempAddress.coordinates.lat.toFixed(6)}
+                  {t.latitude}: {tempAddress.coordinates.lat.toFixed(6)}
                   <br />
-                  Longitude: {tempAddress.coordinates.lng.toFixed(6)}
+                  {t.longtitude}: {tempAddress.coordinates.lng.toFixed(6)}
                 </p>
               ) : (
                 <p className="text-sm text-gray-500 mt-1">
@@ -664,49 +562,24 @@ const CombinedCheckoutPage = () => {
               )}
             </div>
 
-            <div className="flex flex-col gap-2 mt-4">
+            <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => {
-                  navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                      setTempAddress({
-                        ...tempAddress,
-                        coordinates: {
-                          lat: position.coords.latitude,
-                          lng: position.coords.longitude
-                        }
-                      });
-                      toast.success("Current location set!");
-                    },
-                    (error) => {
-                      toast.error("Failed to get current location");
-                    }
-                  );
+                  setTempAddress({
+                    ...tempAddress,
+                    coordinates: undefined,
+                  });
                 }}
-                className="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
               >
-                📍 Use Current Location
+                {t.clear}
               </button>
-              
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => {
-                    setTempAddress({
-                      ...tempAddress,
-                      coordinates: undefined,
-                    });
-                  }}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                >
-                  {t.clear}
-                </button>
-                <button
-                  onClick={() => setShowMap(false)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  {t.select}
-                </button>
-              </div>
+              <button
+                onClick={() => setShowMap(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                {t.select}
+              </button>
             </div>
           </div>
         </div>
