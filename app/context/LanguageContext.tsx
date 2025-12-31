@@ -98,9 +98,11 @@ const translations = {
     logInToYourAccount: "Log in to your account",
     edit: "Edit",
     delete: "Delete",
+    editAddress: "Edit Address",
     addressDeletedSuccessfully: "Address deleted successfully!",
     addressSavedSuccessfully: "Address saved successfully!",
     addressUpdatedSuccessfully: "Address updated successfully!",
+    noSavedAddressesYetAddYourFirstAddressBelow: "No saved addresses yet. Add your first address below.",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -187,6 +189,8 @@ const translations = {
     addressSavedSuccessfully: "អាសយដ្ឋានត្រូវបានរក្សាទុកដោយជោគជ័យ!",
     edit: "កែសម្រួល",
     delete: "លុប",
+    editAddress: "កែសម្រួលអាសយដ្ឋាន",
+    noSavedAddressesYetAddYourFirstAddressBelow: "មិនមានអាសយដ្ឋានរួចរាល់មែនទេ។ សូមបញ្ចូលអាសយដ្ឋានដំបូងនៅទីនេះ",
   },
 };
 

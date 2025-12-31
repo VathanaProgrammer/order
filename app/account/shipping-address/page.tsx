@@ -225,7 +225,7 @@ export default function ShippingAddressPage() {
       <div className="flex flex-col gap-3">
         {savedAddresses.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
-            No saved addresses yet. Add your first address below.
+            {t.noSavedAddressesYetAddYourFirstAddressBelow}
           </div>
         ) : (
           savedAddresses.map((addr) => (
@@ -286,7 +286,7 @@ export default function ShippingAddressPage() {
       {isAdding ? (
         <div className="border rounded-xl p-4 flex flex-col gap-3 bg-white shadow-md mt-4">
           <h3 className="text-lg font-semibold mb-2">
-            {isEditing ? t.editAddress || "Edit Address" : t.addNewAddress}
+            {isEditing ? t.editAddress : t.addNewAddress}
           </h3>
           
           <div>
