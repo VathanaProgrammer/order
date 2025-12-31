@@ -185,6 +185,8 @@ const translations = {
     addressDeletedSuccessfully: "អាសយដ្ឋានត្រូវបានលុបដោយជោគជ័យ!",
     addressUpdatedSuccessfully: "អាសយដ្ឋានត្រូវបានកែដោយជោគជ័យ!",
     addressSavedSuccessfully: "អាសយដ្ឋានត្រូវបានរក្សាទុកដោយជោគជ័យ!",
+    edit: "កែសម្រួល",
+    delete: "លុប",
   },
 };
 
