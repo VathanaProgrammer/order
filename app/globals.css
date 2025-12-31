@@ -39,8 +39,8 @@
 
   .khmer-text {
     font-family: var(--font-hanuman);
-    //letter-spacing: normal;
-    //word-spacing: normal;
+    letter-spacing: normal;
+    word-spacing: normal;
   }
 }
 

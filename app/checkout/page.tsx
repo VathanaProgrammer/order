@@ -305,6 +305,53 @@ const CombinedCheckoutPage = () => {
           </div>
         )}
 
+{selectedAddress === "current" && currentAddress && (
+  <div className="mt-3 bg-white p-4 border rounded-xl">
+    <h4 className="font-semibold mb-2">
+      {t.additionalInfo || "Additional Information"}
+    </h4>
+
+    <input
+      type="text"
+      placeholder={t.label}
+      value={currentAddress.label || ""}
+      onChange={(e) =>
+        setCurrentAddress({
+          ...currentAddress,
+          label: e.target.value,
+        })
+      }
+      className="w-full p-3 border rounded-lg mb-2"
+    />
+
+    <input
+      type="text"
+      placeholder={t.phone}
+      value={currentAddress.phone || ""}
+      onChange={(e) =>
+        setCurrentAddress({
+          ...currentAddress,
+          phone: e.target.value,
+        })
+      }
+      className="w-full p-3 border rounded-lg mb-2"
+    />
+
+    <textarea
+      placeholder={t.details}
+      value={currentAddress.details || ""}
+      onChange={(e) =>
+        setCurrentAddress({
+          ...currentAddress,
+          details: e.target.value,
+        })
+      }
+      className="w-full p-3 border rounded-lg"
+      rows={3}
+    />
+  </div>
+)}
+
         {/* Saved Addresses */}
         {savedAddresses.map((addr) => (
           <div
