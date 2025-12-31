@@ -96,6 +96,11 @@ const translations = {
     signUp: "Sign Up",
     alreadyHaveAnAccount: "Already have an account?",
     logInToYourAccount: "Log in to your account",
+    edit: "Edit",
+    delete: "Delete",
+    addressDeletedSuccessfully: "Address deleted successfully!",
+    addressSavedSuccessfully: "Address saved successfully!",
+    addressUpdatedSuccessfully: "Address updated successfully!",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -177,6 +182,9 @@ const translations = {
     signUp: "ចុះឈ្មោះ",
     alreadyHaveAnAccount: "មានគណនីរួចរាល់មែនទេ?",
     logInToYourAccount: "ចូលទៅកាន់គណនីរបស់អ្នក",
+    addressDeletedSuccessfully: "អាសយដ្ឋានត្រូវបានលុបដោយជោគជ័យ!",
+    addressUpdatedSuccessfully: "អាសយដ្ឋានត្រូវបានកែដោយជោគជ័យ!",
+    addressSavedSuccessfully: "អាសយដ្ឋានត្រូវបានរក្សាទុកដោយជោគជ័យ!",
   },
 };
 

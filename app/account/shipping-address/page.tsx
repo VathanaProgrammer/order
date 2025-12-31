@@ -97,7 +97,7 @@ export default function ShippingAddressPage() {
           prev.map(addr => addr.id === editingId ? updated : addr)
         );
         setSelectedAddress(updated.id ?? null);
-        toast.success("Address updated successfully!");
+        toast.success(t.addressUpdatedSuccessfully);
       } else {
         // Add new address
         console.log("Adding new address:", newAddress);
@@ -107,7 +107,7 @@ export default function ShippingAddressPage() {
         
         setSavedAddresses(prev => [...prev, saved]);
         setSelectedAddress(saved.id ?? null);
-        toast.success("Address saved successfully!");
+        toast.success(t.addressSavedSuccessfully);
       }
 
       // Reset form
@@ -179,7 +179,7 @@ export default function ShippingAddressPage() {
           setSelectedAddress(null);
         }
         
-        toast.success("Address deleted successfully!");
+        toast.success(t.addressDeletedSuccessfully);
       }
     } catch (err: any) {
       console.error("Delete error:", err);
@@ -217,52 +217,9 @@ export default function ShippingAddressPage() {
     resetForm();
   };
 
-  // Function to check what routes are available
-  const checkRoutes = async () => {
-    console.log("Checking available routes...");
-    
-    // Try to access common Laravel route patterns
-    const testPatterns = [
-      `/addresses/${savedAddresses[0]?.id}`,
-      `/address/${savedAddresses[0]?.id}`,
-      `/api/addresses/${savedAddresses[0]?.id}`,
-      `/addresses/update/${savedAddresses[0]?.id}`,
-      `/addresses/delete/${savedAddresses[0]?.id}`,
-    ];
-    
-    for (const pattern of testPatterns) {
-      try {
-        console.log(`Testing GET ${pattern}`);
-        const res = await api.get(pattern);
-        console.log(`✓ ${pattern} works:`, res.data);
-      } catch (err: any) {
-        console.log(`✗ ${pattern} failed:`, err.response?.status);
-      }
-    }
-  };
-
   return (
     <div className="flex flex-col h-full gap-6">
       <Header title={t.shippingAddress} />
-
-      {/* Route check button */}
-      {process.env.NODE_ENV === 'development' && savedAddresses.length > 0 && (
-        <button 
-          onClick={checkRoutes}
-          className="text-xs p-2 bg-purple-100 border border-purple-300 rounded mb-2"
-        >
-          Check Available Routes
-        </button>
-      )}
-
-      {/* Debug info */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded mb-2">
-          <p>User ID: {user?.id}</p>
-          <p>Total addresses: {savedAddresses.length}</p>
-          <p>API Base URL: {api.defaults.baseURL}</p>
-        </div>
-      )}
 
       {/* Saved Addresses */}
       <div className="flex flex-col gap-3">
@@ -286,9 +243,6 @@ export default function ShippingAddressPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-lg">{addr.label}</span>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                        ID: {addr.id}
-                      </span>
                     </div>
                     <p className="text-gray-600 text-sm mt-1">{addr.details}</p>
                     <p className="text-gray-600 text-sm mt-1">
@@ -309,7 +263,7 @@ export default function ShippingAddressPage() {
                       }}
                       className="px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 text-sm"
                     >
-                      {t.edit || "Edit"}
+                      {t.edit}
                     </button>
                     <button
                       onClick={(e) => {
@@ -318,7 +272,7 @@ export default function ShippingAddressPage() {
                       }}
                       className="px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 text-sm"
                     >
-                      {t.delete || "Delete"}
+                      {t.delete}
                     </button>
                   </div>
                 </div>
