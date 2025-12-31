@@ -45,6 +45,7 @@ export default function ShippingAddressPage() {
     setLoading(true);
     try {
       const res = await api.get<{ status: string; data: Address[] }>("/addresses/all");
+      console.log("Fetched addresses:", res.data.data);
       setSavedAddresses(res.data.data);
     } catch (err) {
       console.error(err);
@@ -72,9 +73,18 @@ export default function ShippingAddressPage() {
     setLoading(true);
     try {
       if (isEditing && editingId) {
-        // Edit existing address
-        const res = await api.put(`/addresses/${editingId}`, newAddress);
+        // Edit existing address using PUT
+        console.log("Editing address ID:", editingId, "Data:", newAddress);
+        
+        // Prepare data for PUT request
+        const updateData = {
+          ...newAddress,
+          _method: 'PUT' // Some Laravel setups need this for PUT via POST
+        };
+        
+        const res = await api.put(`/addresses/${editingId}`, updateData);
         const updated: Address = res.data.data;
+        console.log("Updated address:", updated);
         
         setSavedAddresses(prev => 
           prev.map(addr => addr.id === editingId ? updated : addr)
@@ -83,8 +93,10 @@ export default function ShippingAddressPage() {
         toast.success("Address updated successfully!");
       } else {
         // Add new address
+        console.log("Adding new address:", newAddress);
         const res = await api.post("/addresses", newAddress);
         const saved: Address = res.data.data;
+        console.log("Saved address:", saved);
         
         setSavedAddresses(prev => [...prev, saved]);
         setSelectedAddress(saved.id ?? null);
@@ -94,14 +106,28 @@ export default function ShippingAddressPage() {
       // Reset form
       resetForm();
     } catch (err: any) {
-      console.error(err);
-      toast.error(err.response?.data?.message || "Failed to save address");
+      console.error("Save/Edit error:", err);
+      console.error("Error response:", err.response?.data);
+      console.error("Error status:", err.response?.status);
+      
+      // Check for specific error messages
+      if (err.response?.data?.message) {
+        toast.error(err.response.data.message);
+      } else if (err.response?.data?.errors) {
+        // Laravel validation errors
+        const errors = err.response.data.errors;
+        const firstError = Object.values(errors)[0] as string[];
+        toast.error(firstError[0] || "Validation error");
+      } else {
+        toast.error(err.response?.data?.message || "Failed to save address");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleEditAddress = (address: Address) => {
+    console.log("Editing address:", address);
     setNewAddress({
       ...address,
       api_user_id: user?.id || undefined
@@ -119,6 +145,9 @@ export default function ShippingAddressPage() {
 
     setLoading(true);
     try {
+      console.log("Deleting address ID:", id);
+      
+      // Delete using DELETE method (matches your Laravel route)
       await api.delete(`/addresses/${id}`);
       
       setSavedAddresses(prev => prev.filter(addr => addr.id !== id));
@@ -129,8 +158,25 @@ export default function ShippingAddressPage() {
       
       toast.success("Address deleted successfully!");
     } catch (err: any) {
-      console.error(err);
-      toast.error(err.response?.data?.message || "Failed to delete address");
+      console.error("Delete error:", err);
+      console.error("Error response:", err.response?.data);
+      console.error("Error status:", err.response?.status);
+      
+      // More specific error messages
+      if (err.response?.status === 404) {
+        toast.error("Address not found or already deleted");
+      } else if (err.response?.status === 403) {
+        toast.error("You don't have permission to delete this address");
+      } else if (err.response?.status === 401) {
+        toast.error("Please login again to delete address");
+      } else if (err.response?.data?.message) {
+        toast.error(err.response.data.message);
+      } else {
+        toast.error("Failed to delete address");
+      }
+      
+      // Refresh the list in case of error
+      fetchAddress();
     } finally {
       setLoading(false);
     }
@@ -154,9 +200,59 @@ export default function ShippingAddressPage() {
     resetForm();
   };
 
+  // Test API endpoints directly
+  const testApiEndpoints = async () => {
+    console.log("Testing API endpoints...");
+    
+    // Test if we can get a single address first
+    if (savedAddresses.length > 0) {
+      const testId = savedAddresses[0].id;
+      try {
+        console.log(`Testing GET /addresses/${testId}`);
+        const res = await api.get(`/addresses/${testId}`);
+        console.log("Single address response:", res.data);
+      } catch (err) {
+        console.error("GET single address error:", err);
+      }
+    }
+    
+    // Test POST with minimal data
+    const testData = {
+      label: "Test Address",
+      phone: "1234567890",
+      details: "Test location",
+      coordinates: { lat: 11.567, lng: 104.928 },
+      api_user_id: user?.id
+    };
+    
+    try {
+      console.log("Testing POST /addresses with:", testData);
+      const res = await api.post("/addresses", testData);
+      console.log("POST response:", res.data);
+      
+      // Clean up: delete the test address
+      if (res.data.data?.id) {
+        await api.delete(`/addresses/${res.data.data.id}`);
+        console.log("Test address cleaned up");
+      }
+    } catch (err) {
+      console.error("POST test error:", err);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full gap-6">
       <Header title={t.shippingAddress} />
+
+      {/* Test button - remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <button 
+          onClick={testApiEndpoints}
+          className="text-xs p-2 bg-yellow-100 border border-yellow-300 rounded mb-2"
+        >
+          Test API Endpoints
+        </button>
+      )}
 
       {/* Saved Addresses */}
       <div className="flex flex-col gap-3">
@@ -177,8 +273,15 @@ export default function ShippingAddressPage() {
             >
               <div className="flex-1">
                 <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold text-lg">{addr.label}</p>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-lg">{addr.label}</span>
+                      {isEditing && editingId === addr.id && (
+                        <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
+                          Editing...
+                        </span>
+                      )}
+                    </div>
                     <p className="text-gray-600 text-sm mt-1">{addr.details}</p>
                     <p className="text-gray-600 text-sm mt-1">
                       {t.phone}: {addr.phone}
