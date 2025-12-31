@@ -56,6 +56,7 @@ const CombinedCheckoutPage = () => {
   });
   const [showQRPopup, setShowQRPopup] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [isSavingCurrentAddress, setIsSavingCurrentAddress] = useState(false);
   const { t } = useLanguage();
 
   const paymentMethods = [
@@ -116,16 +117,67 @@ const CombinedCheckoutPage = () => {
     }
   };
 
+  // Save current location as a permanent address
+  const handleSaveCurrentLocation = async () => {
+    if (!currentAddress) {
+      toast.error("No current location detected");
+      return;
+    }
+
+    if (!currentAddress.details?.trim()) {
+      toast.error("Please add address details");
+      return;
+    }
+
+    if (!user?.id) {
+      toast.error("User not authenticated");
+      return;
+    }
+
+    setIsSavingCurrentAddress(true);
+    try {
+      // Prepare address data from current location
+      const addressData: APIAddress = {
+        label: currentAddress.label || "Current Location",
+        phone: currentAddress.phone || "",
+        details: currentAddress.details,
+        coordinates: currentAddress.coordinates,
+        api_user_id: user.id,
+      };
+
+      // Save to backend
+      const res = await api.post("/addresses", addressData);
+      
+      // Convert API response to ExtendedAddress
+      const apiResponse = res.data?.data;
+      const newAddress: ExtendedAddress = {
+        ...apiResponse,
+        id: apiResponse.id,
+        label: apiResponse.label,
+        phone: apiResponse.phone,
+        details: apiResponse.details,
+        coordinates: apiResponse.coordinates,
+        api_user_id: apiResponse.api_user_id,
+      };
+      
+      // Update saved addresses list
+      setSavedAddresses(prev => [...prev, newAddress]);
+      
+      // Select the newly saved address
+      setSelectedAddress(newAddress);
+      
+      toast.success("Address saved successfully!");
+    } catch (err: any) {
+      console.error("Save address error:", err);
+      toast.error(err.response?.data?.message || "Failed to save address");
+    } finally {
+      setIsSavingCurrentAddress(false);
+    }
+  };
+
   const handleSelectSavedAddress = (addr: ExtendedAddress) => {
     setSelectedAddress(addr);
     setIsAdding(false);
-  };
-
-  const handleSelectCurrentLocation = () => {
-    if (currentAddress) {
-      setSelectedAddress("current");
-      setIsAdding(false);
-    }
   };
 
   // Handle map click to select coordinates
@@ -363,7 +415,7 @@ const CombinedCheckoutPage = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.details || "Address Details"}
+                    {t.details || "Address Details"} *
                   </label>
                   <textarea
                     placeholder={t.details}
@@ -385,6 +437,24 @@ const CombinedCheckoutPage = () => {
                   Coordinates: {currentAddress.coordinates.lat.toFixed(6)}, {currentAddress.coordinates.lng.toFixed(6)}
                 </p>
               )}
+
+              {/* Save Current Location Button */}
+              <button
+                onClick={handleSaveCurrentLocation}
+                disabled={!currentAddress.details?.trim() || isSavingCurrentAddress}
+                className="mt-4 w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isSavingCurrentAddress ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    💾 Save This Address
+                  </>
+                )}
+              </button>
             </div>
           )}
         </div>
