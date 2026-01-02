@@ -11,14 +11,38 @@ import api from "@/api/api";
 import { toast } from "react-toastify";
 import { useLoading } from "@/context/LoadingContext";
 
+// ✅ UTILITY FUNCTION: Convert any URL to full URL
+const getFullImageUrl = (url: string | null | undefined): string => {
+  if (!url) {
+    return "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg";
+  }
+  
+  // If already full URL, return as-is
+  if (url.startsWith('http')) {
+    return url;
+  }
+  
+  // If relative path starting with /, add base URL
+  if (url.startsWith('/')) {
+    // Use environment variable or fallback
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 
+                   (typeof window !== 'undefined' ? window.location.origin : '');
+    return `${baseUrl}${url}`;
+  }
+  
+  return url;
+};
+
 const Page: React.FC = () => {
   const { user, logout, loading, updateUser } = useAuth();
   const router = useRouter();
   const { setLoading } = useLoading();
+  
+  // ✅ FIXED: Use the utility function to ensure full URL
   const [profileImage, setProfileImage] = useState<string>(
-    user?.image_url || 
-    "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg"
+    getFullImageUrl(user?.image_url)
   );
+  
   const { t } = useLanguage();
 
   const uploadProfilePicture = async (file: File) => {
@@ -34,14 +58,19 @@ const Page: React.FC = () => {
       });
   
       if (res.data.success) {
-        // Update local state with new image URL
+        // ✅ Get the FULL URL from response
         const newImageUrl = res.data.data.full_url || res.data.data.image_url;
-        setProfileImage(newImageUrl);
         
-        // ✅ FIXED: Use updateUser correctly
+        // ✅ Convert to full URL if needed
+        const fullImageUrl = getFullImageUrl(newImageUrl);
+        
+        // ✅ Update both state and auth context
+        setProfileImage(fullImageUrl);
+        
+        // ✅ Store the ORIGINAL URL (as from backend) in context
         updateUser({ 
           ...user, 
-          image_url: newImageUrl 
+          image_url: newImageUrl // Store the original URL from backend
         });
         
         toast.success(res.data.message || "Profile picture updated!");
@@ -86,6 +115,19 @@ const Page: React.FC = () => {
     input?.click();
   };
 
+  // ✅ FIXED: Update profileImage whenever user changes
+  useEffect(() => {
+    if (user?.image_url) {
+      // Always convert to full URL when setting
+      const fullImageUrl = getFullImageUrl(user.image_url);
+      setProfileImage(fullImageUrl);
+      console.log('Profile image URL updated:', fullImageUrl);
+    } else {
+      // Set default avatar
+      setProfileImage("https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg");
+    }
+  }, [user?.image_url]); // This will trigger on refresh too
+
   const accountSections = [
     {
       icon: "mdi:account",
@@ -110,17 +152,6 @@ const Page: React.FC = () => {
     },
   ];
 
-  useEffect(() => {
-    if (user?.image_url) {
-      // Add base URL if it's a relative path
-      const fullImageUrl = user.image_url.startsWith('http') 
-        ? user.image_url 
-        : `${process.env.NEXT_PUBLIC_API_URL || ''}${user.image_url}`;
-      
-      setProfileImage(fullImageUrl);
-    }
-  }, [user?.image_url]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -144,9 +175,15 @@ const Page: React.FC = () => {
               fill
               className="object-cover rounded-full border-4 border-gray-700"
               sizes="120px"
+              // ✅ Add proper error handling
               onError={(e) => {
+                console.error('Image failed to load:', profileImage);
                 e.currentTarget.src = "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg";
               }}
+              // ✅ Add loading attribute
+              loading="lazy"
+              // ✅ Unoptimized if using external domains not configured
+              unoptimized={!profileImage.includes('localhost') && !profileImage.includes('127.0.0.1')}
             />
 
             <input
