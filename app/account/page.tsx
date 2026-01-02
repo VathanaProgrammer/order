@@ -13,7 +13,7 @@ import { useLoading } from "@/context/LoadingContext";
 
 // ✅ UTILITY FUNCTION: Convert any URL to full URL
 const getFullImageUrl = (url: string | null | undefined): string => {
-  if (!url) {
+  if (!url || url === "null" || url === "undefined" || url === "") {
     return "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg";
   }
   
@@ -24,9 +24,9 @@ const getFullImageUrl = (url: string | null | undefined): string => {
   
   // If relative path starting with /, add base URL
   if (url.startsWith('/')) {
-    // Use environment variable or fallback
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || 
-                   (typeof window !== 'undefined' ? window.location.origin : '');
+                   process.env.NEXT_PUBLIC_BASE_URL ||
+                   'https://syspro.asia'; // Your domain
     return `${baseUrl}${url}`;
   }
   
