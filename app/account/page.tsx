@@ -7,24 +7,81 @@ import Icon from "@/components/Icon";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
+import api from "@/api/api";
+import { toast } from "react-toastify";
+import { useLoading } from "@/context/LoadingContext";
 
 const Page: React.FC = () => {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading, updateUser } = useAuth();
   const router = useRouter();
+  const { setLoading } = useLoading();
   const [profileImage, setProfileImage] = useState<string>(
-    user?.image_url ||
+    user?.image_url || 
     "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg"
   );
   const { t } = useLanguage();
 
-  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const uploadProfilePicture = async (file: File) => {
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('profile_picture', file);
+      
+      const res = await api.post('/profile/picture', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+  
+      if (res.data.success) {
+        // Update local state with new image URL
+        const newImageUrl = res.data.data.full_url || res.data.data.image_url;
+        setProfileImage(newImageUrl);
+        
+        // ✅ FIXED: Use updateUser correctly
+        updateUser({ 
+          ...user, 
+          image_url: newImageUrl 
+        });
+        
+        toast.success(res.data.message || "Profile picture updated!");
+      }
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      toast.error(err.response?.data?.message || "Failed to upload image");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setProfileImage(URL.createObjectURL(file));
+    if (!file) return;
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5MB");
+      return;
+    }
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Only JPEG, PNG, JPG, GIF, and WebP images are allowed");
+      return;
+    }
+
+    // Show preview immediately
+    const previewUrl = URL.createObjectURL(file);
+    setProfileImage(previewUrl);
+
+    // Upload to backend
+    await uploadProfilePicture(file);
   };
 
   const handleButtonClick = () => {
     const input = document.getElementById(
-      "image_url"
+      "profile_picture"
     ) as HTMLInputElement | null;
     input?.click();
   };
@@ -44,12 +101,6 @@ const Page: React.FC = () => {
       action: t.manageAddresses,
       route: '/account/shipping-address'
     },
-    // {
-    //   icon: "mdi:package-variant-closed",
-    //   title: "My Orders",
-    //   desc: "Track your recent orders, deliveries, and returns.",
-    //   action: "View Orders",
-    // },
     {
       icon: "lucide:database",
       title: t.rewards,
@@ -57,35 +108,19 @@ const Page: React.FC = () => {
       action: t.viewRewards,
       route: '/account/reward'
     },
-    // {
-    //   icon: "mdi:lock-outline",
-    //   title: "Security",
-    //   desc: "Change password or review login activity.",
-    //   action: "Update Password",
-    // },
-    // {
-    //   icon: "mdi:bell-outline",
-    //   title: "Notifications",
-    //   desc: "Choose what alerts and messages you want to receive.",
-    //   action: "Manage Preferences",
-    // },
-    // {
-    //   icon: "mdi:cog-outline",
-    //   title: "Account Settings",
-    //   desc: "Language, currency, and delete account options.",
-    //   action: "Open Settings",
-    // },
   ];
 
   useEffect(() => {
     if (user?.image_url) {
-      setProfileImage(
-        user.image_url ||
-        "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg"
-      );
+      // Add base URL if it's a relative path
+      const fullImageUrl = user.image_url.startsWith('http') 
+        ? user.image_url 
+        : `${process.env.NEXT_PUBLIC_API_URL || ''}${user.image_url}`;
+      
+      setProfileImage(fullImageUrl);
     }
   }, [user?.image_url]);
-  
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -93,7 +128,6 @@ const Page: React.FC = () => {
       </div>
     );
   }
-  
 
   return (
     <div className="flex flex-col items-center min-h-screen">
@@ -110,12 +144,15 @@ const Page: React.FC = () => {
               fill
               className="object-cover rounded-full border-4 border-gray-700"
               sizes="120px"
+              onError={(e) => {
+                e.currentTarget.src = "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg";
+              }}
             />
 
             <input
               type="file"
-              id="image_url"
-              name="image_url"
+              id="profile_picture"
+              name="profile_picture"
               accept="image/*"
               className="hidden"
               onChange={handleImageChange}
@@ -137,9 +174,9 @@ const Page: React.FC = () => {
           </div>
 
           <div className="mt-3 text-center">
-                <p className="font-semibold text-lg text-gray-900">
-                  {user?.name}
-                </p>
+            <p className="font-semibold text-lg text-gray-900">
+              {user?.name}
+            </p>
           </div>
         </div>
 
@@ -160,7 +197,10 @@ const Page: React.FC = () => {
                 <h3 className="font-medium text-gray-800">{item.title}</h3>
               </div>
               <p className="text-sm text-gray-500">{item.desc}</p>
-              <button onClick={() => router.push(item.route ? item.route : '')} className="mt-2 text-sm font-medium text-blue-600 hover:underline self-start">
+              <button 
+                onClick={() => router.push(item.route ? item.route : '')} 
+                className="mt-2 text-sm font-medium text-blue-600 hover:underline self-start"
+              >
                 {item.action}
               </button>
             </div>
@@ -169,7 +209,10 @@ const Page: React.FC = () => {
 
         {/* Logout */}
         <div className="pb-10">
-          <button onClick={logout} className="w-full bg-red-500 text-white py-2 rounded-[5px] font-semibold hover:bg-red-600 transition">
+          <button 
+            onClick={logout} 
+            className="w-full bg-red-500 text-white py-2 rounded-[5px] font-semibold hover:bg-red-600 transition"
+          >
             {t.logout}
           </button>
         </div>

@@ -23,13 +23,13 @@ interface User {
   };
 }
 
-
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (phone: string, username: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -71,6 +71,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // 🔹 Update user data (e.g., after profile picture upload)
+  const updateUser = (updates: Partial<User>) => {
+    if (user) {
+      setUser({
+        ...user,
+        ...updates
+      });
+    }
+  };
 
   // 🔹 Login and set cookie
   const login = async (phone: string, username: string) => {
@@ -110,7 +119,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser  }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      login, 
+      logout, 
+      refreshUser, 
+      updateUser 
+    }}>
       {children}
     </AuthContext.Provider>
   );
