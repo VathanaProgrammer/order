@@ -115,18 +115,22 @@ const Page: React.FC = () => {
     input?.click();
   };
 
-  // ✅ FIXED: Update profileImage whenever user changes
+  // In your Profile Page useEffect
   useEffect(() => {
-    if (user?.image_url) {
-      // Always convert to full URL when setting
-      const fullImageUrl = getFullImageUrl(user.image_url);
+    console.log('User:', user);
+    
+    // ✅ Check both image_url and profile_url
+    const imageUrl = user?.image_url || user?.profile_url;
+    
+    if (imageUrl) {
+      const fullImageUrl = getFullImageUrl(imageUrl);
+      console.log('Setting profile image to:', fullImageUrl);
       setProfileImage(fullImageUrl);
-      console.log('Profile image URL updated:', fullImageUrl);
     } else {
-      // Set default avatar
+      console.log('No user image, setting default');
       setProfileImage("https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg");
     }
-  }, [user?.image_url]); // This will trigger on refresh too
+  }, [user]);
 
   const accountSections = [
     {
