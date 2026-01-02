@@ -79,6 +79,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...updates
       });
     }
+    console.log("Updated user:", user);
   };
 
   // 🔹 Login and set cookie
