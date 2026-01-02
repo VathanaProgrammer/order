@@ -356,10 +356,10 @@ const CombinedCheckoutPage = () => {
                 <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
                 <p className="text-sm text-gray-500">
                   {isDetectingLocation 
-                    ? "Detecting your location..." 
+                    ? t.detectingYourCurrentLocation
                     : currentAddress 
-                    ? "Click to use your current location"
-                    : "Detect your current location"}
+                    ? t.clickToUseYourCurrentLocation
+                    : t.clickToDetectYourCurrentLocation}
                 </p>
               </div>
             </div>
@@ -436,7 +436,7 @@ const CombinedCheckoutPage = () => {
               
               {currentAddress.coordinates && (
                 <p className="text-xs text-gray-400 mt-3">
-                  Coordinates: {currentAddress.coordinates.lat.toFixed(6)}, {currentAddress.coordinates.lng.toFixed(6)}
+                  {t.coordinates}: {currentAddress.coordinates.lat.toFixed(6)}, {currentAddress.coordinates.lng.toFixed(6)}
                 </p>
               )}
 
@@ -449,11 +449,11 @@ const CombinedCheckoutPage = () => {
                 {isSavingCurrentAddress ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Saving...
+                    {t.saving}
                   </>
                 ) : (
                   <>
-                    💾 Save This Address
+                    💾 {t.saveThisAddress}
                   </>
                 )}
               </button>
@@ -529,7 +529,7 @@ const CombinedCheckoutPage = () => {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.clickToSelectLocation || "Click to select location"} *
+                {t.clickToSelectLocation} *
               </label>
               <input
                 type="text"

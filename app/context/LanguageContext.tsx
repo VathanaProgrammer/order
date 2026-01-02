@@ -103,6 +103,12 @@ const translations = {
     addressSavedSuccessfully: "Address saved successfully!",
     addressUpdatedSuccessfully: "Address updated successfully!",
     noSavedAddressesYetAddYourFirstAddressBelow: "No saved addresses yet. Add your first address below.",
+    saveThisAddress: "Save this address",
+    Saving: "Saving...",
+    clickToUseYourCurrentLocation: "Click to use your current location",
+    detectYourCurrentLocation: "Detect your current location",
+    detectingYourLocation: "Detecting your location...",
+    coordinates: "Coordinates",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -120,7 +126,7 @@ const translations = {
     home: "ទំព័រដើម",
     chat: "សារ",
     total: "សរុប",
-    checkout: "ការទូទាត់",
+    checkout: "ទូទាត់",
     redeemYourRewards: "ប្ដូរពិន្ទុយករង្វាន់",
     myAccount: "គណនីរបស់ខ្ញុំ",
     profileInformation: "ព័ត៌មានគណនី",
@@ -191,6 +197,12 @@ const translations = {
     delete: "លុប",
     editAddress: "កែសម្រួលអាសយដ្ឋាន",
     noSavedAddressesYetAddYourFirstAddressBelow: "មិនមានអាសយដ្ឋានរួចរាល់មែនទេ។ សូមបញ្ចូលអាសយដ្ឋានដំបូងនៅទីនេះ",
+    saveThisAddress: "រក្សាទុកអាសយដ្ឋាននេះ",
+    saving: "កំពុងរក្សាទុក...",
+    clickToUseYourCurrentLocation: "ចុចដើម្បីប្រើទីតាំងបច្ចុប្បន្នរបស់អ្នក",
+    detectYourCurrentLocation: "ស្វែងរកទីតាំងបច្ចុប្បន្នរបស់អ្នក",
+    detectingYourLocation: "កំពុងស្វែងរកទីតាំងរបស់អ្នក...",
+    coordinates: "កូអរដោនេ"
   },
 };
 
