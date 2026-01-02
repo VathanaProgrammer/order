@@ -34,13 +34,13 @@ const getFullImageUrl = (url: string | null | undefined): string => {
 };
 
 const Page: React.FC = () => {
-  const { user, logout, loading, updateUser } = useAuth();
+  const { user, logout, loading, updateUser, refreshUser } = useAuth(); // ✅ Added refreshUser
   const router = useRouter();
   const { setLoading } = useLoading();
   
-  // ✅ FIXED: Use the utility function to ensure full URL
+  // ✅ FIXED: Use profile_url (backend field name)
   const [profileImage, setProfileImage] = useState<string>(
-    getFullImageUrl(user?.image_url)
+    getFullImageUrl(user?.profile_url) // ✅ Changed from image_url to profile_url
   );
   
   const { t } = useLanguage();
@@ -51,32 +51,52 @@ const Page: React.FC = () => {
       const formData = new FormData();
       formData.append('profile_picture', file);
       
+      console.log('📤 Uploading profile picture...');
       const res = await api.post('/profile/picture', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
   
+      console.log('📥 Upload response:', res.data);
+  
       if (res.data.success) {
-        // ✅ Get the FULL URL from response
-        const newImageUrl = res.data.data.full_url || res.data.data.image_url;
+        // ✅ Get the URL from response (backend uses profile_url)
+        const newProfileUrl = res.data.data?.profile_url || 
+                             res.data.data?.full_url || 
+                             res.data.data?.image_url;
         
-        // ✅ Convert to full URL if needed
-        const fullImageUrl = getFullImageUrl(newImageUrl);
+        console.log('🖼️ New profile_url from API:', newProfileUrl);
         
-        // ✅ Update both state and auth context
+        if (!newProfileUrl) {
+          throw new Error('No profile_url returned from server');
+        }
+        
+        // ✅ Convert to full URL for display
+        const fullImageUrl = getFullImageUrl(newProfileUrl);
+        console.log('🔗 Full image URL for display:', fullImageUrl);
+        
+        // ✅ Update local state immediately
         setProfileImage(fullImageUrl);
         
-        // ✅ Store the ORIGINAL URL (as from backend) in context
-        updateUser({ 
-          ...user, 
-          image_url: newImageUrl // Store the original URL from backend
-        });
+        // ✅ CRITICAL: Update auth context with the new profile_url
+        if (user) {
+          updateUser({ 
+            ...user,
+            profile_url: newProfileUrl // ✅ Update profile_url, not image_url
+          });
+        }
+        
+        // ✅ Force a complete refresh from server after a short delay
+        setTimeout(async () => {
+          console.log('🔄 Forcing server refresh after upload...');
+          await refreshUser();
+        }, 500);
         
         toast.success(res.data.message || "Profile picture updated!");
       }
     } catch (err: any) {
-      console.error("Upload error:", err);
+      console.error("❌ Upload error:", err);
       toast.error(err.response?.data?.message || "Failed to upload image");
     } finally {
       setLoading(false);
@@ -115,22 +135,30 @@ const Page: React.FC = () => {
     input?.click();
   };
 
-  // In your Profile Page useEffect
+  // ✅ CRITICAL: Update profileImage whenever user's profile_url changes
   useEffect(() => {
-    console.log('User:', user);
+    console.log('👤 User changed:', user);
+    console.log('🖼️ User profile_url:', user?.profile_url);
     
-    // ✅ Check both image_url and profile_url
-    const imageUrl = user?.image_url || user?.profile_url;
-    
-    if (imageUrl) {
-      const fullImageUrl = getFullImageUrl(imageUrl);
-      console.log('Setting profile image to:', fullImageUrl);
+    if (user?.profile_url) {
+      // Always convert to full URL when setting
+      const fullImageUrl = getFullImageUrl(user.profile_url);
+      console.log('🎯 Setting profile image to:', fullImageUrl);
       setProfileImage(fullImageUrl);
     } else {
-      console.log('No user image, setting default');
+      // Set default avatar
+      console.log('⚠️ No profile_url, setting default image');
       setProfileImage("https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg");
     }
-  }, [user]);
+  }, [user]); // ✅ Watch entire user object
+
+  // ✅ Debug: Log initial state
+  useEffect(() => {
+    console.log('🚀 Profile page mounted');
+    console.log('👤 Initial user:', user);
+    console.log('🖼️ Initial profile_url:', user?.profile_url);
+    console.log('🖼️ Initial profileImage state:', profileImage);
+  }, []);
 
   const accountSections = [
     {
@@ -179,15 +207,17 @@ const Page: React.FC = () => {
               fill
               className="object-cover rounded-full border-4 border-gray-700"
               sizes="120px"
-              // ✅ Add proper error handling
+              priority
               onError={(e) => {
-                console.error('Image failed to load:', profileImage);
+                console.error('❌ Image failed to load:', profileImage);
+                console.error('❌ User profile_url:', user?.profile_url);
+                e.currentTarget.onerror = null; // Prevent infinite loop
                 e.currentTarget.src = "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg";
               }}
-              // ✅ Add loading attribute
-              loading="lazy"
-              // ✅ Unoptimized if using external domains not configured
-              unoptimized={!profileImage.includes('localhost') && !profileImage.includes('127.0.0.1')}
+              onLoad={() => {
+                console.log('✅ Image loaded successfully:', profileImage);
+              }}
+              unoptimized={true} // ✅ Disable Next.js optimization for external images
             />
 
             <input
@@ -218,6 +248,21 @@ const Page: React.FC = () => {
             <p className="font-semibold text-lg text-gray-900">
               {user?.name}
             </p>
+            <p className="text-sm text-gray-500">{user?.mobile || user?.phone}</p>
+            {/* ✅ Debug info */}
+            <div className="text-xs text-gray-400 mt-1 p-2 bg-gray-100 rounded">
+              <p>Profile URL: {user?.profile_url || 'None'}</p>
+              <p>Display URL: {profileImage.length > 40 ? profileImage.substring(0, 40) + '...' : profileImage}</p>
+              <button 
+                onClick={() => {
+                  console.log('🔄 Manual refresh');
+                  refreshUser();
+                }}
+                className="mt-1 text-blue-500 hover:underline"
+              >
+                Refresh Data
+              </button>
+            </div>
           </div>
         </div>
 

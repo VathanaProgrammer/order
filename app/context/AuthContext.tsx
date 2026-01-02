@@ -14,8 +14,7 @@ interface User {
   name: string;
   phone?: string | null;
   mobile?: string | null;
-  image_url?: string | null; // Frontend expects this
-  profile_url?: string | null; // Backend returns this
+  profile_url?: string | null; // ✅ Use profile_url (backend field name)
   reward_points: {
     total: number;
     used: number;
@@ -40,42 +39,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // ✅ UTILITY: Normalize user data from API
-  const normalizeUserData = (apiUser: any): User => {
-    return {
-      id: apiUser.id,
-      name: apiUser.name,
-      phone: apiUser.phone,
-      mobile: apiUser.mobile,
-      // ✅ CRITICAL: Map profile_url to image_url for frontend
-      image_url: apiUser.profile_url || apiUser.image_url,
-      profile_url: apiUser.profile_url, // Keep original for reference
-      reward_points: apiUser.reward_points || {
-        total: 0,
-        used: 0,
-        expired: 0,
-        available: 0
-      }
-    };
-  };
-
   // 🔹 Restore user from cookie on mount
   useEffect(() => {
     const fetchUser = async () => {
       try {
         const res = await api.get("/user", { withCredentials: true });
-        console.log('User API response:', res.data); // Debug
+        console.log('📥 User API response:', res.data);
         
-        if (res.data.success) {
-          // ✅ Use normalized data
-          const normalizedUser = normalizeUserData(res.data.user);
-          console.log('Normalized user:', normalizedUser); // Debug
-          setUser(normalizedUser);
+        if (res.data.success && res.data.user) {
+          // ✅ Use the EXACT data from backend (no mapping needed)
+          setUser(res.data.user);
+          console.log('✅ User set in context:', res.data.user);
         } else {
+          console.log('❌ No user data in response');
           setUser(null);
         }
       } catch (err) {
-        console.log("Auth restore failed:", err);
+        console.error("Auth restore failed:", err);
         setUser(null);
       } finally {
         setLoading(false);
@@ -87,19 +67,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshUser = async () => {
     try {
-      console.log('Refreshing user data...');
+      console.log('🔄 Refreshing user data...');
       const res = await api.get("/user", { withCredentials: true });
-      console.log('Refresh response:', res.data);
+      console.log('🔄 Refresh response:', res.data);
       
-      if (res.data?.success) {
-        // ✅ Use normalized data
-        const normalizedUser = normalizeUserData(res.data.user);
-        console.log('Refreshed normalized user:', normalizedUser);
-        setUser(normalizedUser);
+      if (res.data?.success && res.data.user) {
+        setUser(res.data.user);
+        console.log('✅ User refreshed:', res.data.user);
+        return res.data.user;
+      } else {
+        console.log('❌ Refresh failed: No user data');
+        setUser(null);
+        return null;
       }
-    } catch {
-      console.log('Refresh failed, clearing user');
+    } catch (error) {
+      console.error('❌ Refresh error:', error);
       setUser(null);
+      return null;
     }
   };
 
@@ -110,7 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...user,
         ...updates
       };
-      console.log('Updating user context:', updatedUser);
+      console.log('📝 Updating user context:', updatedUser);
       setUser(updatedUser);
     }
   };
@@ -125,10 +109,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         { withCredentials: true }
       );
 
-      if (res.data.success) {
-        // ✅ Use normalized data
-        const normalizedUser = normalizeUserData(res.data.user);
-        setUser(normalizedUser);
+      if (res.data.success && res.data.user) {
+        setUser(res.data.user);
         await refreshUser();
         router.push("/");
       } else {
