@@ -379,11 +379,12 @@ const CombinedCheckoutPage = () => {
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.label}
+                    {t.label} *
                   </label>
                   <input
                     type="text"
                     placeholder="Home, Work, etc."
+                    required
                     value={currentAddress.label || ""}
                     onChange={(e) =>
                       setCurrentAddress({
@@ -397,10 +398,11 @@ const CombinedCheckoutPage = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.phone}
+                    {t.phone} *
                   </label>
                   <input
                     type="text"
+                    required
                     placeholder={t.phone}
                     value={currentAddress.phone || ""}
                     onChange={(e) =>
