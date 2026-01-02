@@ -62,11 +62,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshUser = async () => {
     try {
+      console.log('Refreshing user data...');
       const res = await api.get("/user", { withCredentials: true });
+      console.log('Refresh response:', res.data);
+      
       if (res.data?.success) {
         setUser(res.data.user);
+        console.log('User updated from refresh:', res.data.user);
+      } else {
+        console.log('Refresh failed, clearing user');
+        setUser(null);
       }
-    } catch {
+    } catch (error) {
+      console.error('Refresh error:', error);
       setUser(null);
     }
   };
