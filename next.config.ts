@@ -4,14 +4,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
-  // images: {
-  //   domains: ["example.com"], // add image host domains
-  // },
-  //   basePath: "/order",  // IMPORTANT
-  // assetPrefix: "/order",
-
+  
   images: {
-    domains: ["127.0.0.1", "localhost"],
+    domains: ["127.0.0.1", "localhost", "syspro.asia", "order.sobenterprise.biz"], // Add syspro.asia here
     remotePatterns: [
       {
         protocol: "https",
@@ -26,13 +21,24 @@ const nextConfig: NextConfig = {
         hostname: "e7.pngegg.com",
       },
       {
+        protocol: "https", // Add protocol
         hostname: "i.pinimg.com",
       },
       {
+        protocol: "https", // Add protocol
         hostname: "images.unsplash.com",
       },
       {
+        protocol: "https", // Add protocol
         hostname: "upload.wikimedia.org",
+      },
+      {
+        protocol: "https",
+        hostname: "syspro.asia", // Add this entry
+      },
+      {
+        protocol: "https",
+        hostname: "order.sobenterprise.biz", // Add this entry
       },
     ],
   },
