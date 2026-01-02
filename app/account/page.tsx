@@ -12,6 +12,7 @@ import { toast } from "react-toastify";
 import { useLoading } from "@/context/LoadingContext";
 
 // ✅ UTILITY FUNCTION: Convert any URL to full URL
+// ✅ CORRECTED UTILITY FUNCTION
 const getFullImageUrl = (url: string | null | undefined): string => {
   if (!url || url === "null" || url === "undefined" || url === "") {
     return "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg";
@@ -22,12 +23,16 @@ const getFullImageUrl = (url: string | null | undefined): string => {
     return url;
   }
   
-  // If relative path starting with /, add base URL
+  // If relative path starting with /, add BASE URL (not API URL)
   if (url.startsWith('/')) {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 
-                   process.env.NEXT_PUBLIC_BASE_URL ||
-                   'https://syspro.asia'; // Your domain
-    return `${baseUrl}${url}`;
+    // ✅ CORRECT: Use the main domain, not API endpoint
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                   'https://syspro.asia'; // Your main domain
+    
+    // Remove any trailing slash from baseUrl
+    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+    
+    return `${cleanBaseUrl}${url}`;
   }
   
   return url;
@@ -151,6 +156,8 @@ const Page: React.FC = () => {
       setProfileImage("https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg");
     }
   }, [user]); // ✅ Watch entire user object
+
+  
 
   // ✅ Debug: Log initial state
   useEffect(() => {

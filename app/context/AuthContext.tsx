@@ -45,6 +45,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const res = await api.get("/user", { withCredentials: true });
         console.log('📥 User API response:', res.data);
+        console.log('🔍 /api/user response after refresh:', res.data);
+      console.log('🔍 Profile URL in API response:', res.data.user?.profile_url);
         
         if (res.data.success && res.data.user) {
           // ✅ Use the EXACT data from backend (no mapping needed)
