@@ -255,21 +255,6 @@ const Page: React.FC = () => {
             <p className="font-semibold text-lg text-gray-900">
               {user?.name}
             </p>
-            <p className="text-sm text-gray-500">{user?.mobile || user?.phone}</p>
-            {/* ✅ Debug info */}
-            <div className="text-xs text-gray-400 mt-1 p-2 bg-gray-100 rounded">
-              <p>Profile URL: {user?.profile_url || 'None'}</p>
-              <p>Display URL: {profileImage.length > 40 ? profileImage.substring(0, 40) + '...' : profileImage}</p>
-              <button 
-                onClick={() => {
-                  console.log('🔄 Manual refresh');
-                  refreshUser();
-                }}
-                className="mt-1 text-blue-500 hover:underline"
-              >
-                Refresh Data
-              </button>
-            </div>
           </div>
         </div>
 
