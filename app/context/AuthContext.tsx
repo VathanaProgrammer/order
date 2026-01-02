@@ -14,7 +14,8 @@ interface User {
   name: string;
   phone?: string | null;
   mobile?: string | null;
-  image_url?: string | null;
+  image_url?: string | null; // Frontend expects this
+  profile_url?: string | null; // Backend returns this
   reward_points: {
     total: number;
     used: number;
@@ -39,13 +40,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // ✅ UTILITY: Normalize user data from API
+  const normalizeUserData = (apiUser: any): User => {
+    return {
+      id: apiUser.id,
+      name: apiUser.name,
+      phone: apiUser.phone,
+      mobile: apiUser.mobile,
+      // ✅ CRITICAL: Map profile_url to image_url for frontend
+      image_url: apiUser.profile_url || apiUser.image_url,
+      profile_url: apiUser.profile_url, // Keep original for reference
+      reward_points: apiUser.reward_points || {
+        total: 0,
+        used: 0,
+        expired: 0,
+        available: 0
+      }
+    };
+  };
+
   // 🔹 Restore user from cookie on mount
   useEffect(() => {
     const fetchUser = async () => {
       try {
         const res = await api.get("/user", { withCredentials: true });
+        console.log('User API response:', res.data); // Debug
+        
         if (res.data.success) {
-          setUser(res.data.user);
+          // ✅ Use normalized data
+          const normalizedUser = normalizeUserData(res.data.user);
+          console.log('Normalized user:', normalizedUser); // Debug
+          setUser(normalizedUser);
         } else {
           setUser(null);
         }
@@ -67,27 +92,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('Refresh response:', res.data);
       
       if (res.data?.success) {
-        setUser(res.data.user);
-        console.log('User updated from refresh:', res.data.user);
-      } else {
-        console.log('Refresh failed, clearing user');
-        setUser(null);
+        // ✅ Use normalized data
+        const normalizedUser = normalizeUserData(res.data.user);
+        console.log('Refreshed normalized user:', normalizedUser);
+        setUser(normalizedUser);
       }
-    } catch (error) {
-      console.error('Refresh error:', error);
+    } catch {
+      console.log('Refresh failed, clearing user');
       setUser(null);
     }
   };
 
-  // 🔹 Update user data (e.g., after profile picture upload)
+  // 🔹 Update user data
   const updateUser = (updates: Partial<User>) => {
     if (user) {
-      setUser({
+      const updatedUser = {
         ...user,
         ...updates
-      });
+      };
+      console.log('Updating user context:', updatedUser);
+      setUser(updatedUser);
     }
-    console.log("Updated user:", user);
   };
 
   // 🔹 Login and set cookie
@@ -100,11 +125,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         { withCredentials: true }
       );
 
-      console.log('username: ', username);
-      console.log("phone: ", phone);
-
       if (res.data.success) {
-        setUser(res.data.user);
+        // ✅ Use normalized data
+        const normalizedUser = normalizeUserData(res.data.user);
+        setUser(normalizedUser);
         await refreshUser();
         router.push("/");
       } else {
