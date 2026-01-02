@@ -443,7 +443,7 @@ const CombinedCheckoutPage = () => {
               {/* Save Current Location Button */}
               <button
                 onClick={handleSaveCurrentLocation}
-                disabled={!currentAddress.details?.trim() || isSavingCurrentAddress}
+                disabled={!currentAddress.details?.trim() || !currentAddress.label?.trim() || !currentAddress.phone?.trim()|| isSavingCurrentAddress}
                 className="mt-4 w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSavingCurrentAddress ? (
