@@ -175,9 +175,9 @@ const EditProfileForm = () => {
       {/* Display current user info */}
       <div className="mb-6 p-4 bg-blue-50 rounded-lg">
         <div className="flex items-center space-x-3">
-          {user.image_url ? (
+          {user.profile_url ? (
             <img
-              src={user.image_url}
+              src={user.profile_url}
               alt={user.name}
               className="w-12 h-12 rounded-full object-cover"
             />
