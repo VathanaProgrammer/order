@@ -193,12 +193,6 @@ const EditProfileForm = () => {
             <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.editProfile}</h2>
             <p className="text-gray-600">{t.updateYourPersonalInformation}</p>
           </div>
-          <button
-            onClick={handleDebug}
-            className="text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-          >
-            Debug
-          </button>
         </div>
 
         {/* ✅ FIXED: Display current user info with proper image */}
