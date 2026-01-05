@@ -63,7 +63,7 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
         // Build query parameters
         const params = new URLSearchParams();
         
-        if (category && category !== "All" || category && category !== "ទាំងអស់") {
+        if (category && category !== "All" && category && category !== "ទាំងអស់") {
           params.append('category', category);
         }
         
