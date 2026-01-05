@@ -15,41 +15,29 @@ export interface ProductData {
     name: string;
     price: string;
     image_url?: string;
+    category?: string; // Add category here
   };
 }
 
-// Add props type here
 interface ProductsProps {
   selectedCategory: string;
   searchQuery: string;
 }
 
-// Accept props in component
 const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) => {
   const [products, setProducts] = useState<ProductData[]>([]);
+  const [allProducts, setAllProducts] = useState<ProductData[]>([]); // Store all products
   const { addToCart } = useCheckout();
   const { setLoading } = useLoading();
 
+  // Fetch all products once
   useEffect(() => {
     async function fetchProducts() {
       setLoading(true);
       try {
         const res = await api.get<{ status: string; data: ProductData[] }>("/product/all");
-        let fetchedProducts = res.data.data;
-
-        // ✅ Optional filtering by category and search query
-        if (selectedCategory && selectedCategory !== "All") {
-          fetchedProducts = fetchedProducts.filter((item) =>
-            item.product.name.toLowerCase().includes(selectedCategory.toLowerCase())
-          );
-        }
-        if (searchQuery) {
-          fetchedProducts = fetchedProducts.filter((item) =>
-            item.product.name.toLowerCase().includes(searchQuery.toLowerCase())
-          );
-        }
-
-        setProducts(fetchedProducts);
+        setAllProducts(res.data.data);
+        setProducts(res.data.data);
       } catch (err) {
         console.error(err);
         toast.error("Failed to load products");
@@ -59,7 +47,42 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
     }
 
     fetchProducts();
-  }, [selectedCategory, searchQuery, setLoading]);
+  }, [setLoading]);
+
+  // Apply filters whenever selectedCategory or searchQuery changes
+  useEffect(() => {
+    let filteredProducts = allProducts;
+
+    // ✅ Correct category filtering
+    if (selectedCategory && selectedCategory !== "All") {
+      filteredProducts = filteredProducts.filter((item) => 
+        item.product.category?.toLowerCase() === selectedCategory.toLowerCase()
+      );
+    }
+
+    // ✅ Correct search filtering
+    if (searchQuery) {
+      filteredProducts = filteredProducts.filter((item) =>
+        item.product.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    setProducts(filteredProducts);
+  }, [selectedCategory, searchQuery, allProducts]);
+
+  // If no products match the filters
+  if (products.length === 0) {
+    return (
+      <div className="mt-4 text-center py-8">
+        <p className="text-gray-500">No products found matching your criteria.</p>
+        {selectedCategory !== "All" && (
+          <p className="text-sm text-gray-400 mt-2">
+            Try selecting "All" categories or different search terms
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 gap-4 mt-4">
@@ -71,11 +94,9 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
           price={Number(item.product.price)}
           image={item.product.image_url && item.product.image_url.trim() !== "" ? item.product.image_url : "/img/default.png"}
         />
-
       ))}
     </div>
   );
-
 };
 
 export default Products;
