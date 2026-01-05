@@ -63,7 +63,7 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
         // Build query parameters
         const params = new URLSearchParams();
         
-        if (category && category !== "All") {
+        if (category && category !== "All" || category && category !== "ទាំងអស់") {
           params.append('category', category);
         }
         
@@ -176,7 +176,7 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
         </div>
         <h3 className="text-lg font-medium text-gray-700">No products found</h3>
         <p className="text-gray-500 mt-1">
-          {selectedCategory !== "All" 
+          {selectedCategory !== "ទាំងអស់" && selectedCategory !== "All" 
             ? `No products in "${selectedCategory}" category`
             : searchQuery 
               ? `No products matching "${searchQuery}"`
