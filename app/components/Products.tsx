@@ -200,7 +200,7 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
         </div>
       )}
 
-      {/* Filter summary */}
+      {/* Filter summary
       <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
           <div className="flex items-center gap-2 flex-wrap">
@@ -224,7 +224,7 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
             )}
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Products grid */}
       <div className="grid grid-cols-2 gap-4">
