@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Product from "./cards/ProductCard";
 import api from "@/api/api";
 import { toast } from "react-toastify";
@@ -24,89 +24,112 @@ interface ProductsProps {
 
 const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) => {
   const [products, setProducts] = useState<ProductData[]>([]);
-  const [loadingTimeout, setLoadingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [isEmpty, setIsEmpty] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { setLoading } = useLoading();
+
+  // Function to cancel ongoing requests
+  const cancelRequest = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
 
   // Fetch products with API filtering
   const fetchProducts = useCallback(async (category: string, search: string) => {
-    // Clear any existing timeout
-    if (loadingTimeout) {
-      clearTimeout(loadingTimeout);
-    }
-
-    setLoading(true);
+    // Cancel any ongoing request
+    cancelRequest();
     
-    // Set a timeout to prevent rapid API calls
-    const timeout = setTimeout(async () => {
+    setIsLoading(true);
+    setHasError(false);
+    setIsEmpty(false);
+    setLoading(true);
+
+    // Create new AbortController for this request
+    abortControllerRef.current = new AbortController();
+
+    // Set timeout for the request
+    timeoutRef.current = setTimeout(async () => {
       try {
         // Build query parameters
         const params = new URLSearchParams();
         
-        // Add category filter if not "All"
         if (category && category !== "All") {
           params.append('category', category);
         }
         
-        // Add search query if exists
         if (search.trim()) {
           params.append('search', search);
         }
 
-        // Build the URL with query parameters
+        // Build the URL
         const queryString = params.toString();
         const url = `/product/all${queryString ? `?${queryString}` : ''}`;
         
-        console.log("Fetching products from:", url); // Debug log
+        console.log("Fetching from:", url);
         
-        const res = await api.get<{ status: string; data: ProductData[] }>(url);
+        const res = await api.get<{ status: string; data: ProductData[] }>(url, {
+          signal: abortControllerRef.current?.signal,
+          timeout: 10000, // 10 second timeout
+        });
         
         if (res.data.status === 'success') {
           setProducts(res.data.data);
-          console.log(`Fetched ${res.data.data.length} products`); // Debug log
+          setIsEmpty(res.data.data.length === 0);
+          console.log(`Success: ${res.data.data.length} products`);
         } else {
           throw new Error("API returned error status");
         }
       } catch (err: any) {
-        console.error("Error fetching products:", err);
+        // Don't show error if request was aborted
+        if (err.name === 'AbortError' || err.name === 'CanceledError') {
+          console.log("Request was cancelled");
+          return;
+        }
         
-        // Show user-friendly error message
-        if (err.response?.status === 404) {
-          toast.error("Products endpoint not found. Please check the API URL.");
-        } else if (err.response?.status === 500) {
-          toast.error("Server error. Please try again later.");
-        } else {
-          toast.error("Failed to load products. Please check your connection.");
+        console.error("Fetch error:", err);
+        setHasError(true);
+        
+        // Don't show toast for network errors during rapid filter changes
+        if (!err.message?.includes('timeout') && !err.message?.includes('network')) {
+          toast.error("Failed to load products");
         }
       } finally {
+        setIsLoading(false);
         setLoading(false);
+        abortControllerRef.current = null;
       }
-    }, 300); // 300ms delay to prevent rapid API calls
+    }, 300); // Small debounce delay
 
-    setLoadingTimeout(timeout);
-  }, [setLoading, loadingTimeout]);
+    // Cleanup
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [cancelRequest, setLoading]);
 
   // Fetch products when filters change
   useEffect(() => {
     fetchProducts(selectedCategory, searchQuery);
     
-    // Cleanup function
+    // Cleanup on unmount
     return () => {
-      if (loadingTimeout) {
-        clearTimeout(loadingTimeout);
-      }
+      cancelRequest();
     };
-  }, [selectedCategory, searchQuery, fetchProducts]);
+  }, [selectedCategory, searchQuery, fetchProducts, cancelRequest]);
 
-  // Show loading skeleton
-  if (products.length === 0) {
+  // Show loading skeleton only for initial load or when we have no products
+  if (isLoading && products.length === 0) {
     return (
       <div className="mt-4">
-        {/* Filter info skeleton */}
-        <div className="mb-4 p-3 bg-gray-100 rounded-lg animate-pulse">
-          <div className="h-5 bg-gray-200 rounded w-1/4"></div>
-        </div>
-        
-        {/* Products skeleton */}
         <div className="grid grid-cols-2 gap-4">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="animate-pulse">
@@ -120,8 +143,73 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
     );
   }
 
+  // Show error state
+  if (hasError && products.length === 0) {
+    return (
+      <div className="mt-4 text-center py-12">
+        <div className="text-red-400 mb-4">
+          <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-medium text-gray-700">Failed to load products</h3>
+        <p className="text-gray-500 mt-1 mb-4">Please try again</p>
+        <button
+          onClick={() => fetchProducts(selectedCategory, searchQuery)}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Show empty state
+  if (isEmpty && !isLoading) {
+    return (
+      <div className="mt-4 text-center py-12">
+        <div className="text-gray-300 mb-4">
+          <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-medium text-gray-700">No products found</h3>
+        <p className="text-gray-500 mt-1">
+          {selectedCategory !== "All" 
+            ? `No products in "${selectedCategory}" category`
+            : searchQuery 
+              ? `No products matching "${searchQuery}"`
+              : "No products available"
+          }
+        </p>
+        <button
+          onClick={() => {
+            setSelectedCategory("All");
+            setSearchQuery("");
+          }}
+          className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors text-sm"
+        >
+          Clear filters
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-4">
+      {/* Loading indicator when filtering (with existing products) */}
+      {isLoading && products.length > 0 && (
+        <div className="mb-4 p-2 bg-yellow-50 border border-yellow-100 rounded-lg">
+          <div className="flex items-center justify-center gap-2 text-yellow-700">
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className="text-sm">Updating products...</span>
+          </div>
+        </div>
+      )}
+
       {/* Filter summary */}
       <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
@@ -169,6 +257,19 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
           />
         ))}
       </div>
+
+      {/* Load more indicator at bottom */}
+      {isLoading && (
+        <div className="mt-4 text-center">
+          <div className="inline-flex items-center gap-2 text-gray-500">
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className="text-sm">Loading more...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
