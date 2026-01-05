@@ -204,8 +204,6 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
       <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-gray-800">{products.length}</span>
-            <span className="text-gray-600">products</span>
             
             {selectedCategory !== "All" && (
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
@@ -224,13 +222,6 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
                 {searchQuery}
               </span>
             )}
-          </div>
-          
-          <div className="text-sm text-gray-500">
-            {selectedCategory === "All" && !searchQuery 
-              ? "Showing all products" 
-              : "Filtered results"
-            }
           </div>
         </div>
       </div>
