@@ -77,7 +77,6 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
         
         const res = await api.get<{ status: string; data: ProductData[] }>(url, {
           signal: abortControllerRef.current?.signal,
-          timeout: 10000, // 10 second timeout
         });
         
         if (res.data.status === 'success') {
@@ -182,15 +181,6 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
               : "No products available"
           }
         </p>
-        <button
-          onClick={() => {
-            setSelectedCategory("All");
-            setSearchQuery("");
-          }}
-          className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors text-sm"
-        >
-          Clear filters
-        </button>
       </div>
     );
   }
