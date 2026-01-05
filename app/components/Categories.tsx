@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import api from "@/api/api";
+import { useLanguage } from "@/context/LanguageContext";
 
 type CategoriesProps = {
   selectedCategory: string;
@@ -15,6 +16,7 @@ type CategoryData = {
 
 const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) => {
   const [categories, setCategories] = useState<CategoryData[]>([]);
+  const { t } = useLanguage();
 
   useEffect(() => {
     async function fetchCategories() {
@@ -30,7 +32,7 @@ const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) =
     fetchCategories();
   }, []);
 
-  const allCategories = [{ id: 0, name: "All" }, ...categories];
+  const allCategories = [{ id: 0, name: t.all }, ...categories];
 
   return (
     <section className="flex overflow-auto hide-scrollbar gap-4 flex-row items-center mt-4">

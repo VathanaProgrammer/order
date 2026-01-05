@@ -110,6 +110,7 @@ const translations = {
     detectingYourLocation: "Detecting your location...",
     coordinates: "Coordinates",
     loading: "Loading...",
+    all: "All",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -205,6 +206,7 @@ const translations = {
     detectingYourLocation: "កំពុងស្វែងរកទីតាំងរបស់អ្នក...",
     coordinates: "កូអរដោនេ",
     loading: "កំពុងផ្ទុក...",
+    all: "ទាំងអស់",
   },
 };
 
