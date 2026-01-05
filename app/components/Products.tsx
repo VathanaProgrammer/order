@@ -4,6 +4,7 @@ import Product from "./cards/ProductCard";
 import api from "@/api/api";
 import { toast } from "react-toastify";
 import { useLoading } from "@/context/LoadingContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 export interface ProductData {
   id: number;
@@ -30,6 +31,7 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { setLoading } = useLoading();
+  const { t } = useLanguage();
 
   // Function to cancel ongoing requests
   const cancelRequest = useCallback(() => {

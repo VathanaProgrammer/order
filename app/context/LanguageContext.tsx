@@ -109,6 +109,7 @@ const translations = {
     detectYourCurrentLocation: "Detect your current location",
     detectingYourLocation: "Detecting your location...",
     coordinates: "Coordinates",
+    loading: "Loading...",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -202,7 +203,8 @@ const translations = {
     clickToUseYourCurrentLocation: "ចុចដើម្បីប្រើទីតាំងបច្ចុប្បន្នរបស់អ្នក",
     detectYourCurrentLocation: "ស្វែងរកទីតាំងបច្ចុប្បន្នរបស់អ្នក",
     detectingYourLocation: "កំពុងស្វែងរកទីតាំងរបស់អ្នក...",
-    coordinates: "កូអរដោនេ"
+    coordinates: "កូអរដោនេ",
+    loading: "កំពុងផ្ទុក...",
   },
 };
 
