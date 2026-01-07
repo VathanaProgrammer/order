@@ -68,7 +68,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         setLoading(true);
 
         try {
-            const response = await api.post('/api/rewards/claim', {
+            const response = await api.post('/rewards/claim', {
                 product_id: product.id,
             });
 
@@ -166,10 +166,10 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 {/* Points Progress Bar */}
                 <div className="mb-4">
                     <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-600">
+                        {/* <span className="text-gray-600">
                             {t.yourPoints || "Your points"}:
                             <span className="font-bold ml-1 text-blue-600">{availablePoints}</span>
-                        </span>
+                        </span> */}
                         <span className="text-gray-600">
                             {t.required || "Need"}:
                             <span className="font-bold ml-1">{requiredPoints}</span>
