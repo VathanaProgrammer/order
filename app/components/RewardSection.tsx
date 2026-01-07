@@ -13,7 +13,12 @@ export interface RewardProduct {
   reward_points: number;
 }
 
-const RewardSection: React.FC = () => {
+// Define the props interface for RewardSection
+interface RewardSectionProps {
+  onClaimSuccess?: () => void; // Add this prop
+}
+
+const RewardSection: React.FC<RewardSectionProps> = ({ onClaimSuccess }) => {
   const [products, setProducts] = useState<RewardProduct[]>([]);
   const { setLoading } = useLoading();
   const { t } = useLanguage();
@@ -44,13 +49,17 @@ const RewardSection: React.FC = () => {
 
   return (
     <section className="mt-4">
-      <h2 className="text-xl font-bold text-gray-700 mb-2 khmer-text">
+      <h2 className="text-xl font-bold text-gray-700 mb-2">
         {t.redeemYourRewards}
       </h2>
 
       <div className="grid grid-cols-2 gap-4 mt-2">
         {products.map((item) => (
-          <RewardCard key={item.id} product={item} />
+          <RewardCard 
+            key={item.id} 
+            product={item} 
+            onClaimSuccess={onClaimSuccess} 
+          />
         ))}
       </div>
     </section>

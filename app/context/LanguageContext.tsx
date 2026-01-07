@@ -10,7 +10,9 @@ interface LanguageContextType {
 }
 
 // Create context with proper type
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+const LanguageContext = createContext<LanguageContextType | undefined>(
+  undefined
+);
 
 // Translation dictionary outside component to avoid re-renders
 const translations = {
@@ -38,7 +40,8 @@ const translations = {
     rewards: "Rewards",
     logout: "Logout",
     manageYourNameAndPhoneNumber: "Manage your name, and phone number.",
-    viewAndUpdateYourShippingAndBillingAddresses: "View and update your shipping and billing addresses.",
+    viewAndUpdateYourShippingAndBillingAddresses:
+      "View and update your shipping and billing addresses.",
     checkAvailableCoupons: "Check available coupons and loyalty points.",
     editProfile: "Edit Profile",
     manageAddresses: "Manage Addresses",
@@ -50,10 +53,12 @@ const translations = {
     name: "Name",
     current: "Current",
     phoneNumber: "Phone Number",
-    phoneNumberWillBeNormalizedToDigitsOnlyFormat: "Phone number will be normalized to digits-only format",
+    phoneNumberWillBeNormalizedToDigitsOnlyFormat:
+      "Phone number will be normalized to digits-only format",
     reset: "Reset",
     saveChanges: "Save Changes",
-    requiredFields: "Required fields. Changes will be reflected immediately across your account.",
+    requiredFields:
+      "Required fields. Changes will be reflected immediately across your account.",
     updating: "Updating...",
     youHaveUnsavedChanges: "You have unsaved changes.",
     redirectingToAccountPage: "Redirecting to account page...",
@@ -102,7 +107,8 @@ const translations = {
     addressDeletedSuccessfully: "Address deleted successfully!",
     addressSavedSuccessfully: "Address saved successfully!",
     addressUpdatedSuccessfully: "Address updated successfully!",
-    noSavedAddressesYetAddYourFirstAddressBelow: "No saved addresses yet. Add your first address below.",
+    noSavedAddressesYetAddYourFirstAddressBelow:
+      "No saved addresses yet. Add your first address below.",
     saveThisAddress: "Save this address",
     Saving: "Saving...",
     clickToUseYourCurrentLocation: "Click to use your current location",
@@ -111,6 +117,21 @@ const translations = {
     coordinates: "Coordinates",
     loading: "Loading...",
     all: "All",
+    claimReward: "Claim Reward",
+    claiming: "Claiming...",
+    confirmClaimReward: "Claim reward",
+    thisWillCost: "This will cost",
+    pointsRequired: "Points required",
+    needMorePoints: "Need",
+    morePoints: "more points",
+    enoughPoints: "You have enough points",
+    insufficientPoints: "Insufficient points",
+    rewardClaimedSuccess: "Reward claimed successfully!",
+    claimFailed: "Failed to claim reward",
+    loginRequired: "Please login first",
+    rewardDetails: "Reward Details",
+    code: "Code",
+    validUntil: "Valid until",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -138,19 +159,23 @@ const translations = {
     name: "ឈ្មោះ",
     current: "បច្ចុប្បន្ន",
     manageYourNameAndPhoneNumber: "គ្រប់គ្រងឈ្មោះ និងលេខទូរស័ព្ទរបស់អ្នក",
-    viewAndUpdateYourShippingAndBillingAddresses: "មើល និងធ្វើបច្ចុប្បន្នភាពអាសយដ្ឋានការទូទាត់ និងវិក្កយបត្រ",
+    viewAndUpdateYourShippingAndBillingAddresses:
+      "មើល និងធ្វើបច្ចុប្បន្នភាពអាសយដ្ឋានការទូទាត់ និងវិក្កយបត្រ",
     checkAvailableCoupons: "រកមើលគូប៉ុង និងពិន្ទុយករង្វាន់",
     manageAddresses: "គ្រប់គ្រងអាសយដ្ឋាន",
     viewRewards: "មើលរង្វាន់",
     editProfile: "កែសម្រួលព័ត៌មានគណនី",
     loadingAcounts: "កំពុងផ្ទុកគណនី...",
-    updateYourPersonalInformation: "ធ្វើបច្ចុប្បន្នភាពព័ត៌មានផ្ទាល់ខ្លួនរបស់អ្នក។",
+    updateYourPersonalInformation:
+      "ធ្វើបច្ចុប្បន្នភាពព័ត៌មានផ្ទាល់ខ្លួនរបស់អ្នក។",
     phone: "ទូរស័ព្ទ",
     availableRewardPoints: "ពិន្ទុយករង្វាន់ដែលអាចប្រើបាន",
-    phoneNumberWillBeNormalizedToDigitsOnlyFormat: "លេខទូរស័ព្ទនឹងត្រូវធ្វើឲ្យមានលេខទាំងអស់",
+    phoneNumberWillBeNormalizedToDigitsOnlyFormat:
+      "លេខទូរស័ព្ទនឹងត្រូវធ្វើឲ្យមានលេខទាំងអស់",
     reset: "កំណត់ឡើងវិញ",
     saveChanges: "រក្សាទុកការផ្លាស់ប្តូរ",
-    requiredFields: "ចន្លោះត្រូវបំពេញ។ ការផ្លាស់ប្តូរនឹងត្រូវបានបង្ហាញភ្លាមៗនៅលើគណនីរបស់អ្នក។",
+    requiredFields:
+      "ចន្លោះត្រូវបំពេញ។ ការផ្លាស់ប្តូរនឹងត្រូវបានបង្ហាញភ្លាមៗនៅលើគណនីរបស់អ្នក។",
     updating: "កំពុងធ្វើបច្ចុប្បន្នភាព...",
     orderSummary: "សង្ខេបការកម្មង់",
     yourCartIsEmpty: "កន្ត្រករបស់អ្នកគឺទទេ",
@@ -198,7 +223,8 @@ const translations = {
     edit: "កែសម្រួល",
     delete: "លុប",
     editAddress: "កែសម្រួលអាសយដ្ឋាន",
-    noSavedAddressesYetAddYourFirstAddressBelow: "មិនមានអាសយដ្ឋានរួចរាល់មែនទេ។ សូមបញ្ចូលអាសយដ្ឋានដំបូងនៅទីនេះ",
+    noSavedAddressesYetAddYourFirstAddressBelow:
+      "មិនមានអាសយដ្ឋានរួចរាល់មែនទេ។ សូមបញ្ចូលអាសយដ្ឋានដំបូងនៅទីនេះ",
     saveThisAddress: "រក្សាទុកអាសយដ្ឋាននេះ",
     saving: "កំពុងរក្សាទុក...",
     clickToUseYourCurrentLocation: "ចុចដើម្បីប្រើទីតាំងបច្ចុប្បន្នរបស់អ្នក",
@@ -207,6 +233,21 @@ const translations = {
     coordinates: "កូអរដោនេ",
     loading: "កំពុងផ្ទុក...",
     all: "ទាំងអស់",
+    claimReward: "ទាមទាររង្វាន់",
+    claiming: "កំពុងទាមទារ...",
+    confirmClaimReward: "ប្តូររង្វាន់",
+    thisWillCost: "នេះនឹងត្រូវការ",
+    pointsRequired: "ពិន្ទុដែលត្រូវការ",
+    needMorePoints: "ត្រូវការបន្ថែម",
+    morePoints: "ពិន្ទុទៀត",
+    enoughPoints: "អ្នកមានពិន្ទុគ្រប់គ្រាន់",
+    insufficientPoints: "ពិន្ទុមិនគ្រប់គ្រាន់",
+    rewardClaimedSuccess: "ទាមទាររង្វាន់ដោយជោគជ័យ!",
+    claimFailed: "ទាមទាររង្វាន់មិនបានជោគជ័យ",
+    loginRequired: "សូមចូលគណនីជាមុន",
+    rewardDetails: "ព័ត៌មានរង្វាន់",
+    code: "លេខកូដ",
+    validUntil: "មានសុពលភាពដល់",
   },
 };
 
@@ -214,7 +255,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<"en" | "km">("km");
 
   const toggleLanguage = () => {
-    setLanguage(prev => prev === "en" ? "km" : "en");
+    setLanguage((prev) => (prev === "en" ? "km" : "en"));
   };
 
   // Use useMemo to prevent unnecessary re-renders
@@ -224,7 +265,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     <LanguageContext.Provider value={{ language, toggleLanguage, t }}>
       {children}
     </LanguageContext.Provider>
-  ); 
+  );
 }
 
 export const useLanguage = () => {
