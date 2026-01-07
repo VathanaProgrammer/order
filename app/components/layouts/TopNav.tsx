@@ -4,6 +4,8 @@ import Icon from "../Icon";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import SpinWheelPic from "@/../public/spin-the-wheel.png";
+import Image from "next/image";
 
 const TopNav = () => {
   const router = useRouter();
@@ -16,6 +18,14 @@ const TopNav = () => {
   const handleProfileClick = () => {
     if (user) {
       router.push("/account");
+    } else {
+      router.push("/sign-in");
+    }
+  };
+
+  const handleWheelClick = () => {
+    if (user) {
+      router.push("/wheel");
     } else {
       router.push("/sign-in");
     }
@@ -66,6 +76,14 @@ const TopNav = () => {
         <h1 className="text-[32px] font-bold main-text">SOB</h1>
 
         <div className="flex flex-row gap-2">
+
+        <button
+          type="button"
+          onClick={handleWheelClick}
+          className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
+        >
+          <Image src={SpinWheelPic} alt="wheel" width={26} height={26} />
+        </button>
               
           {/* Language Toggle Button */}
           <button
