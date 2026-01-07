@@ -230,7 +230,7 @@ export const SpinWheel = () => {
         onClick={spinWheel}
         disabled={isSpinning}
         size="lg"
-        className="px-12 py-6 text-xl font-display bg-red-500 font-bold rounded-full button-glow transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+        className="px-12 py-6 text-xl text-white font-display bg-blue-500 font-bold rounded-full button-glow transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
         {isSpinning ? "Spinning..." : "SPIN TO WIN!"}
       </Button>
