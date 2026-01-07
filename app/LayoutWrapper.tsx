@@ -25,7 +25,8 @@ export default function LayoutWrapper({
     '/account/shipping-address',
     '/checkout/order-success',
     '/account/reward',
-    '/account/edit-profile'
+    '/account/edit-profile',
+    '/wheel'
   ];
 
   const hideTopBar = noTopBarRoutes.includes(pathname);
