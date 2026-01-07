@@ -30,7 +30,7 @@ const ClaimedRewards: React.FC = () => {
 
     const fetchClaimedRewards = async () => {
         try {
-            const response = await api.get('/api/rewards/my-claims');
+            const response = await api.get('/rewards/my-claims');
             setClaimedRewards(response.data.data || []);
         } catch (error) {
             console.error('Error fetching claimed rewards:', error);

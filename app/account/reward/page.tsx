@@ -29,7 +29,7 @@ const Reward: React.FC = () => {
 
   const fetchRewardHistory = async () => {
     try {
-      const res = await api.get("/api/rewards/history");
+      const res = await api.get("/rewards/history");
       setHistory(res.data.data || []);
     } catch (err) {
       console.error("Error fetching reward history:", err);
