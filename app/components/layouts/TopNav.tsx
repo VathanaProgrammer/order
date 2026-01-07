@@ -82,7 +82,7 @@ const TopNav = () => {
           onClick={handleWheelClick}
           className="p-2 flex items-center rounded-[10px] cursor-pointer transition"
         >
-          <Image src={SpinWheelPic} alt="wheel" width={80} height={80} />
+          <Image src={SpinWheelPic} alt="wheel" width={40} height={40} />
         </button>
               
           {/* Language Toggle Button */}
