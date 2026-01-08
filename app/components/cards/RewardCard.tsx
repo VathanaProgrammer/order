@@ -77,7 +77,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 // Force multiple reload methods
                 setTimeout(() => {
                     // Try all methods
-                    try { window.location.reload(true); } catch(e) {}
+                    try { window.location.reload(); } catch(e) {}
                     try { window.location.href = window.location.href; } catch(e) {}
                     try { window.location.replace(window.location.href); } catch(e) {}
                     try { document.location.reload(); } catch(e) {}
