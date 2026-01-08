@@ -28,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="km" className={`h-full ${hanuman.variable}`}>
       <body className="h-full m-0">
+      <AuthProvider>
         <LanguageProvider>
         <GoogleMapsProvider>
             <CheckoutProvider>
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </CheckoutProvider>
         </GoogleMapsProvider>
         </LanguageProvider>
+        </AuthProvider>
       </body>
     </html>
   );
