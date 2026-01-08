@@ -9,90 +9,11 @@ import Image from "next/image";
 
 const TopNav = () => {
   const router = useRouter();
-  const { user, refreshUser } = useAuth();
-  const [points, setPoints] = useState(0);
+  const { user } = useAuth();
+
   const [location, setLocation] = useState<string>("Fetching location...");
   const [error, setError] = useState<string | null>(null);
   const { language, toggleLanguage, t } = useLanguage();
-
-  // Initialize points
-  useEffect(() => {
-    const currentPoints = getAvailablePoints(user);
-    console.log('TopNav: Initial points set to', currentPoints);
-    setPoints(currentPoints);
-  }, [user]);
-
-  // Helper function to get points
-  const getAvailablePoints = (userObj: any) => {
-    if (!userObj) return 0;
-    
-    if (typeof userObj.reward_points === 'number') {
-      return userObj.reward_points;
-    }
-    
-    if (userObj.reward_points && typeof userObj.reward_points === 'object') {
-      return userObj.reward_points.available || userObj.reward_points.total || 0;
-    }
-    
-    return 0;
-  };
-
-  // Debug: Log user data changes
-  useEffect(() => {
-    console.log('TopNav - User updated:', user);
-    const currentPoints = getAvailablePoints(user);
-    console.log('TopNav - Points:', currentPoints);
-  }, [user]);
-
-  // Listen for ALL update events
-  useEffect(() => {
-    const handlePointsUpdated = () => {
-      console.log('TopNav: Points update event received, refreshing...');
-      refreshUser();
-      
-      // Force update points from current user
-      setTimeout(() => {
-        const currentPoints = getAvailablePoints(user);
-        console.log('TopNav: Updating points to', currentPoints);
-        setPoints(currentPoints);
-      }, 100);
-    };
-    
-    // Listen for multiple event types
-    window.addEventListener('userPointsUpdated', handlePointsUpdated);
-    window.addEventListener('userUpdated', handlePointsUpdated);
-    window.addEventListener('storage', handlePointsUpdated);
-    
-    // Also listen for page focus
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log('TopNav: Page visible, refreshing...');
-        refreshUser();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Force initial refresh
-    refreshUser();
-    
-    return () => {
-      window.removeEventListener('userPointsUpdated', handlePointsUpdated);
-      window.removeEventListener('userUpdated', handlePointsUpdated);
-      window.removeEventListener('storage', handlePointsUpdated);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [refreshUser, user]);
-
-  // Auto-refresh periodically (every 10 seconds)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('TopNav: Periodic refresh');
-      refreshUser();
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, [refreshUser]);
 
   const handleProfileClick = () => {
     if (user) {
@@ -150,28 +71,28 @@ const TopNav = () => {
 
   return (
     <section className="flex flex-col gap-2">
-      <div key={`points-${points}`} className="flex flex-row justify-between items-center">
+      <div className="flex flex-row justify-between items-center">
         {/* Logo */}
         <h1 className="text-[32px] font-bold main-text">SOB</h1>
 
         <div className="flex flex-row gap-2">
-          <button
-            type="button"
-            onClick={handleWheelClick}
-            className="p-2 flex items-center rounded-[10px] cursor-pointer transition"
-          >
-            <Image src={SpinWheelPic} alt="wheel" width={40} height={40} />
-          </button>
-          
+
+        <button
+          type="button"
+          onClick={handleWheelClick}
+          className="p-2 flex items-center rounded-[10px] cursor-pointer transition"
+        >
+          <Image src={SpinWheelPic} alt="wheel" width={40} height={40} />
+        </button>
+              
           {/* Language Toggle Button */}
           <button
-            type="button"
-            onClick={toggleLanguage}
-            className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
-          >
-            {language === "en" ? "ភាសាខ្មែរ" : "English"}
-          </button>
-          
+          type="button"
+          onClick={toggleLanguage}
+          className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
+        >
+          {language === "en" ? "ភាសាខ្មែរ" : "English"}
+        </button>
           <div
             onClick={handleProfileClick}
             className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
@@ -183,6 +104,28 @@ const TopNav = () => {
               height={26}
             />
           </div>
+          {/* <div
+            onClick={() => router.push("/cart")}
+            className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
+          >
+            <Icon
+              className="text-gray-500"
+              icon="mdi:cart"
+              width={26}
+              height={26}
+            />
+          </div> */}
+          {/* <div
+            onClick={() => router.push("/notifications")}
+            className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
+          >
+            <Icon
+              className="text-gray-500"
+              icon="zondicons:notifications"
+              width={26}
+              height={26}
+            />
+          </div> */}
         </div>
       </div>
 
@@ -200,14 +143,8 @@ const TopNav = () => {
           </p>
         </div>
 
-        {/* Points Display - Use points state instead of user.reward_points */}
         <div
-          key={`points-display-${points}`}
-          onClick={() => {
-            router.push("/account/reward");
-            // Refresh when navigating to rewards page
-            setTimeout(() => refreshUser(), 100);
-          }}
+          onClick={() => router.push("/account/reward")}
           className="p-2 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
         >
           <Icon
@@ -216,16 +153,12 @@ const TopNav = () => {
             width={20}
             height={20}
           />
-          <p className="text-[16px] font-medium ml-1">{points}</p>
+          <p className="text-[16px] font-medium ml-1">{user?.reward_points?.available || 0}</p>
         </div>
+
       </div>
 
       {error && <p className="text-red-500 text-[12px]">{error}</p>}
-      
-      {/* Debug info (remove in production) */}
-      <div className="text-xs text-gray-400">
-        Last update: {new Date().toLocaleTimeString()} | Points: {points}
-      </div>
     </section>
   );
 };
