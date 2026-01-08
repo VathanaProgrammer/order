@@ -76,45 +76,36 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 const claimData = response.data.data;
                 
                 toast.success(
-                  <div className="space-y-2">
-                    <div className="font-bold text-green-600">✅ {t.rewardClaimedSuccess || "Successfully claimed!"}</div>
-                    <div>
-                      <div><strong>{t.reward || "Reward"}:</strong> {claimData.product_name}</div>
-                    </div>
-                  </div>,
-                  {
-                    autoClose: 8000,
-                    closeOnClick: false,
-                    draggable: false,
-                  }
+                    <div className="space-y-2">
+                        <div className="font-bold text-green-600">✅ {t.rewardClaimedSuccess || "Successfully claimed!"}</div>
+                        <div>
+                            <div><strong>{t.reward || "Reward"}:</strong> {claimData.product_name}</div>
+                        </div>
+                    </div>,
+                    {
+                        autoClose: 8000,
+                        closeOnClick: false,
+                        draggable: false,
+                    }
                 );
-              
-                console.log('Claim successful, refreshing user...');
-              
-                // 1. Refresh user in AuthContext
+
+                // Refresh user data
                 await refreshUser();
                 
-                // 2. Dispatch BOTH events that TopNav is listening for
-                window.dispatchEvent(new Event('userPointsUpdated'));
-                window.dispatchEvent(new Event('userUpdated'));
-                
-                // 3. Simple storage event
-                window.dispatchEvent(new Event('storage'));
-                
                 if (onClaimSuccess) {
-                  onClaimSuccess();
+                    onClaimSuccess();
                 }
-                
+
                 // Copy code to clipboard automatically
                 if (claimData.reward_code) {
-                  navigator.clipboard.writeText(claimData.reward_code);
-                  
-                  // Show copy confirmation
-                  setTimeout(() => {
-                    toast.info(`📋 ${t.codeCopied || "Reward code copied to clipboard!"}`);
-                  }, 1000);
+                    navigator.clipboard.writeText(claimData.reward_code);
+                    
+                    // Show copy confirmation
+                    setTimeout(() => {
+                        toast.info(`📋 ${t.codeCopied || "Reward code copied to clipboard!"}`);
+                    }, 1000);
                 }
-              }
+            }
         } catch (error: any) {
             console.error('Error claiming reward:', error);
             
@@ -142,7 +133,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
     const pointsNeeded = Math.max(0, requiredPoints - availablePoints);
 
     return (
-        <div key={`${product.id}-${Date.now()}`} className="w-full rounded-xl bg-white border border-gray-200 shadow-md flex flex-col overflow-hidden transition-all hover:shadow-xl hover:border-blue-300">
+        <div className="w-full rounded-xl bg-white border border-gray-200 shadow-md flex flex-col overflow-hidden transition-all hover:shadow-xl hover:border-blue-300">
             {/* Product Image */}
             <div className="relative w-full h-44">
                 <Image
