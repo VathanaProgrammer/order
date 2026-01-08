@@ -67,6 +67,15 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         setIsClaiming(true);
         setLoading(true);
 
+        console.log('🎯 Claiming reward...');
+        
+        // 🎯 IMMEDIATELY UPDATE UI - JUST FAKE IT!
+        const newPoints = availablePoints - requiredPoints;
+        console.log('UI: Updating points from', availablePoints, 'to', newPoints);
+        
+        // SIMPLE: Just save to localStorage
+        localStorage.setItem('current_points', newPoints.toString());
+
         try {
             const response = await api.post('/rewards/claim', {
                 product_id: product.id,
@@ -80,8 +89,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                         <div className="font-bold text-green-600">✅ {t.rewardClaimedSuccess || "Successfully claimed!"}</div>
                         <div>
                             <div><strong>{t.reward || "Reward"}:</strong> {claimData.product_name}</div>
-                            <div><strong>Points deducted:</strong> {requiredPoints}</div>
-                            <div><strong>Remaining points:</strong> {availablePoints - requiredPoints}</div>
                         </div>
                     </div>,
                     {
@@ -90,36 +97,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                         draggable: false,
                     }
                 );
-
-                console.log('✅ Claim successful! Server already updated.');
-
-                // 🎯 CRITICAL: JUST UPDATE UI - DON'T TOUCH SERVER
-                console.log('🎯 Updating UI only...');
-
-                // Method 1: Store expected points in localStorage
-                const expectedNewPoints = availablePoints - requiredPoints;
-                localStorage.setItem('expected_points', expectedNewPoints.toString());
-                localStorage.setItem('last_claim_time', Date.now().toString());
-                
-                // Method 2: Dispatch a custom event that TopNav will listen to
-                window.dispatchEvent(new CustomEvent('pointsManuallyUpdated', {
-                    detail: {
-                        newPoints: expectedNewPoints,
-                        timestamp: Date.now(),
-                        productName: product.name
-                    }
-                }));
-
-                // Method 3: Also trigger a storage event (some components listen to this)
-                window.dispatchEvent(new StorageEvent('storage', {
-                    key: 'points_update',
-                    newValue: expectedNewPoints.toString()
-                }));
-
-                // Method 4: Force a global refresh event
-                window.dispatchEvent(new Event('forceUIRefresh'));
-
-                console.log('✅ UI update events dispatched. Points should show:', expectedNewPoints);
 
                 // Copy code to clipboard automatically
                 if (claimData.reward_code) {
@@ -134,12 +111,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 if (onClaimSuccess) {
                     onClaimSuccess();
                 }
-
-                // Optional: Call refreshUser after 2 seconds just to sync
-                setTimeout(() => {
-                    console.log('🔄 Syncing with server after delay...');
-                    refreshUser();
-                }, 2000);
             }
         } catch (error: any) {
             console.error('Error claiming reward:', error);
@@ -154,6 +125,9 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             } else {
                 toast.error(t.claimFailed || "Failed to claim reward");
             }
+            
+            // If error, revert UI points
+            localStorage.setItem('current_points', availablePoints.toString());
         } finally {
             setIsClaiming(false);
             setLoading(false);
@@ -199,13 +173,13 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 {/* Points Progress Bar */}
                 <div className="mb-4">
                     <div className="flex justify-between text-sm mb-1">
+                        {/* <span className="text-gray-600">
+                            {t.yourPoints || "Your points"}:
+                            <span className="font-bold ml-1 text-blue-600">{availablePoints}</span>
+                        </span> */}
                         <span className="text-gray-600">
                             {t.required || "Need"}:
                             <span className="font-bold ml-1">{requiredPoints}</span>
-                        </span>
-                        <span className="text-gray-600">
-                            You have:
-                            <span className="font-bold ml-1 text-blue-600">{availablePoints}</span>
                         </span>
                     </div>
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
