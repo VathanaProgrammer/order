@@ -174,19 +174,19 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
     const handleClaimReward = async () => {
         if (!user) {
-            toast.error(t.loginRequired || "Please login first");
+            alert("Please login first");
             return;
         }
     
         if (availablePoints < requiredPoints) {
-            toast.error(t.insufficientPoints || "Insufficient points");
+            alert("Insufficient points");
             return;
         }
     
         const isConfirmed = window.confirm(
-            `${t.confirmClaimReward || "Claim"}: "${product.name}"?\n\n` +
-            `${t.thisWillCost || "This will cost"}: ${requiredPoints} ${t.points || "points"}\n` +
-            `${t.yourPoints || "Your points"}: ${availablePoints}`
+            `Claim "${product.name}"?\n\n` +
+            `Cost: ${requiredPoints} points\n` +
+            `Your points: ${availablePoints}`
         );
     
         if (!isConfirmed) return;
@@ -199,38 +199,28 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 product_id: product.id,
             });
     
-            console.log('API Response:', response.data);
+            console.log('Response:', response.data);
     
             if (response.data.status === "success") {
-                const claimData = response.data.data;
-                
-                console.log('Claim successful!');
-                
-                // 🎯 CALL THE CUSTOM ALERT FUNCTION
-                showRefreshAlert(
-                    t.rewardClaimedSuccess || "Successfully claimed!",
-                    `You claimed: ${product.name}`,
-                    claimData.reward_code
+                // 🎯 SIMPLE: Just show alert and ask to refresh
+                const shouldRefresh = window.confirm(
+                    `✅ Successfully claimed ${product.name}!\n\n` +
+                    `Click OK to refresh the page.\n` +
+                    `Click Cancel to continue without refreshing.`
                 );
-
-                if (onClaimSuccess) {
-                    onClaimSuccess();
+                
+                if (shouldRefresh) {
+                    console.log('User chose to refresh');
+                    window.location.reload();
+                } else {
+                    console.log('User chose not to refresh');
                 }
                 
                 return;
             }
-        } catch (error: any) {
-            console.error('Error claiming reward:', error);
-            
-            if (error.response?.data?.errors) {
-                const errors = error.response.data.errors;
-                const firstError = Object.values(errors)[0];
-                toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
-            } else if (error.response?.data?.message) {
-                toast.error(error.response.data.message);
-            } else {
-                toast.error(t.claimFailed || "Failed to claim reward");
-            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert("Failed to claim reward");
         } finally {
             setIsClaiming(false);
             setLoading(false);
