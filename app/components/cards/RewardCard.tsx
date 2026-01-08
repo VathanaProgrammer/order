@@ -7,7 +7,6 @@ import { useLanguage } from "@/context/LanguageContext";
 import api from "@/api/api";
 import { toast } from "react-toastify";
 import { useLoading } from "@/context/LoadingContext";
-import Swal from 'sweetalert2';
 
 interface RewardCardProps {
     product: RewardProduct;
@@ -19,6 +18,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
     const { t } = useLanguage();
     const { setLoading } = useLoading();
     const [isClaiming, setIsClaiming] = useState(false);
+    const [showRefreshModal, setShowRefreshModal] = useState(false);
     
     const displayImage = product.image_url || "/img/default.png";
 
@@ -54,36 +54,13 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             return;
         }
         
-        // Use SweetAlert2 for confirmation (mobile-friendly)
-        const { value: isConfirmed } = await Swal.fire({
-            title: `Claim "${product.name}"?`,
-            html: `
-                <div style="text-align: center;">
-                    <div style="font-size: 16px; margin-bottom: 10px;">
-                        <strong>Cost:</strong> ${requiredPoints} points<br>
-                        <strong>Your points:</strong> ${availablePoints}
-                    </div>
-                    <div style="font-size: 14px; color: #666; margin-top: 10px;">
-                        After claiming, your points will be deducted
-                    </div>
-                </div>
-            `,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: '#10B981',
-            cancelButtonColor: '#6B7280',
-            confirmButtonText: 'Yes, claim it!',
-            cancelButtonText: 'Cancel',
-            reverseButtons: true,
-            background: '#ffffff',
-            backdrop: 'rgba(0,0,0,0.4)',
-            showClass: {
-                popup: 'animate__animated animate__fadeInDown animate__faster'
-            },
-            hideClass: {
-                popup: 'animate__animated animate__fadeOutUp animate__faster'
-            }
-        });
+        // Simple native confirm (works best on mobile)
+        const isConfirmed = window.confirm(
+            `Claim "${product.name}"?\n\n` +
+            `Cost: ${requiredPoints} points\n` +
+            `Your points: ${availablePoints}\n\n` +
+            `Click OK to confirm.`
+        );
         
         if (!isConfirmed) {
             return;
@@ -103,46 +80,12 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                             (response.data.message && response.data.message.includes('success'));
             
             if (isSuccess) {
-                toast.success(`Successfully claimed ${product.name}!`);
+                toast.success(`🎉 Successfully claimed ${product.name}!`);
                 
-                // SweetAlert2 for refresh confirmation
-                setTimeout(async () => {
-                    const { value: shouldRefresh } = await Swal.fire({
-                        title: 'Success! 🎉',
-                        html: `
-                            <div style="text-align: center;">
-                                <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
-                                <div style="font-size: 16px; margin-bottom: 15px;">
-                                    You claimed <strong>${product.name}</strong>
-                                </div>
-                                <div style="font-size: 14px; color: #666;">
-                                    Your points have been updated
-                                </div>
-                            </div>
-                        `,
-                        icon: 'success',
-                        showCancelButton: true,
-                        confirmButtonColor: '#10B981',
-                        cancelButtonColor: '#3B82F6',
-                        confirmButtonText: 'Refresh Page',
-                        cancelButtonText: 'Continue Browsing',
-                        reverseButtons: true,
-                        background: '#ffffff',
-                        backdrop: 'rgba(0,0,0,0.4)',
-                        showClass: {
-                            popup: 'animate__animated animate__fadeInDown animate__faster'
-                        },
-                        hideClass: {
-                            popup: 'animate__animated animate__fadeOutUp animate__faster'
-                        }
-                    });
-                    
-                    if (shouldRefresh) {
-                        window.location.reload();
-                    } else if (onClaimSuccess) {
-                        onClaimSuccess(); // Callback to update parent state
-                    }
-                }, 1000); // Small delay for better UX
+                // Small delay then show refresh modal
+                setTimeout(() => {
+                    setShowRefreshModal(true);
+                }, 800);
                 
             } else {
                 toast.error("Failed to claim reward. Please try again.");
@@ -150,23 +93,21 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         } catch (error: any) {
             console.error('Claim error:', error);
             const errorMessage = error.response?.data?.message || error.message || "Unknown error";
-            
-            // SweetAlert2 for error
-            Swal.fire({
-                title: 'Claim Failed',
-                text: errorMessage,
-                icon: 'error',
-                confirmButtonColor: '#EF4444',
-                confirmButtonText: 'OK',
-                background: '#ffffff',
-                backdrop: 'rgba(0,0,0,0.4)',
-                showClass: {
-                    popup: 'animate__animated animate__shakeX animate__faster'
-                }
-            });
+            toast.error(`Failed: ${errorMessage}`);
         } finally {
             setIsClaiming(false);
             setLoading(false);
+        }
+    };
+
+    const handleRefresh = () => {
+        window.location.reload();
+    };
+
+    const handleContinue = () => {
+        setShowRefreshModal(false);
+        if (onClaimSuccess) {
+            onClaimSuccess();
         }
     };
     
@@ -178,121 +119,181 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
     const pointsNeeded = Math.max(0, requiredPoints - availablePoints);
 
     return (
-        <div className="w-full rounded-xl bg-white border border-gray-200 shadow-md flex flex-col overflow-hidden transition-all hover:shadow-xl hover:border-blue-300">
-            {/* Product Image */}
-            <div className="relative w-full h-44">
-                <Image
-                    src={displayImage}
-                    alt={product.name || "Reward product"}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                    sizes="(max-width: 768px) 100vw"
-                    onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/img/default.png";
-                    }}
-                />
-                
-                {/* Points Badge */}
-                <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg flex items-center">
-                    <span className="mr-1">⭐</span>
-                    {requiredPoints}
-                </div>
-            </div>
-
-            {/* Product Info */}
-            <div className="p-4 flex flex-col flex-1">
-                <h3 className="font-bold text-gray-800 text-base mb-3 line-clamp-2 min-h-[3rem]">
-                    {product.name || "Reward Item"}
-                </h3>
-
-                {/* Points Progress Bar */}
-                <div className="mb-4">
-                    <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-600">
-                            {t.required || "Need"}:
-                            <span className="font-bold ml-1">{requiredPoints}</span>
-                        </span>
-                        <span className="text-gray-600">
-                            You have:
-                            <span className="font-bold ml-1 text-blue-600">{availablePoints}</span>
-                        </span>
-                    </div>
-                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                            className={`h-full rounded-full transition-all duration-500 ${
-                                hasEnoughPoints 
-                                    ? 'bg-gradient-to-r from-green-500 to-emerald-600' 
-                                    : 'bg-gradient-to-r from-red-500 to-orange-500'
-                            }`}
-                            style={{ 
-                                width: `${progressPercentage}%` 
-                            }}
-                        />
+        <>
+            <div className="w-full rounded-xl bg-white border border-gray-200 shadow-md flex flex-col overflow-hidden transition-all hover:shadow-xl hover:border-blue-300">
+                {/* Product Image */}
+                <div className="relative w-full h-44">
+                    <Image
+                        src={displayImage}
+                        alt={product.name || "Reward product"}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                        sizes="(max-width: 768px) 100vw"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).src = "/img/default.png";
+                        }}
+                    />
+                    
+                    {/* Points Badge */}
+                    <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg flex items-center">
+                        <span className="mr-1">⭐</span>
+                        {requiredPoints}
                     </div>
                 </div>
 
-                {/* Claim Button */}
-                <button
-                    onClick={handleClaimReward}
-                    disabled={isClaiming || !canClaim}
-                    className={`
-                        w-full py-3 px-4 rounded-lg font-bold text-sm transition-all
-                        ${isClaiming
-                            ? 'bg-gray-400 cursor-not-allowed'
-                            : canClaim
-                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-md hover:shadow-lg active:scale-95'
-                                : !user
-                                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md hover:shadow-lg'
-                                    : 'bg-gradient-to-r from-gray-300 to-gray-400 text-gray-600 cursor-not-allowed'
-                        }
-                        disabled:opacity-50 disabled:cursor-not-allowed
-                        flex items-center justify-center
-                    `}
-                >
-                    {isClaiming ? (
-                        <>
-                            <svg className="animate-spin h-4 w-4 mr-2 text-white" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                            </svg>
-                            {t.claiming || "Processing..."}
-                        </>
-                    ) : !user ? (
-                        <>
-                            🔐 {t.loginRequired || "Login to Claim"}
-                        </>
-                    ) : !hasEnoughPoints ? (
-                        <>
-                            ⚠️ {t.needMorePoints || `Need ${pointsNeeded} more`}
-                        </>
-                    ) : (
-                        <>
-                            🎁 {t.claimNow || "Claim Now"}
-                        </>
-                    )}
-                </button>
+                {/* Product Info */}
+                <div className="p-4 flex flex-col flex-1">
+                    <h3 className="font-bold text-gray-800 text-base mb-3 line-clamp-2 min-h-[3rem]">
+                        {product.name || "Reward Item"}
+                    </h3>
 
-                {/* Status Message */}
-                {user && (
-                    <div className={`mt-2 text-center text-xs font-medium ${
-                        hasEnoughPoints ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                        {hasEnoughPoints ? (
-                            <div className="flex items-center justify-center">
-                                <span className="mr-1">✅</span>
-                                {t.readyToClaim || "Ready to claim!"}
-                            </div>
+                    {/* Points Progress Bar */}
+                    <div className="mb-4">
+                        <div className="flex justify-between text-sm mb-1">
+                            <span className="text-gray-600">
+                                {t.required || "Need"}:
+                                <span className="font-bold ml-1">{requiredPoints}</span>
+                            </span>
+                            <span className="text-gray-600">
+                                You have:
+                                <span className="font-bold ml-1 text-blue-600">{availablePoints}</span>
+                            </span>
+                        </div>
+                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div 
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                    hasEnoughPoints 
+                                        ? 'bg-gradient-to-r from-green-500 to-emerald-600' 
+                                        : 'bg-gradient-to-r from-red-500 to-orange-500'
+                                }`}
+                                style={{ 
+                                    width: `${progressPercentage}%` 
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Claim Button */}
+                    <button
+                        onClick={handleClaimReward}
+                        disabled={isClaiming || !canClaim}
+                        className={`
+                            w-full py-3 px-4 rounded-lg font-bold text-sm transition-all
+                            ${isClaiming
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : canClaim
+                                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-md hover:shadow-lg active:scale-95'
+                                    : !user
+                                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md hover:shadow-lg'
+                                        : 'bg-gradient-to-r from-gray-300 to-gray-400 text-gray-600 cursor-not-allowed'
+                            }
+                            disabled:opacity-50 disabled:cursor-not-allowed
+                            flex items-center justify-center
+                        `}
+                    >
+                        {isClaiming ? (
+                            <>
+                                <svg className="animate-spin h-4 w-4 mr-2 text-white" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                {t.claiming || "Processing..."}
+                            </>
+                        ) : !user ? (
+                            <>
+                                🔐 {t.loginRequired || "Login to Claim"}
+                            </>
+                        ) : !hasEnoughPoints ? (
+                            <>
+                                ⚠️ {t.needMorePoints || `Need ${pointsNeeded} more`}
+                            </>
                         ) : (
-                            <div className="flex items-center justify-center">
-                                <span className="mr-1">❌</span>
-                                {t.insufficientPoints || "Insufficient points"}
-                            </div>
+                            <>
+                                🎁 {t.claimNow || "Claim Now"}
+                            </>
                         )}
-                    </div>
-                )}
+                    </button>
+
+                    {/* Status Message */}
+                    {user && (
+                        <div className={`mt-2 text-center text-xs font-medium ${
+                            hasEnoughPoints ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                            {hasEnoughPoints ? (
+                                <div className="flex items-center justify-center">
+                                    <span className="mr-1">✅</span>
+                                    {t.readyToClaim || "Ready to claim!"}
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-center">
+                                    <span className="mr-1">❌</span>
+                                    {t.insufficientPoints || "Insufficient points"}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
+
+            {/* Mobile-friendly Refresh Modal */}
+            {showRefreshModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+                    <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-fade-in">
+                        {/* Success Icon */}
+                        <div className="flex justify-center mb-4">
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                                <span className="text-3xl">✅</span>
+                            </div>
+                        </div>
+                        
+                        {/* Title */}
+                        <h3 className="text-lg font-bold text-center text-gray-800 mb-2">
+                            Claim Successful! 🎉
+                        </h3>
+                        
+                        {/* Message */}
+                        <p className="text-center text-gray-600 mb-6">
+                            You claimed <span className="font-semibold">{product.name}</span>
+                        </p>
+                        
+                        {/* Action Buttons */}
+                        <div className="space-y-3">
+                            <button
+                                onClick={handleRefresh}
+                                className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-lg active:scale-[0.98] transition-transform"
+                            >
+                                Refresh Page
+                            </button>
+                            
+                            <button
+                                onClick={handleContinue}
+                                className="w-full py-3 bg-gray-100 text-gray-700 font-semibold rounded-lg active:scale-[0.98] transition-transform"
+                            >
+                                Continue Browsing
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style jsx>{`
+                @keyframes fade-in {
+                    from {
+                        opacity: 0;
+                        transform: scale(0.95);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: scale(1);
+                    }
+                }
+                
+                .animate-fade-in {
+                    animation: fade-in 0.2s ease-out;
+                }
+            `}</style>
+        </>
     );
 };
 
