@@ -91,6 +91,14 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
                 // Refresh user data
                 await refreshUser();
+
+                // Dispatch a custom event to notify other components
+                window.dispatchEvent(new CustomEvent('userPointsUpdated'));
+                
+                // Force a small delay and re-check
+                setTimeout(() => {
+                    refreshUser();
+                }, 500);
                 
                 if (onClaimSuccess) {
                     onClaimSuccess();
