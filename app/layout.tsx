@@ -11,6 +11,7 @@ import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
 import { LanguageProvider } from "./context/LanguageContext";
 import { Hanuman } from 'next/font/google';
+import { PointsProvider } from "./context/PointsContext";
 
 export const metadata: Metadata = {
   title: "SOB-Ecommerce",
@@ -33,8 +34,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <GoogleMapsProvider>
             <CheckoutProvider>
               <LoadingProvider>
+                <PointsProvider>
                 <LayoutWrapper>{children}</LayoutWrapper>
-
                 {/* ✅ Toastify container (instead of Toaster) */}
                 <ToastContainer
                   position="top-center"
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   draggable
                   theme="colored"
                 />
+                </PointsProvider>
               </LoadingProvider>
             </CheckoutProvider>
         </GoogleMapsProvider>
