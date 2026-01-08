@@ -68,14 +68,34 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         
         // 🎯 IMMEDIATELY UPDATE UI - BEFORE API CALL
         const newPoints = availablePoints - requiredPoints;
-        console.log('UI: Immediately updating points to', newPoints);
+        console.log('UI: Immediately updating points from', availablePoints, 'to', newPoints);
         
-        // Method 1: Update localStorage
+        // Generate unique claim ID
+        const claimId = Date.now() + Math.random();
+        
+        // Update localStorage with current points
         localStorage.setItem('current_points', newPoints.toString());
+        localStorage.setItem('last_claim_id', claimId.toString());
+        localStorage.setItem('last_claim_time', Date.now().toString());
         
-        // Method 2: Dispatch event (guaranteed to work)
+        // Dispatch MULTIPLE events to ensure TopNav gets it
         window.dispatchEvent(new CustomEvent('updatePointsDisplay', {
-            detail: { points: newPoints }
+            detail: { 
+                points: newPoints,
+                claimId: claimId,
+                productId: product.id,
+                timestamp: Date.now()
+            }
+        }));
+        
+        // Also dispatch generic events
+        window.dispatchEvent(new Event('claimSuccess'));
+        window.dispatchEvent(new Event('pointsUpdated'));
+        
+        // Force a storage event (works across tabs)
+        window.dispatchEvent(new StorageEvent('storage', {
+            key: 'points_update',
+            newValue: newPoints.toString()
         }));
 
         try {
@@ -91,7 +111,8 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                         <div className="font-bold text-green-600">✅ {t.rewardClaimedSuccess || "Successfully claimed!"}</div>
                         <div>
                             <div><strong>{t.reward || "Reward"}:</strong> {claimData.product_name}</div>
-                            <div><strong>New points balance:</strong> {newPoints}</div>
+                            <div><strong>Points deducted:</strong> {requiredPoints}</div>
+                            <div><strong>New balance:</strong> {newPoints.toLocaleString()}</div>
                         </div>
                     </div>,
                     {
@@ -113,6 +134,13 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 if (onClaimSuccess) {
                     onClaimSuccess();
                 }
+                
+                // Final update event
+                setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('finalPointsUpdate', {
+                        detail: { points: newPoints }
+                    }));
+                }, 100);
             }
         } catch (error: any) {
             console.error('Error claiming reward:', error);

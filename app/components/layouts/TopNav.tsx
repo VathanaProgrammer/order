@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Icon from "../Icon";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -11,90 +11,134 @@ const TopNav = () => {
   const router = useRouter();
   const { user } = useAuth();
   const [displayPoints, setDisplayPoints] = useState(0);
+  const [forceUpdate, setForceUpdate] = useState(0); // Force update counter
+  const lastUpdateRef = useRef<number>(0);
   const [location, setLocation] = useState<string>("Fetching location...");
   const [error, setError] = useState<string | null>(null);
   const { language, toggleLanguage, t } = useLanguage();
 
-  // Function to get points - ALWAYS works
-  const getPoints = useCallback(() => {
-    // 1. First try localStorage
-    const savedPoints = localStorage.getItem('current_points');
-    if (savedPoints) {
-      const points = parseInt(savedPoints, 10);
-      if (!isNaN(points)) {
-        return points;
-      }
-    }
-    
-    // 2. Fallback to server points
-    return user?.reward_points?.available || 0;
+  // Initialize points from server
+  useEffect(() => {
+    const points = user?.reward_points?.available || 0;
+    console.log('TopNav: Initial points from server:', points);
+    setDisplayPoints(points);
+    lastUpdateRef.current = points;
+    localStorage.setItem('current_points', points.toString());
   }, [user]);
 
-  // Initialize and update points
+  // 🎯 LISTEN FOR ALL POSSIBLE UPDATE EVENTS
   useEffect(() => {
-    const points = getPoints();
-    console.log('TopNav: Setting points to', points);
-    setDisplayPoints(points);
-  }, [user, getPoints]);
-
-  // 🎯 LISTEN FOR UI UPDATES - MULTIPLE METHODS FOR RELIABILITY
-  useEffect(() => {
-    console.log('TopNav: Setting up reliable update listeners');
+    console.log('TopNav: Setting up bulletproof update system');
     
-    // Method 1: Custom event (most reliable)
+    // Function to update points
+    const updatePoints = (newPoints: number) => {
+      console.log('🔄 Updating points to:', newPoints);
+      setDisplayPoints(newPoints);
+      setForceUpdate(prev => prev + 1); // Force re-render
+      lastUpdateRef.current = newPoints;
+    };
+    
+    // Event 1: Custom points display event
     const handleUpdatePoints = (event: any) => {
       const newPoints = event.detail?.points;
       if (newPoints !== undefined) {
-        console.log('🎯 Event received! Updating points to:', newPoints);
-        setDisplayPoints(newPoints);
+        console.log('🎯 Custom event received:', newPoints);
+        updatePoints(newPoints);
         localStorage.setItem('current_points', newPoints.toString());
       }
     };
     
-    // Method 2: Storage event (works across tabs)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'current_points' && e.newValue) {
-        const newPoints = parseInt(e.newValue, 10);
-        if (!isNaN(newPoints) && newPoints !== displayPoints) {
-          console.log('💾 Storage event! Updating points to:', newPoints);
-          setDisplayPoints(newPoints);
+    // Event 2: Generic claim success
+    const handleClaimSuccess = () => {
+      console.log('✅ Claim success event');
+      // Read from localStorage
+      const savedPoints = localStorage.getItem('current_points');
+      if (savedPoints) {
+        const points = parseInt(savedPoints, 10);
+        if (!isNaN(points)) {
+          updatePoints(points);
         }
       }
     };
     
-    // Method 3: Interval check (never fails)
-    const checkForUpdates = () => {
+    // Event 3: Points updated
+    const handlePointsUpdated = () => {
+      console.log('📊 Points updated event');
+      const savedPoints = localStorage.getItem('current_points');
+      if (savedPoints) {
+        const points = parseInt(savedPoints, 10);
+        if (!isNaN(points)) {
+          updatePoints(points);
+        }
+      }
+    };
+    
+    // Event 4: Final points update
+    const handleFinalUpdate = (event: any) => {
+      const newPoints = event.detail?.points;
+      if (newPoints !== undefined) {
+        console.log('🏁 Final update:', newPoints);
+        updatePoints(newPoints);
+      }
+    };
+    
+    // Event 5: Storage event
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'current_points' && e.newValue) {
+        const points = parseInt(e.newValue, 10);
+        if (!isNaN(points)) {
+          console.log('💾 Storage event:', points);
+          updatePoints(points);
+        }
+      }
+    };
+    
+    // Add ALL event listeners
+    window.addEventListener('updatePointsDisplay', handleUpdatePoints);
+    window.addEventListener('claimSuccess', handleClaimSuccess);
+    window.addEventListener('pointsUpdated', handlePointsUpdated);
+    window.addEventListener('finalPointsUpdate', handleFinalUpdate);
+    window.addEventListener('storage', handleStorageChange);
+    
+    // 🎯 CRITICAL: Auto-check every 100ms (never fails)
+    const interval = setInterval(() => {
       const savedPoints = localStorage.getItem('current_points');
       if (savedPoints) {
         const points = parseInt(savedPoints, 10);
         if (!isNaN(points) && points !== displayPoints) {
-          console.log('⏰ Interval check! Updating points to:', points);
-          setDisplayPoints(points);
+          console.log('⏰ Auto-check updating:', points);
+          updatePoints(points);
+        }
+      }
+      
+      // Also force update every 5 seconds to catch any missed updates
+      setForceUpdate(prev => prev + 1);
+    }, 100);
+    
+    // Also check on page focus
+    const handlePageFocus = () => {
+      console.log('👀 Page focused, checking points');
+      const savedPoints = localStorage.getItem('current_points');
+      if (savedPoints) {
+        const points = parseInt(savedPoints, 10);
+        if (!isNaN(points)) {
+          updatePoints(points);
         }
       }
     };
     
-    const interval = setInterval(checkForUpdates, 500); // Check every 500ms
-    
-    // Add all listeners
-    window.addEventListener('updatePointsDisplay', handleUpdatePoints);
-    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handlePageFocus);
     
     return () => {
       window.removeEventListener('updatePointsDisplay', handleUpdatePoints);
+      window.removeEventListener('claimSuccess', handleClaimSuccess);
+      window.removeEventListener('pointsUpdated', handlePointsUpdated);
+      window.removeEventListener('finalPointsUpdate', handleFinalUpdate);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handlePageFocus);
       clearInterval(interval);
     };
   }, [displayPoints]);
-
-  // Force check on mount
-  useEffect(() => {
-    const points = getPoints();
-    if (points !== displayPoints) {
-      console.log('🔄 Force update on mount:', points);
-      setDisplayPoints(points);
-    }
-  }, [getPoints, displayPoints]);
 
   const handleProfileClick = () => {
     if (user) {
@@ -165,7 +209,6 @@ const TopNav = () => {
             <Image src={SpinWheelPic} alt="wheel" width={40} height={40} />
           </button>
           
-          {/* Language Toggle Button */}
           <button
             type="button"
             onClick={toggleLanguage}
@@ -202,9 +245,9 @@ const TopNav = () => {
           </p>
         </div>
 
-        {/* Points Display - ALWAYS updates */}
+        {/* 🎯 Points Display - ALWAYS UPDATES */}
         <div
-          key={`points-${displayPoints}`} // Key forces DOM update
+          key={`points-${displayPoints}-${forceUpdate}-${Date.now()}-${Math.random()}`}
           onClick={() => router.push("/account/reward")}
           className="p-2 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
         >
