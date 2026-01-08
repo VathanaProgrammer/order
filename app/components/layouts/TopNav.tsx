@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import Icon from "../Icon";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -10,78 +10,36 @@ import Image from "next/image";
 const TopNav = () => {
   const router = useRouter();
   const { user } = useAuth();
-  const [displayPoints, setDisplayPoints] = useState(0);
-  const [updateCounter, setUpdateCounter] = useState(0); // Force updates
-  const lastPointsRef = useRef(0);
-  const [location, setLocation] = useState<string>("Fetching location...");
-  const [error, setError] = useState<string | null>(null);
   const { language, toggleLanguage, t } = useLanguage();
 
-  // Initialize points from server
+  const [displayPoints, setDisplayPoints] = useState(0);
+  const [pointsKey, setPointsKey] = useState(0); // Forces DOM remount for visual refresh
+
+  const [location, setLocation] = useState<string>("Fetching location...");
+  const [error, setError] = useState<string | null>(null);
+
+  // Initialize points from user
   useEffect(() => {
     const points = user?.reward_points?.available || 0;
-    console.log('TopNav: Initial points:', points);
     setDisplayPoints(points);
-    lastPointsRef.current = points;
-    if (typeof window !== 'undefined') {
-      (window as any).__CURRENT_POINTS = points;
-    }
   }, [user]);
 
-  // 🎯 CRITICAL: Force update on ANY points change
+  // Listen for points updates via Custom Events (reliable & instant)
   useEffect(() => {
-    console.log('TopNav: Setting up force update system');
-    
-    const handleForceUpdate = (event: any) => {
-      const newPoints = event.detail?.points;
-      console.log('🎯 Force update event:', newPoints);
-      
-      if (newPoints !== undefined) {
-        // Always update, even if same value
+    const handlePointsUpdate = (e: any) => {
+      const newPoints = e.detail?.points;
+      if (newPoints !== undefined && newPoints !== displayPoints) {
         setDisplayPoints(newPoints);
-        
-        // Force React to see this as a change
-        setUpdateCounter(prev => {
-          const newCounter = prev + 1;
-          console.log('Update counter:', newCounter);
-          return newCounter;
-        });
-        
-        lastPointsRef.current = newPoints;
+        setPointsKey((k) => k + 1); // Force remount of points display
       }
     };
-    
-    const handleFinalUpdate = (event: any) => {
-      const newPoints = event.detail?.points;
-      if (newPoints !== undefined) {
-        console.log('🏁 Final update:', newPoints);
-        setDisplayPoints(newPoints);
-        setUpdateCounter(prev => prev + 1);
-      }
-    };
-    
-    // Listen for both events
-    window.addEventListener('forcePointsUpdate', handleForceUpdate);
-    window.addEventListener('finalPointsUpdate', handleFinalUpdate);
-    
-    // 🎯 CRITICAL: Check global variable every 100ms
-    const checkGlobalPoints = () => {
-      if (typeof window !== 'undefined' && (window as any).__CURRENT_POINTS !== undefined) {
-        const globalPoints = (window as any).__CURRENT_POINTS;
-        if (globalPoints !== displayPoints) {
-          console.log('🌍 Global variable changed:', globalPoints);
-          setDisplayPoints(globalPoints);
-          setUpdateCounter(prev => prev + 1);
-        }
-      }
-    };
-    
-    const interval = setInterval(checkGlobalPoints, 100);
-    
+
+    window.addEventListener("forcePointsUpdate", handlePointsUpdate);
+    window.addEventListener("finalPointsUpdate", handlePointsUpdate);
+
     return () => {
-      window.removeEventListener('forcePointsUpdate', handleForceUpdate);
-      window.removeEventListener('finalPointsUpdate', handleFinalUpdate);
-      clearInterval(interval);
+      window.removeEventListener("forcePointsUpdate", handlePointsUpdate);
+      window.removeEventListener("finalPointsUpdate", handlePointsUpdate);
     };
   }, [displayPoints]);
 
@@ -98,7 +56,7 @@ const TopNav = () => {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         if (!mounted) return;
-        
+
         const { latitude, longitude } = position.coords;
 
         try {
@@ -112,7 +70,7 @@ const TopNav = () => {
             data.address.village ||
             "";
           const country = data.address.country || "";
-          
+
           if (mounted) {
             setLocation(
               city && country ? `${city}, ${country}` : "Unknown location"
@@ -138,19 +96,13 @@ const TopNav = () => {
   }, []);
 
   const handleProfileClick = () => {
-    if (user) {
-      router.push("/account");
-    } else {
-      router.push("/sign-in");
-    }
+    if (user) router.push("/account");
+    else router.push("/sign-in");
   };
 
   const handleWheelClick = () => {
-    if (user) {
-      router.push("/wheel");
-    } else {
-      router.push("/sign-in");
-    }
+    if (user) router.push("/wheel");
+    else router.push("/sign-in");
   };
 
   return (
@@ -166,7 +118,7 @@ const TopNav = () => {
           >
             <Image src={SpinWheelPic} alt="wheel" width={40} height={40} />
           </button>
-          
+
           <button
             type="button"
             onClick={toggleLanguage}
@@ -174,7 +126,7 @@ const TopNav = () => {
           >
             {language === "en" ? "ភាសាខ្មែរ" : "English"}
           </button>
-          
+
           <div
             onClick={handleProfileClick}
             className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
@@ -203,9 +155,9 @@ const TopNav = () => {
           </p>
         </div>
 
-        {/* 🎯 Points Display - ALWAYS UPDATES */}
+        {/* Points Display - Always updates reliably */}
         <div
-          key={`points-${displayPoints}-${updateCounter}`} // Counter ensures unique key
+          key={`points-${displayPoints}-${pointsKey}`}
           onClick={() => router.push("/account/reward")}
           className="p-2 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
         >

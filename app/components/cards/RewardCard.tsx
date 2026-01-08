@@ -44,122 +44,105 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
     const handleClaimReward = async () => {
         if (!user) {
-            toast.error(t.loginRequired || "Please login first");
-            return;
+          toast.error(t.loginRequired || "Please login first");
+          return;
         }
-
+    
         if (availablePoints < requiredPoints) {
-            toast.error(t.insufficientPoints || "Insufficient points");
-            return;
+          toast.error(t.insufficientPoints || "Insufficient points");
+          return;
         }
-
+    
         const isConfirmed = window.confirm(
-            `${t.confirmClaimReward || "Claim"}: "${product.name}"?\n\n` +
-            `${t.thisWillCost || "This will cost"}: ${requiredPoints} ${t.points || "points"}\n` +
-            `${t.yourPoints || "Your points"}: ${availablePoints}`
+          `${t.confirmClaimReward || "Claim"}: "${product.name}"?\n\n` +
+          `${t.thisWillCost || "This will cost"}: ${requiredPoints} ${t.points || "points"}\n` +
+          `${t.yourPoints || "Your points"}: ${availablePoints}`
         );
-
+    
         if (!isConfirmed) return;
-
+    
         setIsClaiming(true);
         setLoading(true);
-
-        console.log('🎯 Claiming reward...');
-        
-        // 🎯 IMMEDIATELY UPDATE UI
+    
         const newPoints = availablePoints - requiredPoints;
-        console.log('UI: Points updating from', availablePoints, 'to', newPoints);
-        
-        // Generate unique update ID
-        const updateId = Date.now();
-        
-        // Method 1: Set global variable
-        if (typeof window !== 'undefined') {
-            (window as any).__CURRENT_POINTS = newPoints;
-            (window as any).__LAST_UPDATE_ID = updateId;
-        }
-        
-        // Method 2: Dispatch event with unique ID
-        window.dispatchEvent(new CustomEvent('forcePointsUpdate', {
-            detail: {
-                points: newPoints,
-                updateId: updateId,
-                timestamp: Date.now()
-            }
-        }));
-        
-        // Method 3: Also update localStorage
-        localStorage.setItem('current_points', newPoints.toString());
-        localStorage.setItem('update_id', updateId.toString());
-
+    
+        // Immediately update UI via event (only reliable method)
+        window.dispatchEvent(
+          new CustomEvent("forcePointsUpdate", {
+            detail: { points: newPoints },
+          })
+        );
+    
         try {
-            const response = await api.post('/rewards/claim', {
-                product_id: product.id,
-            });
-
-            if (response.data.status === "success") {
-                const claimData = response.data.data;
-                
-                toast.success(
-                    <div className="space-y-2">
-                        <div className="font-bold text-green-600">✅ {t.rewardClaimedSuccess || "Successfully claimed!"}</div>
-                        <div>
-                            <div><strong>{t.reward || "Reward"}:</strong> {claimData.product_name}</div>
-                            <div><strong>New points:</strong> {newPoints}</div>
-                        </div>
-                    </div>,
-                    {
-                        autoClose: 8000,
-                        closeOnClick: false,
-                        draggable: false,
-                    }
-                );
-
-                // Copy code to clipboard automatically
-                if (claimData.reward_code) {
-                    navigator.clipboard.writeText(claimData.reward_code);
-                    
-                    setTimeout(() => {
-                        toast.info(`📋 ${t.codeCopied || "Reward code copied to clipboard!"}`);
-                    }, 1000);
-                }
-
-                if (onClaimSuccess) {
-                    onClaimSuccess();
-                }
-                
-                // Final update
-                setTimeout(() => {
-                    window.dispatchEvent(new CustomEvent('finalPointsUpdate', {
-                        detail: { points: newPoints, updateId: Date.now() }
-                    }));
-                }, 100);
+          const response = await api.post("/rewards/claim", {
+            product_id: product.id,
+          });
+    
+          if (response.data.status === "success") {
+            const claimData = response.data.data;
+    
+            toast.success(
+              <div className="space-y-2">
+                <div className="font-bold text-green-600">
+                  ✅ {t.rewardClaimedSuccess || "Successfully claimed!"}
+                </div>
+                <div>
+                  <div>
+                    <strong>{t.reward || "Reward"}:</strong> {claimData.product_name}
+                  </div>
+                  <div>
+                    <strong>New points:</strong> {newPoints}
+                  </div>
+                </div>
+              </div>,
+              {
+                autoClose: 8000,
+                closeOnClick: false,
+                draggable: false,
+              }
+            );
+    
+            if (claimData.reward_code) {
+              navigator.clipboard.writeText(claimData.reward_code);
+              setTimeout(() => {
+                toast.info(`📋 ${t.codeCopied || "Reward code copied to clipboard!"}`);
+              }, 1000);
             }
+    
+            if (onClaimSuccess) onClaimSuccess();
+    
+            // Final confirmation update
+            window.dispatchEvent(
+              new CustomEvent("finalPointsUpdate", {
+                detail: { points: newPoints },
+              })
+            );
+          }
         } catch (error: any) {
-            console.error('Error claiming reward:', error);
-            
-            // Revert on error
-            if (typeof window !== 'undefined') {
-                (window as any).__CURRENT_POINTS = availablePoints;
-            }
-            window.dispatchEvent(new CustomEvent('forcePointsUpdate', {
-                detail: { points: availablePoints }
-            }));
-            
-            if (error.response?.data?.errors) {
-                const errors = error.response.data.errors;
-                const firstError = Object.values(errors)[0];
-                toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
-            } else if (error.response?.data?.message) {
-                toast.error(error.response.data.message);
-            } else {
-                toast.error(t.claimFailed || "Failed to claim reward");
-            }
+          console.error("Error claiming reward:", error);
+    
+          // Revert UI on error
+          window.dispatchEvent(
+            new CustomEvent("forcePointsUpdate", {
+              detail: { points: availablePoints },
+            })
+          );
+    
+          // Error handling (unchanged)
+          if (error.response?.data?.errors) {
+            const errors = error.response.data.errors;
+            const firstError = Object.values(errors)[0];
+            toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
+          } else if (error.response?.data?.message) {
+            toast.error(error.response.data.message);
+          } else {
+            toast.error(t.claimFailed || "Failed to claim reward");
+          }
         } finally {
-            setIsClaiming(false);
-            setLoading(false);
+          setIsClaiming(false);
+          setLoading(false);
         }
-    };
+      };
 
     // Calculate progress percentage
     const progressPercentage = requiredPoints > 0 
