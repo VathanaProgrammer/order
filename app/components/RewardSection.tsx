@@ -5,6 +5,7 @@ import api from "@/api/api";
 import { toast } from "react-toastify";
 import { useLoading } from "@/context/LoadingContext";
 import { useLanguage } from "@/context/LanguageContext";
+import useSWR from 'swr';
 
 export interface RewardProduct {
   id: number;
@@ -19,33 +20,26 @@ interface RewardSectionProps {
 }
 
 const RewardSection: React.FC<RewardSectionProps> = ({ onClaimSuccess }) => {
-  const [products, setProducts] = useState<RewardProduct[]>([]);
-  const { setLoading } = useLoading();
   const { t } = useLanguage();
 
-  useEffect(() => {
-    async function fetchRewardProducts() {
-      setLoading(true);
-      try {
-        const res = await api.get<{
-          status: string;
-          data: RewardProduct[];
-        }>("/product/reward/all");
-
-        setProducts(res.data.data ?? []);
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load reward products");
-      } finally {
-        setLoading(false);
-      }
+  const { data: products, mutate } = useSWR<RewardProduct[]>(
+    '/product/reward/all',
+    async (url: any) => {
+      const res = await api.get(url);
+      return res.data.data ?? [];
     }
+  );
 
-    fetchRewardProducts();
-  }, [setLoading]);
+  const handleClaimSuccess = async () => {
+    // Revalidate (refresh) the data
+    await mutate();
+    
+    if (onClaimSuccess) {
+      onClaimSuccess();
+    }
+  };
 
-  // Nothing to show → render nothing
-  if (products.length === 0) return null;
+  if (!products || products.length === 0) return null;
 
   return (
     <section className="mt-4">
@@ -58,7 +52,7 @@ const RewardSection: React.FC<RewardSectionProps> = ({ onClaimSuccess }) => {
           <RewardCard 
             key={item.id} 
             product={item} 
-            onClaimSuccess={onClaimSuccess} 
+            onClaimSuccess={handleClaimSuccess}
           />
         ))}
       </div>
