@@ -44,12 +44,12 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
     const handleClaimReward = async () => {
         if (!user) {
-            toast.error(t.loginRequired || "Please login first");
+            //toast.error(t.loginRequired || "Please login first");
             return;
         }
 
         if (availablePoints < requiredPoints) {
-            toast.error(t.insufficientPoints || "Insufficient points");
+            //toast.error(t.insufficientPoints || "Insufficient points");
             return;
         }
 
@@ -73,13 +73,13 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 const claimData = response.data.data;
                 
                 // 🎯 SIMPLE SUCCESS MESSAGE
-                toast.success(
-                    `${t.rewardClaimedSuccess || "Successfully claimed!"}\nRefreshing page...`,
-                    {
-                        autoClose: 1000,
-                        hideProgressBar: true,
-                    }
-                );
+                // toast.success(
+                //     `${t.rewardClaimedSuccess || "Successfully claimed!"}\nRefreshing page...`,
+                //     {
+                //         autoClose: 1000,
+                //         hideProgressBar: true,
+                //     }
+                // );
 
                 // Copy code to clipboard automatically
                 if (claimData.reward_code) {
@@ -121,11 +121,11 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             if (error.response?.data?.errors) {
                 const errors = error.response.data.errors;
                 const firstError = Object.values(errors)[0];
-                toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
+                //toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
             } else if (error.response?.data?.message) {
-                toast.error(error.response.data.message);
+                //toast.error(error.response.data.message);
             } else {
-                toast.error(t.claimFailed || "Failed to claim reward");
+                //toast.error(t.claimFailed || "Failed to claim reward");
             }
         } finally {
             setIsClaiming(false);
