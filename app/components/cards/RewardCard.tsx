@@ -72,18 +72,26 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             if (response.data.status === "success") {
                 const claimData = response.data.data;
                 
-                // 🎯 CUSTOM ALERT WITH REFRESH BUTTON
-                showRefreshAlert(
-                    `✅ ${t.rewardClaimedSuccess || "Successfully claimed!"}`,
-                    `You claimed: ${product.name}`,
-                    claimData.reward_code
+                // Custom toast with button
+                const CustomToast = () => (
+                    <div className="p-3">
+                        <div className="font-bold text-green-600">✅ Successfully claimed!</div>
+                        <div className="mt-2">{product.name}</div>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="mt-3 w-full bg-blue-500 text-white py-2 px-4 rounded-lg font-bold hover:bg-blue-600 transition"
+                        >
+                            🔄 Refresh Points
+                        </button>
+                    </div>
                 );
-    
-                if (onClaimSuccess) {
-                    onClaimSuccess();
-                }
                 
-                // Don't try to auto-refresh - let user click the button
+                toast(<CustomToast />, {
+                    autoClose: false,
+                    closeOnClick: false,
+                    draggable: false,
+                });
+                
                 return;
             }
         } catch (error: any) {
