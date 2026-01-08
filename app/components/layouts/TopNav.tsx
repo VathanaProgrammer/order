@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Icon from "../Icon";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -15,54 +15,86 @@ const TopNav = () => {
   const [error, setError] = useState<string | null>(null);
   const { language, toggleLanguage, t } = useLanguage();
 
-  // Get initial points
-  useEffect(() => {
-    // First check localStorage
+  // Function to get points - ALWAYS works
+  const getPoints = useCallback(() => {
+    // 1. First try localStorage
     const savedPoints = localStorage.getItem('current_points');
     if (savedPoints) {
       const points = parseInt(savedPoints, 10);
       if (!isNaN(points)) {
-        console.log('Using localStorage points:', points);
-        setDisplayPoints(points);
-        return;
+        return points;
       }
     }
     
-    // Fallback to user points
-    const userPoints = user?.reward_points?.available || 0;
-    console.log('Using user points:', userPoints);
-    setDisplayPoints(userPoints);
-    
-    // Save to localStorage for next time
-    localStorage.setItem('current_points', userPoints.toString());
+    // 2. Fallback to server points
+    return user?.reward_points?.available || 0;
   }, [user]);
 
-  // Listen for localStorage changes
+  // Initialize and update points
   useEffect(() => {
-    const handleStorageChange = () => {
+    const points = getPoints();
+    console.log('TopNav: Setting points to', points);
+    setDisplayPoints(points);
+  }, [user, getPoints]);
+
+  // 🎯 LISTEN FOR UI UPDATES - MULTIPLE METHODS FOR RELIABILITY
+  useEffect(() => {
+    console.log('TopNav: Setting up reliable update listeners');
+    
+    // Method 1: Custom event (most reliable)
+    const handleUpdatePoints = (event: any) => {
+      const newPoints = event.detail?.points;
+      if (newPoints !== undefined) {
+        console.log('🎯 Event received! Updating points to:', newPoints);
+        setDisplayPoints(newPoints);
+        localStorage.setItem('current_points', newPoints.toString());
+      }
+    };
+    
+    // Method 2: Storage event (works across tabs)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'current_points' && e.newValue) {
+        const newPoints = parseInt(e.newValue, 10);
+        if (!isNaN(newPoints) && newPoints !== displayPoints) {
+          console.log('💾 Storage event! Updating points to:', newPoints);
+          setDisplayPoints(newPoints);
+        }
+      }
+    };
+    
+    // Method 3: Interval check (never fails)
+    const checkForUpdates = () => {
       const savedPoints = localStorage.getItem('current_points');
       if (savedPoints) {
         const points = parseInt(savedPoints, 10);
         if (!isNaN(points) && points !== displayPoints) {
-          console.log('LocalStorage changed! New points:', points);
+          console.log('⏰ Interval check! Updating points to:', points);
           setDisplayPoints(points);
         }
       }
     };
     
-    // Listen for storage events (from other tabs)
+    const interval = setInterval(checkForUpdates, 500); // Check every 500ms
+    
+    // Add all listeners
+    window.addEventListener('updatePointsDisplay', handleUpdatePoints);
     window.addEventListener('storage', handleStorageChange);
     
-    // Also listen for our own tab's changes
-    const interval = setInterval(() => {
-      handleStorageChange();
-    }, 1000); // Check every second
-    
     return () => {
+      window.removeEventListener('updatePointsDisplay', handleUpdatePoints);
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };
   }, [displayPoints]);
+
+  // Force check on mount
+  useEffect(() => {
+    const points = getPoints();
+    if (points !== displayPoints) {
+      console.log('🔄 Force update on mount:', points);
+      setDisplayPoints(points);
+    }
+  }, [getPoints, displayPoints]);
 
   const handleProfileClick = () => {
     if (user) {
@@ -125,23 +157,23 @@ const TopNav = () => {
         <h1 className="text-[32px] font-bold main-text">SOB</h1>
 
         <div className="flex flex-row gap-2">
-
-        <button
-          type="button"
-          onClick={handleWheelClick}
-          className="p-2 flex items-center rounded-[10px] cursor-pointer transition"
-        >
-          <Image src={SpinWheelPic} alt="wheel" width={40} height={40} />
-        </button>
-              
+          <button
+            type="button"
+            onClick={handleWheelClick}
+            className="p-2 flex items-center rounded-[10px] cursor-pointer transition"
+          >
+            <Image src={SpinWheelPic} alt="wheel" width={40} height={40} />
+          </button>
+          
           {/* Language Toggle Button */}
           <button
-          type="button"
-          onClick={toggleLanguage}
-          className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
-        >
-          {language === "en" ? "ភាសាខ្មែរ" : "English"}
-        </button>
+            type="button"
+            onClick={toggleLanguage}
+            className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
+          >
+            {language === "en" ? "ភាសាខ្មែរ" : "English"}
+          </button>
+          
           <div
             onClick={handleProfileClick}
             className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
@@ -170,8 +202,9 @@ const TopNav = () => {
           </p>
         </div>
 
-        {/* Points Display - Just show displayPoints */}
+        {/* Points Display - ALWAYS updates */}
         <div
+          key={`points-${displayPoints}`} // Key forces DOM update
           onClick={() => router.push("/account/reward")}
           className="p-2 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
         >
@@ -181,9 +214,10 @@ const TopNav = () => {
             width={20}
             height={20}
           />
-          <p className="text-[16px] font-medium ml-1">{displayPoints}</p>
+          <p className="text-[16px] font-medium ml-1">
+            {displayPoints.toLocaleString()}
+          </p>
         </div>
-
       </div>
 
       {error && <p className="text-red-500 text-[12px]">{error}</p>}

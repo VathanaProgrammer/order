@@ -14,7 +14,7 @@ interface RewardCardProps {
 }
 
 const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
-    const { user, refreshUser } = useAuth();
+    const { user } = useAuth();
     const { t } = useLanguage();
     const { setLoading } = useLoading();
     const [isClaiming, setIsClaiming] = useState(false);
@@ -25,12 +25,10 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
     const getAvailablePoints = () => {
         if (!user || !user.reward_points) return 0;
         
-        // If reward_points is a number
         if (typeof user.reward_points === 'number') {
             return user.reward_points;
         }
         
-        // If reward_points is an object with available property
         if (typeof user.reward_points === 'object' && user.reward_points !== null) {
             const points = user.reward_points as any;
             return points.available || points.total || 0;
@@ -39,7 +37,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         return 0;
     };
 
-    // Helper function to get user's available points as number
     const availablePoints = getAvailablePoints();
     const requiredPoints = product.reward_points || 0;
     const hasEnoughPoints = availablePoints >= requiredPoints;
@@ -69,12 +66,17 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
         console.log('🎯 Claiming reward...');
         
-        // 🎯 IMMEDIATELY UPDATE UI - JUST FAKE IT!
+        // 🎯 IMMEDIATELY UPDATE UI - BEFORE API CALL
         const newPoints = availablePoints - requiredPoints;
-        console.log('UI: Updating points from', availablePoints, 'to', newPoints);
+        console.log('UI: Immediately updating points to', newPoints);
         
-        // SIMPLE: Just save to localStorage
+        // Method 1: Update localStorage
         localStorage.setItem('current_points', newPoints.toString());
+        
+        // Method 2: Dispatch event (guaranteed to work)
+        window.dispatchEvent(new CustomEvent('updatePointsDisplay', {
+            detail: { points: newPoints }
+        }));
 
         try {
             const response = await api.post('/rewards/claim', {
@@ -89,6 +91,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                         <div className="font-bold text-green-600">✅ {t.rewardClaimedSuccess || "Successfully claimed!"}</div>
                         <div>
                             <div><strong>{t.reward || "Reward"}:</strong> {claimData.product_name}</div>
+                            <div><strong>New points balance:</strong> {newPoints}</div>
                         </div>
                     </div>,
                     {
@@ -102,7 +105,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 if (claimData.reward_code) {
                     navigator.clipboard.writeText(claimData.reward_code);
                     
-                    // Show copy confirmation
                     setTimeout(() => {
                         toast.info(`📋 ${t.codeCopied || "Reward code copied to clipboard!"}`);
                     }, 1000);
@@ -115,7 +117,12 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         } catch (error: any) {
             console.error('Error claiming reward:', error);
             
-            // Handle Laravel validation errors
+            // If error, revert the UI
+            localStorage.setItem('current_points', availablePoints.toString());
+            window.dispatchEvent(new CustomEvent('updatePointsDisplay', {
+                detail: { points: availablePoints }
+            }));
+            
             if (error.response?.data?.errors) {
                 const errors = error.response.data.errors;
                 const firstError = Object.values(errors)[0];
@@ -125,9 +132,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             } else {
                 toast.error(t.claimFailed || "Failed to claim reward");
             }
-            
-            // If error, revert UI points
-            localStorage.setItem('current_points', availablePoints.toString());
         } finally {
             setIsClaiming(false);
             setLoading(false);
@@ -173,13 +177,13 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 {/* Points Progress Bar */}
                 <div className="mb-4">
                     <div className="flex justify-between text-sm mb-1">
-                        {/* <span className="text-gray-600">
-                            {t.yourPoints || "Your points"}:
-                            <span className="font-bold ml-1 text-blue-600">{availablePoints}</span>
-                        </span> */}
                         <span className="text-gray-600">
                             {t.required || "Need"}:
                             <span className="font-bold ml-1">{requiredPoints}</span>
+                        </span>
+                        <span className="text-gray-600">
+                            You have:
+                            <span className="font-bold ml-1 text-blue-600">{availablePoints}</span>
                         </span>
                     </div>
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
