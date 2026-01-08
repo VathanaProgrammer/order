@@ -10,6 +10,31 @@ import Image from "next/image";
 const TopNav = () => {
   const router = useRouter();
   const { user } = useAuth();
+  const [forceUpdate, forceUpdateValue] = useForceUpdate();
+  const [renderKey, setRenderKey] = useState(0);
+  
+  // Force re-render when user changes
+  useEffect(() => {
+    console.log('TopNav: User changed, forcing re-render');
+    forceUpdate();
+    setRenderKey(prev => prev + 1);
+  }, [user, forceUpdate]);
+
+  // Listen for force render events
+  useEffect(() => {
+    const handleForceRender = () => {
+      console.log('TopNav: Force render event received');
+      forceUpdate();
+      setRenderKey(prev => prev + 1);
+    };
+    
+    window.addEventListener('forceRender', handleForceRender);
+    
+    return () => {
+      window.removeEventListener('forceRender', handleForceRender);
+    };
+  }, [forceUpdate]);
+  
   const availablePoints = user?.reward_points?.available ?? 0;
   const [points, setPoints] = useState(availablePoints);
 
