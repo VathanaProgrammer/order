@@ -80,7 +80,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                             (response.data.message && response.data.message.includes('success'));
             
             if (isSuccess) {
-                //toast.success(`🎉 Successfully claimed ${product.name}!`);
+                toast.success(`🎉 Successfully claimed ${product.name}!`);
                 
                 // Small delay then show refresh modal
                 setTimeout(() => {
@@ -219,40 +219,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                     )}
                 </div>
             </div>
-
-            {/* Mobile-friendly Refresh Modal */}
-            {showRefreshModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-                    <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-fade-in">
-                        {/* Success Icon */}
-                        <div className="flex justify-center mb-4">
-                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                                <span className="text-3xl">✅</span>
-                            </div>
-                        </div>
-                        
-                        {/* Title */}
-                        <h3 className="text-lg font-bold text-center text-gray-800 mb-2">
-                            Claim Successful! 🎉
-                        </h3>
-                        
-                        {/* Message */}
-                        <p className="text-center text-gray-600 mb-6">
-                            You claimed <span className="font-semibold">{product.name}</span>
-                        </p>
-                        
-                        {/* Action Buttons */}
-                        <div className="space-y-3">
-                            <button
-                                onClick={handleRefresh}
-                                className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-lg active:scale-[0.98] transition-transform"
-                            >
-                                OK
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             <style jsx>{`
                 @keyframes fade-in {
