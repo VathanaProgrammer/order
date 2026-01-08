@@ -16,7 +16,7 @@ interface RewardCardProps {
 }
 
 const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
-  const { user, refreshUser } = useAuth();  // ← Get refreshUser
+  const { user, refreshUser } = useAuth(); // ← Get refreshUser
   const { t } = useLanguage();
   const { setLoading } = useLoading();
   const { updatePoints } = usePoints();
@@ -59,8 +59,10 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
     const isConfirmed = window.confirm(
       `${t.confirmClaimReward || "Claim"}: "${product.name}"?\n\n` +
-      `${t.thisWillCost || "This will cost"}: ${requiredPoints} ${t.points || "points"}\n` +
-      `${t.yourPoints || "Your points"}: ${availablePoints}`
+        `${t.thisWillCost || "This will cost"}: ${requiredPoints} ${
+          t.points || "points"
+        }\n` +
+        `${t.yourPoints || "Your points"}: ${availablePoints}`
     );
 
     if (!isConfirmed) return;
@@ -80,36 +82,29 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
       if (response.data.status === "success") {
         const claimData = response.data.data;
-      
-        // Prefer server-returned points if available, fallback to optimistic
-        let finalPoints = newPoints;
-        if (claimData && typeof claimData.new_points !== "undefined") {
-          finalPoints = claimData.new_points;
-        } else if (claimData && typeof claimData.available_points !== "undefined") {
-          finalPoints = claimData.available_points;
-        } else if (claimData && claimData.reward_points) {
-          finalPoints = claimData.reward_points.available || claimData.reward_points.total || newPoints;
-        }
-      
-        // Force update with server-confirmed points (prevents revert)
-        updatePoints(finalPoints);
-      
+
         toast.success(
           <div className="space-y-2">
-            <div className="font-bold text-green-600">✅ Successfully claimed!</div>
-            <div><strong>Reward:</strong> {claimData.product_name || product.name}</div>
-            <div><strong>New points:</strong> {finalPoints.toLocaleString()}</div>
+            <div className="font-bold text-green-600">
+              ✅ Successfully claimed!
+            </div>
+            <div>
+              <strong>Reward:</strong> {claimData.product_name || product.name}
+            </div>
+            <div>
+              <strong>New points:</strong> {newPoints.toLocaleString()}
+            </div>
           </div>,
           { autoClose: 8000 }
         );
-      
+
         if (claimData.reward_code) {
           navigator.clipboard.writeText(claimData.reward_code);
           setTimeout(() => toast.info("Reward code copied!"), 1000);
         }
-      
+
         if (onClaimSuccess) onClaimSuccess();
-      
+
         // Still refresh user for full sync (safe now)
         await refreshUser();
       } else {
@@ -127,7 +122,8 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         (error.response?.data?.errors
           ? Object.values(error.response.data.errors)[0]
           : null) ||
-        t.claimFailed || "Failed to claim reward";
+        t.claimFailed ||
+        "Failed to claim reward";
 
       toast.error(message);
     } finally {
@@ -136,9 +132,10 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
     }
   };
 
-  const progressPercentage = requiredPoints > 0
-    ? Math.min((availablePoints / requiredPoints) * 100, 100)
-    : 0;
+  const progressPercentage =
+    requiredPoints > 0
+      ? Math.min((availablePoints / requiredPoints) * 100, 100)
+      : 0;
 
   const pointsNeeded = Math.max(0, requiredPoints - availablePoints);
 
@@ -171,11 +168,15 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
           <div className="flex justify-between text-sm mb-1">
             <span className="text-gray-600">
               {t.required || "Need"}:
-              <span className="font-bold ml-1">{requiredPoints.toLocaleString()}</span>
+              <span className="font-bold ml-1">
+                {requiredPoints.toLocaleString()}
+              </span>
             </span>
             <span className="text-gray-600">
               You have:
-              <span className="font-bold ml-1 text-blue-600">{availablePoints.toLocaleString()}</span>
+              <span className="font-bold ml-1 text-blue-600">
+                {availablePoints.toLocaleString()}
+              </span>
             </span>
           </div>
           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -195,13 +196,14 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
           disabled={isClaiming || !canClaim}
           className={`
             w-full py-3 px-4 rounded-lg font-bold text-sm transition-all
-            ${isClaiming
-              ? "bg-gray-400 cursor-not-allowed"
-              : canClaim
-              ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-md hover:shadow-lg active:scale-95"
-              : !user
-              ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md hover:shadow-lg"
-              : "bg-gradient-to-r from-gray-300 to-gray-400 text-gray-600 cursor-not-allowed"
+            ${
+              isClaiming
+                ? "bg-gray-400 cursor-not-allowed"
+                : canClaim
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-md hover:shadow-lg active:scale-95"
+                : !user
+                ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md hover:shadow-lg"
+                : "bg-gradient-to-r from-gray-300 to-gray-400 text-gray-600 cursor-not-allowed"
             }
             disabled:opacity-50 disabled:cursor-not-allowed
             flex items-center justify-center
@@ -209,9 +211,24 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         >
           {isClaiming ? (
             <>
-              <svg className="animate-spin h-4 w-4 mr-2 text-white" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              <svg
+                className="animate-spin h-4 w-4 mr-2 text-white"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  fill="none"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
               </svg>
               {t.claiming || "Processing..."}
             </>
@@ -225,7 +242,11 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         </button>
 
         {user && (
-          <div className={`mt-2 text-center text-xs font-medium ${hasEnoughPoints ? "text-green-600" : "text-red-600"}`}>
+          <div
+            className={`mt-2 text-center text-xs font-medium ${
+              hasEnoughPoints ? "text-green-600" : "text-red-600"
+            }`}
+          >
             {hasEnoughPoints ? (
               <div className="flex items-center justify-center">
                 <span className="mr-1">✅</span>
