@@ -85,7 +85,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 // Small delay then show refresh modal
                 setTimeout(() => {
                     setShowRefreshModal(true);
-                }, 800);
+                }, 500);
                 
             } else {
                 toast.error("Failed to claim reward. Please try again.");
@@ -97,7 +97,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         } finally {
             setTimeout(() => {
                 window.location.reload();
-            }, 1000);
+            }, 1300);
             setIsClaiming(false);
             setLoading(false);
         }
