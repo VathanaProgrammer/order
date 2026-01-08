@@ -42,191 +42,110 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
     const hasEnoughPoints = availablePoints >= requiredPoints;
     const canClaim = user && hasEnoughPoints;
 
-    // 🎯 CUSTOM ALERT FUNCTION
-    const showRefreshAlert = (title: string, message: string, rewardCode?: string) => {
-        console.log('Creating custom alert...');
-        
-        // Remove any existing alerts
-        const existingOverlay = document.getElementById('refresh-alert-overlay');
-        if (existingOverlay) {
-            existingOverlay.remove();
-        }
-        
-        // Create overlay
-        const overlay = document.createElement('div');
-        overlay.id = 'refresh-alert-overlay';
-        overlay.style.position = 'fixed';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
-        overlay.style.zIndex = '9999';
-        overlay.style.display = 'flex';
-        overlay.style.justifyContent = 'center';
-        overlay.style.alignItems = 'center';
-        
-        // Create alert box
-        const alertBox = document.createElement('div');
-        alertBox.style.backgroundColor = 'white';
-        alertBox.style.padding = '24px';
-        alertBox.style.borderRadius = '12px';
-        alertBox.style.boxShadow = '0 10px 25px rgba(0,0,0,0.3)';
-        alertBox.style.maxWidth = '400px';
-        alertBox.style.width = '90%';
-        
-        // Add content
-        alertBox.innerHTML = `
-            <div style="text-align: center;">
-                <div style="font-size: 24px; margin-bottom: 8px;">🎉</div>
-                <h3 style="margin: 0 0 12px 0; color: #10b981; font-weight: bold;">${title}</h3>
-                <p style="margin: 0 0 16px 0; color: #4b5563;">${message}</p>
-                
-                ${rewardCode ? `
-                    <div style="background: #f3f4f6; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-                        <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Reward Code:</div>
-                        <div style="font-family: monospace; font-size: 16px; font-weight: bold; color: #059669;">${rewardCode}</div>
-                        <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">Copied to clipboard</div>
-                    </div>
-                ` : ''}
-                
-                <button id="refreshBtn" style="
-                    background: linear-gradient(to right, #3b82f6, #1d4ed8);
-                    color: white;
-                    border: none;
-                    padding: 12px 24px;
-                    border-radius: 8px;
-                    font-weight: bold;
-                    font-size: 16px;
-                    cursor: pointer;
-                    width: 100%;
-                    margin-top: 8px;
-                    transition: all 0.2s;
-                ">
-                    🔄 Refresh Page to Update Points
-                </button>
-                
-                <button id="closeBtn" style="
-                    background: #6b7280;
-                    color: white;
-                    border: none;
-                    padding: 12px 24px;
-                    border-radius: 8px;
-                    font-weight: bold;
-                    font-size: 16px;
-                    cursor: pointer;
-                    width: 100%;
-                    margin-top: 8px;
-                    transition: all 0.2s;
-                ">
-                    ✖️ Close (Points won't update)
-                </button>
-                
-                <div style="margin-top: 12px; font-size: 12px; color: #9ca3af;">
-                    Page will auto-refresh in 5 seconds...
-                </div>
-            </div>
-        `;
-        
-        // Add to page
-        overlay.appendChild(alertBox);
-        document.body.appendChild(overlay);
-        
-        // Add click handler for refresh button
-        const refreshBtn = document.getElementById('refreshBtn');
-        const closeBtn = document.getElementById('closeBtn');
-        
-        if (refreshBtn) {
-            refreshBtn.onclick = () => {
-                console.log('Refresh button clicked');
-                overlay.remove();
-                window.location.reload();
-            };
-        }
-        
-        if (closeBtn) {
-            closeBtn.onclick = () => {
-                console.log('Close button clicked');
-                overlay.remove();
-            };
-        }
-        
-        // Auto-refresh after 5 seconds
-        const autoRefreshTimer = setTimeout(() => {
-            console.log('Auto-refreshing...');
-            overlay.remove();
-            window.location.reload();
-        }, 5000);
-        
-        // Clear timer if overlay is removed
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                clearTimeout(autoRefreshTimer);
-                overlay.remove();
-            }
-        });
-        
-        // Copy reward code if exists
-        if (rewardCode) {
-            navigator.clipboard.writeText(rewardCode);
-        }
-    };
-
     const handleClaimReward = async () => {
+        console.log('=== DEBUG START ===');
+        console.log('1. User:', user?.id);
+        console.log('2. Available points:', availablePoints);
+        console.log('3. Required points:', requiredPoints);
+        
         if (!user) {
+            console.log('ERROR: No user');
             alert("Please login first");
             return;
         }
-    
+        
         if (availablePoints < requiredPoints) {
+            console.log('ERROR: Insufficient points');
             alert("Insufficient points");
             return;
         }
-    
+        
+        console.log('4. Showing confirmation dialog...');
         const isConfirmed = window.confirm(
             `Claim "${product.name}"?\n\n` +
             `Cost: ${requiredPoints} points\n` +
             `Your points: ${availablePoints}`
         );
-    
-        if (!isConfirmed) return;
-    
+        
+        console.log('5. User confirmed?', isConfirmed);
+        
+        if (!isConfirmed) {
+            console.log('User cancelled');
+            return;
+        }
+        
         setIsClaiming(true);
         setLoading(true);
-    
+        
+        console.log('6. Making API call...');
+        
         try {
             const response = await api.post('/rewards/claim', {
                 product_id: product.id,
             });
-    
-            console.log('Response:', response.data);
-    
+        
+            console.log('7. API Response status:', response.status);
+            console.log('8. API Response data:', response.data);
+            
+            // Check what structure the response actually has
+            console.log('9. Response keys:', Object.keys(response.data));
+            
+            // Try different success checks
+            let isSuccess = false;
+            let successMessage = '';
+            
             if (response.data.status === "success") {
-                // 🎯 SIMPLE: Just show alert and ask to refresh
+                isSuccess = true;
+                successMessage = 'status === "success"';
+            } else if (response.data.success === true) {
+                isSuccess = true;
+                successMessage = 'success === true';
+            } else if (response.data.message && response.data.message.includes('success')) {
+                isSuccess = true;
+                successMessage = 'message contains success';
+            }
+            
+            console.log('10. Is success?', isSuccess, 'Reason:', successMessage);
+            
+            if (isSuccess) {
+                console.log('11. SUCCESS! Showing refresh dialog...');
+                
+                // Force show a simple alert first
+                alert(`✅ API SUCCESS! Response: ${JSON.stringify(response.data)}`);
+                
+                // Then show refresh confirm
                 const shouldRefresh = window.confirm(
                     `✅ Successfully claimed ${product.name}!\n\n` +
                     `Click OK to refresh the page.\n` +
                     `Click Cancel to continue without refreshing.`
                 );
                 
+                console.log('12. Should refresh?', shouldRefresh);
+                
                 if (shouldRefresh) {
-                    console.log('User chose to refresh');
+                    console.log('13. Reloading page...');
                     window.location.reload();
                 } else {
-                    console.log('User chose not to refresh');
+                    console.log('13. User chose not to refresh');
                 }
                 
                 return;
+            } else {
+                console.log('11. NOT SUCCESS - Response:', response.data);
+                alert(`API did not return success. Response: ${JSON.stringify(response.data)}`);
             }
-        } catch (error) {
-            console.error('Error:', error);
-            alert("Failed to claim reward");
+        } catch (error: any) {
+            console.error('ERROR:', error);
+            console.log('Error response:', error.response?.data);
+            alert(`Failed to claim reward. Error: ${error.message}`);
         } finally {
+            console.log('14. Finally block');
             setIsClaiming(false);
             setLoading(false);
         }
+        
+        console.log('15. Function end');
     };
-
     // Calculate progress percentage
     const progressPercentage = requiredPoints > 0 
         ? Math.min((availablePoints / requiredPoints) * 100, 100)
