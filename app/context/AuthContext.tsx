@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (res.data.success && res.data.user) {
           // ✅ Use the EXACT data from backend (no mapping needed)
-          setUser(res.data.user);
+          setUser(() => ({ ...res.data.user }));
           console.log('✅ User set in context:', res.data.user);
         } else {
           console.log('❌ No user data in response');
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('🔄 Refresh response:', res.data);
       
       if (res.data?.success && res.data.user) {
-        setUser(res.data.user);
+        setUser(() => ({ ...res.data.user }));
         console.log('✅ User refreshed:', res.data.user);
         return res.data.user;
       } else {

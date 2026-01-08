@@ -14,7 +14,7 @@ interface RewardCardProps {
 }
 
 const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
-    const { user, refreshUser } = useAuth();
+    const { user, refreshUser, updateUser } = useAuth();
     const { t } = useLanguage();
     const { setLoading } = useLoading();
     const [isClaiming, setIsClaiming] = useState(false);
@@ -88,6 +88,14 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                         draggable: false,
                     }
                 );
+
+                updateUser({
+                    reward_points: {
+                      ...user.reward_points,
+                      available: user.reward_points.available - requiredPoints,
+                    },
+                });
+                  
 
                 // Refresh user data
                 await refreshUser();
