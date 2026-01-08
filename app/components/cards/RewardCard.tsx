@@ -7,6 +7,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import api from "@/api/api";
 import { toast } from "react-toastify";
 import { useLoading } from "@/context/LoadingContext";
+import Swal from 'sweetalert2';
 
 interface RewardCardProps {
     product: RewardProduct;
@@ -53,13 +54,36 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             return;
         }
         
-        // Use window.confirm for mobile compatibility (better than custom modal on mobile)
-        const isConfirmed = window.confirm(
-            `Claim "${product.name}"?\n\n` +
-            `Cost: ${requiredPoints} points\n` +
-            `Your points: ${availablePoints}\n\n` +
-            `Click OK to confirm.`
-        );
+        // Use SweetAlert2 for confirmation (mobile-friendly)
+        const { value: isConfirmed } = await Swal.fire({
+            title: `Claim "${product.name}"?`,
+            html: `
+                <div style="text-align: center;">
+                    <div style="font-size: 16px; margin-bottom: 10px;">
+                        <strong>Cost:</strong> ${requiredPoints} points<br>
+                        <strong>Your points:</strong> ${availablePoints}
+                    </div>
+                    <div style="font-size: 14px; color: #666; margin-top: 10px;">
+                        After claiming, your points will be deducted
+                    </div>
+                </div>
+            `,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10B981',
+            cancelButtonColor: '#6B7280',
+            confirmButtonText: 'Yes, claim it!',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true,
+            background: '#ffffff',
+            backdrop: 'rgba(0,0,0,0.4)',
+            showClass: {
+                popup: 'animate__animated animate__fadeInDown animate__faster'
+            },
+            hideClass: {
+                popup: 'animate__animated animate__fadeOutUp animate__faster'
+            }
+        });
         
         if (!isConfirmed) {
             return;
@@ -81,11 +105,37 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             if (isSuccess) {
                 toast.success(`Successfully claimed ${product.name}!`);
                 
-                // Optional: Ask user if they want to refresh (less intrusive)
-                setTimeout(() => {
-                    const shouldRefresh = window.confirm(
-                        "Claim successful! Refresh page to update your points?"
-                    );
+                // SweetAlert2 for refresh confirmation
+                setTimeout(async () => {
+                    const { value: shouldRefresh } = await Swal.fire({
+                        title: 'Success! 🎉',
+                        html: `
+                            <div style="text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+                                <div style="font-size: 16px; margin-bottom: 15px;">
+                                    You claimed <strong>${product.name}</strong>
+                                </div>
+                                <div style="font-size: 14px; color: #666;">
+                                    Your points have been updated
+                                </div>
+                            </div>
+                        `,
+                        icon: 'success',
+                        showCancelButton: true,
+                        confirmButtonColor: '#10B981',
+                        cancelButtonColor: '#3B82F6',
+                        confirmButtonText: 'Refresh Page',
+                        cancelButtonText: 'Continue Browsing',
+                        reverseButtons: true,
+                        background: '#ffffff',
+                        backdrop: 'rgba(0,0,0,0.4)',
+                        showClass: {
+                            popup: 'animate__animated animate__fadeInDown animate__faster'
+                        },
+                        hideClass: {
+                            popup: 'animate__animated animate__fadeOutUp animate__faster'
+                        }
+                    });
                     
                     if (shouldRefresh) {
                         window.location.reload();
@@ -100,7 +150,20 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         } catch (error: any) {
             console.error('Claim error:', error);
             const errorMessage = error.response?.data?.message || error.message || "Unknown error";
-            toast.error(`Failed: ${errorMessage}`);
+            
+            // SweetAlert2 for error
+            Swal.fire({
+                title: 'Claim Failed',
+                text: errorMessage,
+                icon: 'error',
+                confirmButtonColor: '#EF4444',
+                confirmButtonText: 'OK',
+                background: '#ffffff',
+                backdrop: 'rgba(0,0,0,0.4)',
+                showClass: {
+                    popup: 'animate__animated animate__shakeX animate__faster'
+                }
+            });
         } finally {
             setIsClaiming(false);
             setLoading(false);
