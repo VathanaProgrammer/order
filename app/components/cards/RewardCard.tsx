@@ -110,6 +110,10 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             }
     
             if (onClaimSuccess) onClaimSuccess();
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
     
             // Final confirmation update
             window.dispatchEvent(
