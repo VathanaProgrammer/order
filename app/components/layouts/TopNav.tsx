@@ -24,13 +24,13 @@ const TopNav = () => {
     setDisplayPoints(points);
   }, [user]);
 
-  // Listen for points updates via Custom Events (reliable & instant)
+  // Listen for points updates via Custom Events (runs only once)
   useEffect(() => {
     const handlePointsUpdate = (e: any) => {
       const newPoints = e.detail?.points;
-      if (newPoints !== undefined && newPoints !== displayPoints) {
+      if (newPoints !== undefined) {
         setDisplayPoints(newPoints);
-        setPointsKey((k) => k + 1); // Force remount of points display
+        setPointsKey((k) => k + 1); // ALWAYS force remount on any update
       }
     };
 
@@ -41,9 +41,9 @@ const TopNav = () => {
       window.removeEventListener("forcePointsUpdate", handlePointsUpdate);
       window.removeEventListener("finalPointsUpdate", handlePointsUpdate);
     };
-  }, [displayPoints]);
+  }, []); // ← EMPTY dependency array: listeners attached once, no stale closure
 
-  // Location handler
+  // Location handler (unchanged)
   useEffect(() => {
     if (!navigator.geolocation) {
       setError("Geolocation not supported");
@@ -155,9 +155,9 @@ const TopNav = () => {
           </p>
         </div>
 
-        {/* Points Display - Always updates reliably */}
+        {/* Points Display */}
         <div
-          key={`points-${displayPoints}-${pointsKey}`}
+          key={`points-${displayPoints}-${pointsKey}`} // Key always unique on change
           onClick={() => router.push("/account/reward")}
           className="p-2 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
         >
