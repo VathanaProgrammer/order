@@ -70,48 +70,24 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             });
 
             if (response.data.status === "success") {
-                const claimData = response.data.data;
+                // Clear everything and force refresh
+                localStorage.clear();
+                sessionStorage.clear();
                 
-                // 🎯 SIMPLE SUCCESS MESSAGE
-                toast.success(
-                    `${t.rewardClaimedSuccess || "Successfully claimed!"}\nRefreshing page...`,
-                    {
-                        autoClose: 1000,
-                        hideProgressBar: true,
-                    }
-                );
-
-                // Copy code to clipboard automatically
-                if (claimData.reward_code) {
-                    navigator.clipboard.writeText(claimData.reward_code);
-                }
-
-                if (onClaimSuccess) {
-                    onClaimSuccess();
-                }
-
-                // 🎯 GUARANTEED PAGE REFRESH
-                console.log('🎯 CLAIM SUCCESSFUL - FORCING PAGE REFRESH');
+                // Force multiple reload methods
+                setTimeout(() => {
+                    // Try all methods
+                    try { window.location.reload(true); } catch(e) {}
+                    try { window.location.href = window.location.href; } catch(e) {}
+                    try { window.location.replace(window.location.href); } catch(e) {}
+                    try { document.location.reload(); } catch(e) {}
+                    
+                    // Final attempt
+                    setTimeout(() => {
+                        window.location = window.location;
+                    }, 100);
+                }, 300);
                 
-                // Method 1: Reload after very short delay
-                setTimeout(() => {
-                    console.log('🔄 Method 1: location.reload()');
-                    window.location.reload();
-                }, 800);
-
-                // Method 2: Force reload from server (backup)
-                setTimeout(() => {
-                    console.log('💥 Method 2: Hard reload');
-                    window.location.href = window.location.href;
-                }, 1200);
-
-                // Method 3: Nuclear option (final backup)
-                setTimeout(() => {
-                    console.log('☢️ Method 3: Replace location');
-                    window.location.replace(window.location.href);
-                }, 1600);
-
-                // Stop execution - let the reloads happen
                 return;
             }
         } catch (error: any) {
