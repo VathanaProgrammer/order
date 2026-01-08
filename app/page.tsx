@@ -28,18 +28,6 @@ export default function ProductPage() {
         </div>
       </div>
 
-      // Add this somewhere in your page
-<button 
-  onClick={() => {
-    console.log('Testing reload...');
-    alert('Page should refresh now');
-    window.location.reload();
-  }}
-  className="bg-red-500 text-white p-2 rounded"
->
-  TEST RELOAD
-</button>
-
       <div>
         <FeaturedSection products={featuredProducts} />
         <Products selectedCategory={selectedCategory} searchQuery={searchQuery} />

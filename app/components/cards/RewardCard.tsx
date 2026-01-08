@@ -42,70 +42,19 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
     const hasEnoughPoints = availablePoints >= requiredPoints;
     const canClaim = user && hasEnoughPoints;
 
-    const handleClaimReward = async () => {
-        if (!user) {
-            toast.error(t.loginRequired || "Please login first");
-            return;
-        }
-    
-        if (availablePoints < requiredPoints) {
-            toast.error(t.insufficientPoints || "Insufficient points");
-            return;
-        }
-    
-        const isConfirmed = window.confirm(
-            `${t.confirmClaimReward || "Claim"}: "${product.name}"?\n\n` +
-            `${t.thisWillCost || "This will cost"}: ${requiredPoints} ${t.points || "points"}\n` +
-            `${t.yourPoints || "Your points"}: ${availablePoints}`
-        );
-    
-        if (!isConfirmed) return;
-    
-        setIsClaiming(true);
-        setLoading(true);
-    
-        try {
-            const response = await api.post('/rewards/claim', {
-                product_id: product.id,
-            });
-    
-            if (response.data.status === "success") {
-                const claimData = response.data.data;
-                
-                // Create a simple alert with refresh button
-                const userConfirmed = window.confirm(
-                    `✅ Successfully claimed ${product.name}!\n\n` +
-                    `Click OK to refresh the page and see your updated points.`
-                );
-                
-                if (userConfirmed) {
-                    window.location.reload();
-                }
-                
-                return;
-            }
-        } catch (error: any) {
-            console.error('Error claiming reward:', error);
-            
-            if (error.response?.data?.errors) {
-                const errors = error.response.data.errors;
-                const firstError = Object.values(errors)[0];
-                toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
-            } else if (error.response?.data?.message) {
-                toast.error(error.response.data.message);
-            } else {
-                toast.error(t.claimFailed || "Failed to claim reward");
-            }
-        } finally {
-            setIsClaiming(false);
-            setLoading(false);
-        }
-    };
-    
     // 🎯 CUSTOM ALERT FUNCTION
     const showRefreshAlert = (title: string, message: string, rewardCode?: string) => {
+        console.log('Creating custom alert...');
+        
+        // Remove any existing alerts
+        const existingOverlay = document.getElementById('refresh-alert-overlay');
+        if (existingOverlay) {
+            existingOverlay.remove();
+        }
+        
         // Create overlay
         const overlay = document.createElement('div');
+        overlay.id = 'refresh-alert-overlay';
         overlay.style.position = 'fixed';
         overlay.style.top = '0';
         overlay.style.left = '0';
@@ -153,12 +102,28 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                     width: 100%;
                     margin-top: 8px;
                     transition: all 0.2s;
-                " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                ">
                     🔄 Refresh Page to Update Points
                 </button>
                 
+                <button id="closeBtn" style="
+                    background: #6b7280;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    font-size: 16px;
+                    cursor: pointer;
+                    width: 100%;
+                    margin-top: 8px;
+                    transition: all 0.2s;
+                ">
+                    ✖️ Close (Points won't update)
+                </button>
+                
                 <div style="margin-top: 12px; font-size: 12px; color: #9ca3af;">
-                    Points will update after refresh
+                    Page will auto-refresh in 5 seconds...
                 </div>
             </div>
         `;
@@ -168,24 +133,107 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         document.body.appendChild(overlay);
         
         // Add click handler for refresh button
-        setTimeout(() => {
-            const refreshBtn = document.getElementById('refreshBtn');
-            if (refreshBtn) {
-                refreshBtn.onclick = () => {
-                    console.log('Refresh button clicked');
-                    window.location.reload();
-                };
-                
-                // Auto-click after 5 seconds
-                setTimeout(() => {
-                    refreshBtn.click();
-                }, 5000);
+        const refreshBtn = document.getElementById('refreshBtn');
+        const closeBtn = document.getElementById('closeBtn');
+        
+        if (refreshBtn) {
+            refreshBtn.onclick = () => {
+                console.log('Refresh button clicked');
+                overlay.remove();
+                window.location.reload();
+            };
+        }
+        
+        if (closeBtn) {
+            closeBtn.onclick = () => {
+                console.log('Close button clicked');
+                overlay.remove();
+            };
+        }
+        
+        // Auto-refresh after 5 seconds
+        const autoRefreshTimer = setTimeout(() => {
+            console.log('Auto-refreshing...');
+            overlay.remove();
+            window.location.reload();
+        }, 5000);
+        
+        // Clear timer if overlay is removed
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                clearTimeout(autoRefreshTimer);
+                overlay.remove();
             }
-        }, 100);
+        });
         
         // Copy reward code if exists
         if (rewardCode) {
             navigator.clipboard.writeText(rewardCode);
+        }
+    };
+
+    const handleClaimReward = async () => {
+        if (!user) {
+            toast.error(t.loginRequired || "Please login first");
+            return;
+        }
+    
+        if (availablePoints < requiredPoints) {
+            toast.error(t.insufficientPoints || "Insufficient points");
+            return;
+        }
+    
+        const isConfirmed = window.confirm(
+            `${t.confirmClaimReward || "Claim"}: "${product.name}"?\n\n` +
+            `${t.thisWillCost || "This will cost"}: ${requiredPoints} ${t.points || "points"}\n` +
+            `${t.yourPoints || "Your points"}: ${availablePoints}`
+        );
+    
+        if (!isConfirmed) return;
+    
+        setIsClaiming(true);
+        setLoading(true);
+    
+        try {
+            const response = await api.post('/rewards/claim', {
+                product_id: product.id,
+            });
+    
+            console.log('API Response:', response.data);
+    
+            if (response.data.status === "success") {
+                const claimData = response.data.data;
+                
+                console.log('Claim successful!');
+                
+                // 🎯 CALL THE CUSTOM ALERT FUNCTION
+                showRefreshAlert(
+                    t.rewardClaimedSuccess || "Successfully claimed!",
+                    `You claimed: ${product.name}`,
+                    claimData.reward_code
+                );
+
+                if (onClaimSuccess) {
+                    onClaimSuccess();
+                }
+                
+                return;
+            }
+        } catch (error: any) {
+            console.error('Error claiming reward:', error);
+            
+            if (error.response?.data?.errors) {
+                const errors = error.response.data.errors;
+                const firstError = Object.values(errors)[0];
+                toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
+            } else if (error.response?.data?.message) {
+                toast.error(error.response.data.message);
+            } else {
+                toast.error(t.claimFailed || "Failed to claim reward");
+            }
+        } finally {
+            setIsClaiming(false);
+            setLoading(false);
         }
     };
 
