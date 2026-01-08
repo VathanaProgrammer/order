@@ -18,6 +18,12 @@ const TopNav = () => {
       const currentPoints = user?.reward_points?.available || 0;
       setPoints(currentPoints);
     }, [user]);
+
+      // Debug: Log user data changes
+  useEffect(() => {
+    console.log('TopNav - User updated:', user);
+    console.log('TopNav - Points:', user?.reward_points?.available || 0);
+  }, [user]);
     
     // Listen for points updates
     useEffect(() => {

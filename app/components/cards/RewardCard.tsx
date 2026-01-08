@@ -89,6 +89,8 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                     }
                 );
 
+                console.log('Claim successful, refreshing user...');
+
                 // Refresh user data
                 await refreshUser();
 
@@ -113,6 +115,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                         toast.info(`📋 ${t.codeCopied || "Reward code copied to clipboard!"}`);
                     }, 1000);
                 }
+
             }
         } catch (error: any) {
             console.error('Error claiming reward:', error);
