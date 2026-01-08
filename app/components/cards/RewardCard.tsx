@@ -97,7 +97,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         } finally {
             setTimeout(() => {
                 window.location.reload();
-            }, 1300);
+            }, 2000);
             setIsClaiming(false);
             setLoading(false);
         }
