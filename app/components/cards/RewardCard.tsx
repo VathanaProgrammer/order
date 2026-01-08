@@ -72,25 +72,15 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             if (response.data.status === "success") {
                 const claimData = response.data.data;
                 
-                // Custom toast with button
-                const CustomToast = () => (
-                    <div className="p-3">
-                        <div className="font-bold text-green-600">✅ Successfully claimed!</div>
-                        <div className="mt-2">{product.name}</div>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="mt-3 w-full bg-blue-500 text-white py-2 px-4 rounded-lg font-bold hover:bg-blue-600 transition"
-                        >
-                            🔄 Refresh Points
-                        </button>
-                    </div>
+                // Create a simple alert with refresh button
+                const userConfirmed = window.confirm(
+                    `✅ Successfully claimed ${product.name}!\n\n` +
+                    `Click OK to refresh the page and see your updated points.`
                 );
                 
-                toast(<CustomToast />, {
-                    autoClose: false,
-                    closeOnClick: false,
-                    draggable: false,
-                });
+                if (userConfirmed) {
+                    window.location.reload();
+                }
                 
                 return;
             }
