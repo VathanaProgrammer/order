@@ -172,6 +172,16 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                     }
                 }, 2000);
 
+                // SIMPLE FIX: Wait, then refresh
+                    console.log('⏳ Waiting 1.5 seconds for backend...');
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    
+                    console.log('🔄 Refreshing user data...');
+                    await refreshUser();
+                    
+                    // Force UI update
+                    window.dispatchEvent(new CustomEvent('forceUpdatePoints'));
+
                 // Notify parent component
                 if (onClaimSuccess) {
                     console.log('📞 Calling onClaimSuccess callback');
