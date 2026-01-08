@@ -9,16 +9,20 @@ import Image from "next/image";
 
 const TopNav = () => {
   const router = useRouter();
-  //const { user } = useAuth();
-  const auth = useAuth();
+  const { user } = useAuth();
+  const availablePoints = user?.reward_points?.available ?? 0;
+  const [points, setPoints] = useState(availablePoints);
 
+  useEffect(() => {
+    setPoints(availablePoints);
+  }, [availablePoints]);
 
   const [location, setLocation] = useState<string>("Fetching location...");
   const [error, setError] = useState<string | null>(null);
   const { language, toggleLanguage, t } = useLanguage();
 
   const handleProfileClick = () => {
-    if (auth.user) {
+    if (user) {
       router.push("/account");
     } else {
       router.push("/sign-in");
@@ -26,7 +30,7 @@ const TopNav = () => {
   };
 
   const handleWheelClick = () => {
-    if (auth.user) {
+    if (user) {
       router.push("/wheel");
     } else {
       router.push("/sign-in");
@@ -72,8 +76,8 @@ const TopNav = () => {
   }, []);
 
   useEffect(() => {
-    console.log("TopNav user updated:", auth.user?.reward_points);
-  }, [auth.user]);  
+    console.log("TopNav user updated:", user?.reward_points);
+  }, [user]);  
 
   return (
     <section className="flex flex-col gap-2">
@@ -159,7 +163,7 @@ const TopNav = () => {
             width={20}
             height={20}
           />
-          <p className="text-[16px] font-medium ml-1">{auth.user?.reward_points?.available || 0}</p>
+          <p className="text-[16px] font-medium ml-1">{points}</p>
         </div>
 
       </div>
