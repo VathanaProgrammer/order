@@ -80,38 +80,41 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
       if (response.data.status === "success") {
         const claimData = response.data.data;
-
+      
+        // Prefer server-returned points if available, fallback to optimistic
+        let finalPoints = newPoints;
+        if (claimData && typeof claimData.new_points !== "undefined") {
+          finalPoints = claimData.new_points;
+        } else if (claimData && typeof claimData.available_points !== "undefined") {
+          finalPoints = claimData.available_points;
+        } else if (claimData && claimData.reward_points) {
+          finalPoints = claimData.reward_points.available || claimData.reward_points.total || newPoints;
+        }
+      
+        // Force update with server-confirmed points (prevents revert)
+        updatePoints(finalPoints);
+      
         toast.success(
           <div className="space-y-2">
-            <div className="font-bold text-green-600">
-              ✅ {t.rewardClaimedSuccess || "Successfully claimed!"}
-            </div>
-            <div>
-              <strong>{t.reward || "Reward"}:</strong> {claimData.product_name || product.name}
-            </div>
-            <div>
-              <strong>{t.newPoints || "New points"}:</strong> {newPoints.toLocaleString()}
-            </div>
+            <div className="font-bold text-green-600">✅ Successfully claimed!</div>
+            <div><strong>Reward:</strong> {claimData.product_name || product.name}</div>
+            <div><strong>New points:</strong> {finalPoints.toLocaleString()}</div>
           </div>,
           { autoClose: 8000 }
         );
-
+      
         if (claimData.reward_code) {
           navigator.clipboard.writeText(claimData.reward_code);
-          setTimeout(() => {
-            toast.info(`📋 ${t.codeCopied || "Reward code copied to clipboard!"}`);
-          }, 1000);
+          setTimeout(() => toast.info("Reward code copied!"), 1000);
         }
-
+      
         if (onClaimSuccess) onClaimSuccess();
-
-        // Sync with server - eliminates need for manual refresh
+      
+        // Still refresh user for full sync (safe now)
         await refreshUser();
-
       } else {
-        // Server rejected (unlikely if multiple claims allowed)
         updatePoints(availablePoints);
-        toast.error(response.data.message || t.claimFailed || "Claim failed");
+        toast.error(response.data.message || "Claim failed");
       }
     } catch (error: any) {
       // Network or server error → revert
