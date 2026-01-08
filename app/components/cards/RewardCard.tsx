@@ -76,64 +76,45 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 const claimData = response.data.data;
                 
                 toast.success(
-                    <div className="space-y-2">
-                        <div className="font-bold text-green-600">✅ {t.rewardClaimedSuccess || "Successfully claimed!"}</div>
-                        <div>
-                            <div><strong>{t.reward || "Reward"}:</strong> {claimData.product_name}</div>
-                        </div>
-                    </div>,
-                    {
-                        autoClose: 8000,
-                        closeOnClick: false,
-                        draggable: false,
-                    }
+                  <div className="space-y-2">
+                    <div className="font-bold text-green-600">✅ {t.rewardClaimedSuccess || "Successfully claimed!"}</div>
+                    <div>
+                      <div><strong>{t.reward || "Reward"}:</strong> {claimData.product_name}</div>
+                    </div>
+                  </div>,
+                  {
+                    autoClose: 8000,
+                    closeOnClick: false,
+                    draggable: false,
+                  }
                 );
-
+              
                 console.log('Claim successful, refreshing user...');
-
-                      // 1. Refresh user in AuthContext
-      await refreshUser();
-      
-      // 2. Dispatch a global event
-      window.dispatchEvent(new CustomEvent('userUpdated', {
-        detail: { 
-          action: 'points_updated',
-          newPoints: availablePoints - requiredPoints 
-        }
-      }));
-      
-      // 3. Force localStorage change (triggers storage event)
-      const event = new StorageEvent('storage', {
-        key: 'user_points_update',
-        newValue: Date.now().toString(),
-      });
-      window.dispatchEvent(event);
-      
-      // 4. Force a DOM event
-      document.dispatchEvent(new Event('userDataChanged'));
-      
-      // 5. Use broadcast channel for cross-tab communication
-      if (typeof BroadcastChannel !== 'undefined') {
-        const channel = new BroadcastChannel('user_updates');
-        channel.postMessage({ type: 'POINTS_UPDATED' });
-        channel.close();
-      }
-      
-      // 6. Force React state update by modifying a global variable
-      if (typeof window !== 'undefined') {
-        (window as any).__FORCE_USER_REFRESH = Date.now();
-      }
-      
-      if (onClaimSuccess) {
-        onClaimSuccess();
-      }
-      
-      // 7. Final fallback: force another refresh after delay
-      setTimeout(() => {
-        refreshUser();
-        window.dispatchEvent(new Event('userUpdated'));
-      }, 500);
-    }
+              
+                // 1. Refresh user in AuthContext
+                await refreshUser();
+                
+                // 2. Dispatch BOTH events that TopNav is listening for
+                window.dispatchEvent(new Event('userPointsUpdated'));
+                window.dispatchEvent(new Event('userUpdated'));
+                
+                // 3. Simple storage event
+                window.dispatchEvent(new Event('storage'));
+                
+                if (onClaimSuccess) {
+                  onClaimSuccess();
+                }
+                
+                // Copy code to clipboard automatically
+                if (claimData.reward_code) {
+                  navigator.clipboard.writeText(claimData.reward_code);
+                  
+                  // Show copy confirmation
+                  setTimeout(() => {
+                    toast.info(`📋 ${t.codeCopied || "Reward code copied to clipboard!"}`);
+                  }, 1000);
+                }
+              }
         } catch (error: any) {
             console.error('Error claiming reward:', error);
             
