@@ -5,7 +5,7 @@ import Image from "next/image";
 import { RewardProduct } from "../RewardSection";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { usePoints } from "@/context/PointsContext";  // ← New import
+import { usePoints } from "@/context/PointsContext";
 import { useLoading } from "@/context/LoadingContext";
 import api from "@/api/api";
 import { toast } from "react-toastify";
@@ -16,16 +16,16 @@ interface RewardCardProps {
 }
 
 const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();  // ← Get refreshUser
   const { t } = useLanguage();
   const { setLoading } = useLoading();
-  const { updatePoints } = usePoints();  // ← Get global points updater
+  const { updatePoints } = usePoints();
 
   const [isClaiming, setIsClaiming] = useState(false);
 
   const displayImage = product.image_url || "/img/default.png";
 
-  // Safely extract available points (handles number or object)
+  // Safely get available points
   const getAvailablePoints = (): number => {
     if (!user?.reward_points) return 0;
 
@@ -70,7 +70,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
     const newPoints = availablePoints - requiredPoints;
 
-    // ← Optimistically update points globally and instantly
+    // Instant optimistic update
     updatePoints(newPoints);
 
     try {
@@ -87,22 +87,15 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
               ✅ {t.rewardClaimedSuccess || "Successfully claimed!"}
             </div>
             <div>
-              <div>
-                <strong>{t.reward || "Reward"}:</strong> {claimData.product_name}
-              </div>
-              <div>
-                <strong>New points:</strong> {newPoints.toLocaleString()}
-              </div>
+              <strong>{t.reward || "Reward"}:</strong> {claimData.product_name || product.name}
+            </div>
+            <div>
+              <strong>{t.newPoints || "New points"}:</strong> {newPoints.toLocaleString()}
             </div>
           </div>,
-          {
-            autoClose: 8000,
-            closeOnClick: false,
-            draggable: false,
-          }
+          { autoClose: 8000 }
         );
 
-        // Auto-copy reward code if provided
         if (claimData.reward_code) {
           navigator.clipboard.writeText(claimData.reward_code);
           setTimeout(() => {
@@ -110,32 +103,36 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
           }, 1000);
         }
 
-        if (onClaimSuccess) {
-          onClaimSuccess();
-        }
+        if (onClaimSuccess) onClaimSuccess();
+
+        // Sync with server - eliminates need for manual refresh
+        await refreshUser();
+
+      } else {
+        // Server rejected (unlikely if multiple claims allowed)
+        updatePoints(availablePoints);
+        toast.error(response.data.message || t.claimFailed || "Claim failed");
       }
     } catch (error: any) {
-      console.error("Error claiming reward:", error);
-
-      // ← Revert points on failure
+      // Network or server error → revert
       updatePoints(availablePoints);
 
-      if (error.response?.data?.errors) {
-        const errors = error.response.data.errors;
-        const firstError = Object.values(errors)[0];
-        toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
-      } else if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error(t.claimFailed || "Failed to claim reward");
-      }
+      console.error("Claim error:", error);
+
+      const message =
+        error.response?.data?.message ||
+        (error.response?.data?.errors
+          ? Object.values(error.response.data.errors)[0]
+          : null) ||
+        t.claimFailed || "Failed to claim reward";
+
+      toast.error(message);
     } finally {
       setIsClaiming(false);
       setLoading(false);
     }
   };
 
-  // Progress calculation
   const progressPercentage = requiredPoints > 0
     ? Math.min((availablePoints / requiredPoints) * 100, 100)
     : 0;
@@ -144,11 +141,10 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
   return (
     <div className="w-full rounded-xl bg-white border border-gray-200 shadow-md flex flex-col overflow-hidden transition-all hover:shadow-xl hover:border-blue-300">
-      {/* Product Image */}
       <div className="relative w-full h-44">
         <Image
           src={displayImage}
-          alt={product.name || "Reward product"}
+          alt={product.name || "Reward"}
           fill
           className="object-cover"
           unoptimized
@@ -157,21 +153,17 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             (e.target as HTMLImageElement).src = "/img/default.png";
           }}
         />
-
-        {/* Points Badge */}
         <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg flex items-center">
           <span className="mr-1">⭐</span>
           {requiredPoints.toLocaleString()}
         </div>
       </div>
 
-      {/* Product Info */}
       <div className="p-4 flex flex-col flex-1">
         <h3 className="font-bold text-gray-800 text-base mb-3 line-clamp-2 min-h-[3rem]">
           {product.name || "Reward Item"}
         </h3>
 
-        {/* Points Progress Bar */}
         <div className="mb-4">
           <div className="flex justify-between text-sm mb-1">
             <span className="text-gray-600">
@@ -195,7 +187,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
           </div>
         </div>
 
-        {/* Claim Button */}
         <button
           onClick={handleClaimReward}
           disabled={isClaiming || !canClaim}
@@ -230,13 +221,8 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
           )}
         </button>
 
-        {/* Status Message */}
         {user && (
-          <div
-            className={`mt-2 text-center text-xs font-medium ${
-              hasEnoughPoints ? "text-green-600" : "text-red-600"
-            }`}
-          >
+          <div className={`mt-2 text-center text-xs font-medium ${hasEnoughPoints ? "text-green-600" : "text-red-600"}`}>
             {hasEnoughPoints ? (
               <div className="flex items-center justify-center">
                 <span className="mr-1">✅</span>
