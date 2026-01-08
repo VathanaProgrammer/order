@@ -55,16 +55,16 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         }
         
         // Simple native confirm (works best on mobile)
-        const isConfirmed = window.confirm(
-            `Claim "${product.name}"?\n\n` +
-            `Cost: ${requiredPoints} points\n` +
-            `Your points: ${availablePoints}\n\n` +
-            `Click OK to confirm.`
-        );
+        // const isConfirmed = window.confirm(
+        //     `Claim "${product.name}"?\n\n` +
+        //     `Cost: ${requiredPoints} points\n` +
+        //     `Your points: ${availablePoints}\n\n` +
+        //     `Click OK to confirm.`
+        // );
         
-        if (!isConfirmed) {
-            return;
-        }
+        // if (!isConfirmed) {
+        //     return;
+        // }
         
         setIsClaiming(true);
         setLoading(true);
@@ -102,13 +102,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
     const handleRefresh = () => {
         window.location.reload();
-    };
-
-    const handleContinue = () => {
-        setShowRefreshModal(false);
-        if (onClaimSuccess) {
-            onClaimSuccess();
-        }
     };
     
     // Calculate progress percentage
@@ -263,14 +256,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                                 onClick={handleRefresh}
                                 className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-lg active:scale-[0.98] transition-transform"
                             >
-                                Refresh Page
-                            </button>
-                            
-                            <button
-                                onClick={handleContinue}
-                                className="w-full py-3 bg-gray-100 text-gray-700 font-semibold rounded-lg active:scale-[0.98] transition-transform"
-                            >
-                                Continue Browsing
+                                OK
                             </button>
                         </div>
                     </div>
