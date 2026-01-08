@@ -91,32 +91,49 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
                 console.log('Claim successful, refreshing user...');
 
-                // Refresh user data
-                await refreshUser();
-
-                // Dispatch a custom event to notify other components
-                window.dispatchEvent(new CustomEvent('userPointsUpdated'));
-                
-                // Force a small delay and re-check
-                setTimeout(() => {
-                    refreshUser();
-                }, 500);
-                
-                if (onClaimSuccess) {
-                    onClaimSuccess();
-                }
-
-                // Copy code to clipboard automatically
-                if (claimData.reward_code) {
-                    navigator.clipboard.writeText(claimData.reward_code);
-                    
-                    // Show copy confirmation
-                    setTimeout(() => {
-                        toast.info(`📋 ${t.codeCopied || "Reward code copied to clipboard!"}`);
-                    }, 1000);
-                }
-
-            }
+                      // 1. Refresh user in AuthContext
+      await refreshUser();
+      
+      // 2. Dispatch a global event
+      window.dispatchEvent(new CustomEvent('userUpdated', {
+        detail: { 
+          action: 'points_updated',
+          newPoints: availablePoints - requiredPoints 
+        }
+      }));
+      
+      // 3. Force localStorage change (triggers storage event)
+      const event = new StorageEvent('storage', {
+        key: 'user_points_update',
+        newValue: Date.now().toString(),
+      });
+      window.dispatchEvent(event);
+      
+      // 4. Force a DOM event
+      document.dispatchEvent(new Event('userDataChanged'));
+      
+      // 5. Use broadcast channel for cross-tab communication
+      if (typeof BroadcastChannel !== 'undefined') {
+        const channel = new BroadcastChannel('user_updates');
+        channel.postMessage({ type: 'POINTS_UPDATED' });
+        channel.close();
+      }
+      
+      // 6. Force React state update by modifying a global variable
+      if (typeof window !== 'undefined') {
+        (window as any).__FORCE_USER_REFRESH = Date.now();
+      }
+      
+      if (onClaimSuccess) {
+        onClaimSuccess();
+      }
+      
+      // 7. Final fallback: force another refresh after delay
+      setTimeout(() => {
+        refreshUser();
+        window.dispatchEvent(new Event('userUpdated'));
+      }, 500);
+    }
         } catch (error: any) {
             console.error('Error claiming reward:', error);
             

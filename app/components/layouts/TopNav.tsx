@@ -1,6 +1,6 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import Icon from "../Icon";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import Icon from "lucide-react"
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -9,152 +9,82 @@ import Image from "next/image";
 
 const TopNav = () => {
   const router = useRouter();
-  const { user } = useAuth();
-  const [points, setPoints] = useState(0);
-  const { refreshUser } = useAuth();
-
-    // Initialize points
-    useEffect(() => {
-      const currentPoints = user?.reward_points?.available || 0;
-      setPoints(currentPoints);
-    }, [user]);
-
-      // Debug: Log user data changes
-  useEffect(() => {
-    console.log('TopNav - User updated:', user);
-    console.log('TopNav - Points:', user?.reward_points?.available || 0);
-  }, [user]);
-    
-    // Listen for points updates
-    useEffect(() => {
-      const handlePointsUpdated = () => {
-        refreshUser();
-      };
-      
-      window.addEventListener('userPointsUpdated', handlePointsUpdated);
-      
-      return () => {
-        window.removeEventListener('userPointsUpdated', handlePointsUpdated);
-      };
-    }, [refreshUser]);
-
+  const { user, refreshUser } = useAuth();
+  const [points, setPoints] = useState<number>(0);
   const [location, setLocation] = useState<string>("Fetching location...");
   const [error, setError] = useState<string | null>(null);
   const { language, toggleLanguage, t } = useLanguage();
 
-  const handleProfileClick = () => {
-    if (user) {
-      router.push("/account");
-    } else {
-      router.push("/sign-in");
+  // MEMOIZED: Calculate points from user object
+  const currentPoints = useMemo(() => {
+    if (!user) return 0;
+    
+    console.log('TopNav: Calculating points from user:', user);
+    
+    if (typeof user.reward_points === 'number') {
+      return user.reward_points;
     }
-  };
-
-  const handleWheelClick = () => {
-    if (user) {
-      router.push("/wheel");
-    } else {
-      router.push("/sign-in");
+    
+    if (user.reward_points && typeof user.reward_points === 'object') {
+      return (user.reward_points as any).available || 
+             (user.reward_points as any).total || 0;
     }
-  };
+    
+    return 0;
+  }, [user]); // This will recompute ONLY when user changes
 
+  // Force update when points change
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setTimeout(() => {
-        setError("Geolocation is not supported by your browser");
-        setLocation("");
-      }, 0);
-      return;
-    }
+    console.log('TopNav: Points changed to', currentPoints);
+    setPoints(currentPoints);
+  }, [currentPoints]);
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
+  // Force refresh user data on mount
+  useEffect(() => {
+    console.log('TopNav: Mounted, refreshing user data');
+    refreshUser();
+  }, [refreshUser]);
 
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-          );
-          const data = await res.json();
-          const city =
-            data.address.city ||
-            data.address.town ||
-            data.address.village ||
-            "";
-          const country = data.address.country || "";
-          setLocation(
-            city && country ? `${city}, ${country}` : "Unknown location"
-          );
-        } catch (err) {
-          setLocation(`Lat: ${latitude}, Lon: ${longitude}`);
-        }
-      },
-      (err) => {
-        setError(err.message);
-        setLocation("");
+  // Listen for real-time updates
+  useEffect(() => {
+    const handleUserUpdate = () => {
+      console.log('TopNav: Manual refresh triggered');
+      refreshUser();
+    };
+
+    // Multiple triggers
+    window.addEventListener('userUpdated', handleUserUpdate);
+    
+    // Refresh when page becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshUser();
       }
-    );
-  }, []);
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('userUpdated', handleUserUpdate);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshUser]);
+
+  // Refresh every 2 seconds for debugging (remove in production)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('TopNav: Auto-refreshing...');
+      refreshUser();
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, [refreshUser]);
+
+  // ... rest of your handlers ...
 
   return (
     <section className="flex flex-col gap-2">
-      <div key={`points-${points}`} className="flex flex-row justify-between items-center">
-        {/* Logo */}
-        <h1 className="text-[32px] font-bold main-text">SOB</h1>
-
-        <div className="flex flex-row gap-2">
-
-        <button
-          type="button"
-          onClick={handleWheelClick}
-          className="p-2 flex items-center rounded-[10px] cursor-pointer transition"
-        >
-          <Image src={SpinWheelPic} alt="wheel" width={40} height={40} />
-        </button>
-              
-          {/* Language Toggle Button */}
-          <button
-          type="button"
-          onClick={toggleLanguage}
-          className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
-        >
-          {language === "en" ? "ភាសាខ្មែរ" : "English"}
-        </button>
-          <div
-            onClick={handleProfileClick}
-            className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
-          >
-            <Icon
-              className="text-gray-500"
-              icon="mdi:account"
-              width={26}
-              height={26}
-            />
-          </div>
-          {/* <div
-            onClick={() => router.push("/cart")}
-            className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
-          >
-            <Icon
-              className="text-gray-500"
-              icon="mdi:cart"
-              width={26}
-              height={26}
-            />
-          </div> */}
-          {/* <div
-            onClick={() => router.push("/notifications")}
-            className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition"
-          >
-            <Icon
-              className="text-gray-500"
-              icon="zondicons:notifications"
-              width={26}
-              height={26}
-            />
-          </div> */}
-        </div>
-      </div>
+      {/* ... your existing header code ... */}
 
       <div className="flex flex-row justify-between items-center mt-2">
         {/* Location */}
@@ -170,8 +100,14 @@ const TopNav = () => {
           </p>
         </div>
 
+        {/* Points display - Add key and ensure it updates */}
         <div
-          onClick={() => router.push("/account/reward")}
+          key={`nav-points-${points}-${Date.now()}`} // Force DOM update
+          onClick={() => {
+            router.push("/account/reward");
+            // Force refresh when navigating to rewards page
+            setTimeout(() => refreshUser(), 100);
+          }}
           className="p-2 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
         >
           <Icon
@@ -179,13 +115,31 @@ const TopNav = () => {
             icon="vaadin:database"
             width={20}
             height={20}
-          />
-          <p className="text-[16px] font-medium ml-1">{points}</p>
+          >
+            {/* Add animation when points change */}
+            <animate
+              attributeName="opacity"
+              values="1;0.5;1"
+              dur="0.5s"
+              begin="indefinite"
+              id="pointsAnimation"
+            />
+          </Icon>
+          <p 
+            key={`points-value-${points}`}
+            className="text-[16px] font-medium ml-1 transition-all duration-300"
+          >
+            {points.toLocaleString()} {/* Format with commas */}
+          </p>
         </div>
-
       </div>
 
       {error && <p className="text-red-500 text-[12px]">{error}</p>}
+      
+      {/* Debug info - remove in production */}
+      <div className="text-xs text-gray-500 mt-1">
+        Last update: {new Date().toLocaleTimeString()}
+      </div>
     </section>
   );
 };
