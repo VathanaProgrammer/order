@@ -95,7 +95,9 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             const errorMessage = error.response?.data?.message || error.message || "Unknown error";
             toast.error(`Failed: ${errorMessage}`);
         } finally {
-            window.location.reload();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
             setIsClaiming(false);
             setLoading(false);
         }
