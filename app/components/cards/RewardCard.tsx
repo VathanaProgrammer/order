@@ -25,9 +25,18 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
     const getAvailablePoints = () => {
         if (!user || !user.reward_points) return 0;
         
-        console.log('RewardCard: Current user points:', user.reward_points.available);
+        // If reward_points is a number
+        if (typeof user.reward_points === 'number') {
+            return user.reward_points;
+        }
         
-        return user.reward_points.available || 0;
+        // If reward_points is an object with available property
+        if (typeof user.reward_points === 'object' && user.reward_points !== null) {
+            const points = user.reward_points as any;
+            return points.available || points.total || 0;
+        }
+        
+        return 0;
     };
 
     // Helper function to get user's available points as number
@@ -58,17 +67,10 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         setIsClaiming(true);
         setLoading(true);
 
-        console.log('🎯 Starting claim process...');
-        console.log('Current points:', availablePoints);
-        console.log('Required points:', requiredPoints);
-        console.log('Expected new points:', availablePoints - requiredPoints);
-
         try {
             const response = await api.post('/rewards/claim', {
                 product_id: product.id,
             });
-
-            console.log('Claim API response:', response.data);
 
             if (response.data.status === "success") {
                 const claimData = response.data.data;
@@ -89,104 +91,35 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                     }
                 );
 
-                console.log('✅ Claim successful, starting refresh process...');
+                console.log('✅ Claim successful! Server already updated.');
 
-                // STRATEGY 1: Immediate refresh
-                console.log('🔄 Step 1: Calling refreshUser()...');
-                await refreshUser();
-                console.log('✅ Step 1 complete');
+                // 🎯 CRITICAL: JUST UPDATE UI - DON'T TOUCH SERVER
+                console.log('🎯 Updating UI only...');
+
+                // Method 1: Store expected points in localStorage
+                const expectedNewPoints = availablePoints - requiredPoints;
+                localStorage.setItem('expected_points', expectedNewPoints.toString());
+                localStorage.setItem('last_claim_time', Date.now().toString());
                 
-                // STRATEGY 2: Direct API verification
-                console.log('🔍 Step 2: Direct API verification...');
-                setTimeout(async () => {
-                    try {
-                        const verifyResponse = await api.get('/user?_verify=1', {
-                            headers: {
-                                'Cache-Control': 'no-cache',
-                                'Pragma': 'no-cache'
-                            }
-                        });
-                        console.log('Verification response structure:', verifyResponse.data);
-                        
-                        // Try to extract points
-                        let verifiedPoints = 0;
-                        if (verifyResponse.data?.user?.reward_points?.available !== undefined) {
-                            verifiedPoints = verifyResponse.data.user.reward_points.available;
-                        } else if (verifyResponse.data?.data?.reward_points?.available !== undefined) {
-                            verifiedPoints = verifyResponse.data.data.reward_points.available;
-                        } else if (verifyResponse.data?.reward_points?.available !== undefined) {
-                            verifiedPoints = verifyResponse.data.reward_points.available;
-                        }
-                        
-                        console.log('✅ Verified points:', verifiedPoints);
-                        console.log('📊 Expected points:', availablePoints - requiredPoints);
-                        console.log('📊 Match?', verifiedPoints === (availablePoints - requiredPoints));
-                    } catch (error) {
-                        console.error('❌ Verification failed:', error);
-                    }
-                }, 300);
-                
-                // STRATEGY 3: Multiple events for different listeners
-                console.log('📢 Step 3: Dispatching events...');
-                
-                // Event 1: Generic points update
-                window.dispatchEvent(new CustomEvent('pointsUpdated', {
+                // Method 2: Dispatch a custom event that TopNav will listen to
+                window.dispatchEvent(new CustomEvent('pointsManuallyUpdated', {
                     detail: {
-                        productId: product.id,
-                        pointsDeducted: requiredPoints,
-                        newPoints: availablePoints - requiredPoints
+                        newPoints: expectedNewPoints,
+                        timestamp: Date.now(),
+                        productName: product.name
                     }
                 }));
-                
-                // Event 2: Specific user refresh event
-                window.dispatchEvent(new Event('userRefreshed'));
-                
-                // Event 3: Storage event (some components listen to this)
+
+                // Method 3: Also trigger a storage event (some components listen to this)
                 window.dispatchEvent(new StorageEvent('storage', {
                     key: 'points_update',
-                    newValue: Date.now().toString()
+                    newValue: expectedNewPoints.toString()
                 }));
-                
-                console.log('✅ Step 3 complete - Events dispatched');
-                
-                // STRATEGY 4: Delayed refresh to catch any async updates
-                console.log('⏰ Step 4: Scheduling delayed refresh...');
-                setTimeout(async () => {
-                    console.log('🔄 Running delayed refresh...');
-                    try {
-                        await refreshUser();
-                        console.log('✅ Delayed refresh complete');
-                    } catch (error) {
-                        console.error('❌ Delayed refresh failed:', error);
-                    }
-                }, 1000);
-                
-                // STRATEGY 5: Another refresh after 2 seconds
-                setTimeout(async () => {
-                    console.log('🔄 Running final refresh...');
-                    try {
-                        await refreshUser();
-                        console.log('✅ Final refresh complete');
-                    } catch (error) {
-                        console.error('❌ Final refresh failed:', error);
-                    }
-                }, 2000);
 
-                // SIMPLE FIX: Wait, then refresh
-                    console.log('⏳ Waiting 1.5 seconds for backend...');
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                    
-                    console.log('🔄 Refreshing user data...');
-                    await refreshUser();
-                    
-                    // Force UI update
-                    window.dispatchEvent(new CustomEvent('forceUpdatePoints'));
+                // Method 4: Force a global refresh event
+                window.dispatchEvent(new Event('forceUIRefresh'));
 
-                // Notify parent component
-                if (onClaimSuccess) {
-                    console.log('📞 Calling onClaimSuccess callback');
-                    onClaimSuccess();
-                }
+                console.log('✅ UI update events dispatched. Points should show:', expectedNewPoints);
 
                 // Copy code to clipboard automatically
                 if (claimData.reward_code) {
@@ -197,11 +130,19 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                         toast.info(`📋 ${t.codeCopied || "Reward code copied to clipboard!"}`);
                     }, 1000);
                 }
-                
-                console.log('🎉 All refresh strategies initiated!');
+
+                if (onClaimSuccess) {
+                    onClaimSuccess();
+                }
+
+                // Optional: Call refreshUser after 2 seconds just to sync
+                setTimeout(() => {
+                    console.log('🔄 Syncing with server after delay...');
+                    refreshUser();
+                }, 2000);
             }
         } catch (error: any) {
-            console.error('❌ Error claiming reward:', error);
+            console.error('Error claiming reward:', error);
             
             // Handle Laravel validation errors
             if (error.response?.data?.errors) {
@@ -340,13 +281,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                         )}
                     </div>
                 )}
-                
-                {/* Debug info - remove in production */}
-                <div className="mt-2 text-xs text-gray-500 text-center">
-                    <div>Your points: {availablePoints}</div>
-                    <div>Required: {requiredPoints}</div>
-                    <div>Status: {hasEnoughPoints ? "✅ Ready" : "❌ Need " + pointsNeeded + " more"}</div>
-                </div>
             </div>
         </div>
     );
