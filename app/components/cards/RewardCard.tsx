@@ -43,109 +43,70 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
     const canClaim = user && hasEnoughPoints;
 
     const handleClaimReward = async () => {
-        console.log('=== DEBUG START ===');
-        console.log('1. User:', user?.id);
-        console.log('2. Available points:', availablePoints);
-        console.log('3. Required points:', requiredPoints);
-        
         if (!user) {
-            console.log('ERROR: No user');
-            alert("Please login first");
+            toast.info("Please login first");
             return;
         }
         
         if (availablePoints < requiredPoints) {
-            console.log('ERROR: Insufficient points');
-            alert("Insufficient points");
+            toast.warning(`You need ${requiredPoints - availablePoints} more points`);
             return;
         }
         
-        console.log('4. Showing confirmation dialog...');
+        // Use window.confirm for mobile compatibility (better than custom modal on mobile)
         const isConfirmed = window.confirm(
             `Claim "${product.name}"?\n\n` +
             `Cost: ${requiredPoints} points\n` +
-            `Your points: ${availablePoints}`
+            `Your points: ${availablePoints}\n\n` +
+            `Click OK to confirm.`
         );
         
-        console.log('5. User confirmed?', isConfirmed);
-        
         if (!isConfirmed) {
-            console.log('User cancelled');
             return;
         }
         
         setIsClaiming(true);
         setLoading(true);
         
-        console.log('6. Making API call...');
-        
         try {
             const response = await api.post('/rewards/claim', {
                 product_id: product.id,
             });
         
-            console.log('7. API Response status:', response.status);
-            console.log('8. API Response data:', response.data);
-            
-            // Check what structure the response actually has
-            console.log('9. Response keys:', Object.keys(response.data));
-            
-            // Try different success checks
-            let isSuccess = false;
-            let successMessage = '';
-            
-            if (response.data.status === "success") {
-                isSuccess = true;
-                successMessage = 'status === "success"';
-            } else if (response.data.success === true) {
-                isSuccess = true;
-                successMessage = 'success === true';
-            } else if (response.data.message && response.data.message.includes('success')) {
-                isSuccess = true;
-                successMessage = 'message contains success';
-            }
-            
-            console.log('10. Is success?', isSuccess, 'Reason:', successMessage);
+            // Check for success
+            const isSuccess = response.data.status === "success" || 
+                            response.data.success === true ||
+                            (response.data.message && response.data.message.includes('success'));
             
             if (isSuccess) {
-                console.log('11. SUCCESS! Showing refresh dialog...');
+                toast.success(`Successfully claimed ${product.name}!`);
                 
-                // Force show a simple alert first
-                alert(`✅ API SUCCESS! Response: ${JSON.stringify(response.data)}`);
+                // Optional: Ask user if they want to refresh (less intrusive)
+                setTimeout(() => {
+                    const shouldRefresh = window.confirm(
+                        "Claim successful! Refresh page to update your points?"
+                    );
+                    
+                    if (shouldRefresh) {
+                        window.location.reload();
+                    } else if (onClaimSuccess) {
+                        onClaimSuccess(); // Callback to update parent state
+                    }
+                }, 1000); // Small delay for better UX
                 
-                // Then show refresh confirm
-                const shouldRefresh = window.confirm(
-                    `✅ Successfully claimed ${product.name}!\n\n` +
-                    `Click OK to refresh the page.\n` +
-                    `Click Cancel to continue without refreshing.`
-                );
-                
-                console.log('12. Should refresh?', shouldRefresh);
-                
-                if (shouldRefresh) {
-                    console.log('13. Reloading page...');
-                    window.location.reload();
-                } else {
-                    console.log('13. User chose not to refresh');
-                }
-                
-                return;
             } else {
-                console.log('11. NOT SUCCESS - Response:', response.data);
-                alert(`API did not return success. Response: ${JSON.stringify(response.data)}`);
+                toast.error("Failed to claim reward. Please try again.");
             }
         } catch (error: any) {
-            console.error('ERROR:', error);
-            console.log('Error response:', error.response?.data);
-            alert(`Failed to claim reward. Error: ${error.message}`);
+            console.error('Claim error:', error);
+            const errorMessage = error.response?.data?.message || error.message || "Unknown error";
+            toast.error(`Failed: ${errorMessage}`);
         } finally {
-            console.log('14. Finally block');
             setIsClaiming(false);
             setLoading(false);
         }
-        
-        console.log('15. Function end');
     };
+    
     // Calculate progress percentage
     const progressPercentage = requiredPoints > 0 
         ? Math.min((availablePoints / requiredPoints) * 100, 100)
