@@ -143,16 +143,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
                     {/* Points Progress Bar */}
                     <div className="mb-4">
-                        <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-600">
-                                {t.required || "Need"}:
-                                <span className="font-bold ml-1">{requiredPoints}</span>
-                            </span>
-                            <span className="text-gray-600">
-                                You have:
-                                <span className="font-bold ml-1 text-blue-600">{availablePoints}</span>
-                            </span>
-                        </div>
                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                             <div 
                                 className={`h-full rounded-full transition-all duration-500 ${
