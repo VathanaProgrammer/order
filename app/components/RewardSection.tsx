@@ -32,7 +32,7 @@ const RewardSection: React.FC<RewardSectionProps> = ({ onClaimSuccess }) => {
 
   const handleClaimSuccess = async () => {
     // Revalidate (refresh) the data
-    await mutate();
+    await mutate(undefined, { revalidate: true });
     
     if (onClaimSuccess) {
       onClaimSuccess();
