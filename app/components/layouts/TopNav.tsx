@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Icon from "../Icon";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -11,54 +11,93 @@ const TopNav = () => {
   const router = useRouter();
   const { user } = useAuth();
   const [displayPoints, setDisplayPoints] = useState(0);
+  const [updateCounter, setUpdateCounter] = useState(0); // Force updates
+  const lastPointsRef = useRef(0);
   const [location, setLocation] = useState<string>("Fetching location...");
   const [error, setError] = useState<string | null>(null);
   const { language, toggleLanguage, t } = useLanguage();
 
-  // Get points from user initially
-  const getInitialPoints = useCallback(() => {
-    return user?.reward_points?.available || 0;
-  }, [user]);
-
-  // Initialize points
+  // Initialize points from server
   useEffect(() => {
-    const points = getInitialPoints();
+    const points = user?.reward_points?.available || 0;
     console.log('TopNav: Initial points:', points);
     setDisplayPoints(points);
-  }, [getInitialPoints]);
+    lastPointsRef.current = points;
+    if (typeof window !== 'undefined') {
+      (window as any).__CURRENT_POINTS = points;
+    }
+  }, [user]);
 
-  // 🎯 SIMPLE: Listen for point updates
+  // 🎯 CRITICAL: Force update on ANY points change
   useEffect(() => {
-    console.log('TopNav: Setting up point listener');
+    console.log('TopNav: Setting up force update system');
     
-    const handleUpdatePoints = (event: any) => {
+    const handleForceUpdate = (event: any) => {
       const newPoints = event.detail?.points;
+      console.log('🎯 Force update event:', newPoints);
+      
       if (newPoints !== undefined) {
-        console.log('🎯 Points update received:', newPoints);
+        // Always update, even if same value
         setDisplayPoints(newPoints);
+        
+        // Force React to see this as a change
+        setUpdateCounter(prev => {
+          const newCounter = prev + 1;
+          console.log('Update counter:', newCounter);
+          return newCounter;
+        });
+        
+        lastPointsRef.current = newPoints;
       }
     };
     
-    window.addEventListener('updatePoints', handleUpdatePoints);
+    const handleFinalUpdate = (event: any) => {
+      const newPoints = event.detail?.points;
+      if (newPoints !== undefined) {
+        console.log('🏁 Final update:', newPoints);
+        setDisplayPoints(newPoints);
+        setUpdateCounter(prev => prev + 1);
+      }
+    };
+    
+    // Listen for both events
+    window.addEventListener('forcePointsUpdate', handleForceUpdate);
+    window.addEventListener('finalPointsUpdate', handleFinalUpdate);
+    
+    // 🎯 CRITICAL: Check global variable every 100ms
+    const checkGlobalPoints = () => {
+      if (typeof window !== 'undefined' && (window as any).__CURRENT_POINTS !== undefined) {
+        const globalPoints = (window as any).__CURRENT_POINTS;
+        if (globalPoints !== displayPoints) {
+          console.log('🌍 Global variable changed:', globalPoints);
+          setDisplayPoints(globalPoints);
+          setUpdateCounter(prev => prev + 1);
+        }
+      }
+    };
+    
+    const interval = setInterval(checkGlobalPoints, 100);
     
     return () => {
-      window.removeEventListener('updatePoints', handleUpdatePoints);
+      window.removeEventListener('forcePointsUpdate', handleForceUpdate);
+      window.removeEventListener('finalPointsUpdate', handleFinalUpdate);
+      clearInterval(interval);
     };
-  }, []);
+  }, [displayPoints]);
 
-  // Location handler - SEPARATE from points
+  // Location handler
   useEffect(() => {
     if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser");
+      setError("Geolocation not supported");
       setLocation("");
       return;
     }
 
-    let isMounted = true;
+    let mounted = true;
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        if (!isMounted) return;
+        if (!mounted) return;
         
         const { latitude, longitude } = position.coords;
 
@@ -74,19 +113,19 @@ const TopNav = () => {
             "";
           const country = data.address.country || "";
           
-          if (isMounted) {
+          if (mounted) {
             setLocation(
               city && country ? `${city}, ${country}` : "Unknown location"
             );
           }
         } catch (err) {
-          if (isMounted) {
+          if (mounted) {
             setLocation(`Lat: ${latitude}, Lon: ${longitude}`);
           }
         }
       },
       (err) => {
-        if (isMounted) {
+        if (mounted) {
           setError(err.message);
           setLocation("");
         }
@@ -94,7 +133,7 @@ const TopNav = () => {
     );
 
     return () => {
-      isMounted = false;
+      mounted = false;
     };
   }, []);
 
@@ -117,7 +156,6 @@ const TopNav = () => {
   return (
     <section className="flex flex-col gap-2">
       <div className="flex flex-row justify-between items-center">
-        {/* Logo */}
         <h1 className="text-[32px] font-bold main-text">SOB</h1>
 
         <div className="flex flex-row gap-2">
@@ -165,9 +203,9 @@ const TopNav = () => {
           </p>
         </div>
 
-        {/* Points Display - Simple */}
+        {/* 🎯 Points Display - ALWAYS UPDATES */}
         <div
-          key={`points-${displayPoints}`}
+          key={`points-${displayPoints}-${updateCounter}`} // Counter ensures unique key
           onClick={() => router.push("/account/reward")}
           className="p-2 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
         >

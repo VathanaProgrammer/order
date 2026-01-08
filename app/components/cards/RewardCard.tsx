@@ -66,14 +66,31 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
         console.log('🎯 Claiming reward...');
         
-        // 🎯 UPDATE UI IMMEDIATELY
+        // 🎯 IMMEDIATELY UPDATE UI
         const newPoints = availablePoints - requiredPoints;
-        console.log('UI: Points will update to', newPoints);
+        console.log('UI: Points updating from', availablePoints, 'to', newPoints);
         
-        // SIMPLE: Just trigger a global event
-        window.dispatchEvent(new CustomEvent('updatePoints', {
-            detail: { points: newPoints }
+        // Generate unique update ID
+        const updateId = Date.now();
+        
+        // Method 1: Set global variable
+        if (typeof window !== 'undefined') {
+            (window as any).__CURRENT_POINTS = newPoints;
+            (window as any).__LAST_UPDATE_ID = updateId;
+        }
+        
+        // Method 2: Dispatch event with unique ID
+        window.dispatchEvent(new CustomEvent('forcePointsUpdate', {
+            detail: {
+                points: newPoints,
+                updateId: updateId,
+                timestamp: Date.now()
+            }
         }));
+        
+        // Method 3: Also update localStorage
+        localStorage.setItem('current_points', newPoints.toString());
+        localStorage.setItem('update_id', updateId.toString());
 
         try {
             const response = await api.post('/rewards/claim', {
@@ -88,6 +105,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                         <div className="font-bold text-green-600">✅ {t.rewardClaimedSuccess || "Successfully claimed!"}</div>
                         <div>
                             <div><strong>{t.reward || "Reward"}:</strong> {claimData.product_name}</div>
+                            <div><strong>New points:</strong> {newPoints}</div>
                         </div>
                     </div>,
                     {
@@ -109,9 +127,24 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 if (onClaimSuccess) {
                     onClaimSuccess();
                 }
+                
+                // Final update
+                setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('finalPointsUpdate', {
+                        detail: { points: newPoints, updateId: Date.now() }
+                    }));
+                }, 100);
             }
         } catch (error: any) {
             console.error('Error claiming reward:', error);
+            
+            // Revert on error
+            if (typeof window !== 'undefined') {
+                (window as any).__CURRENT_POINTS = availablePoints;
+            }
+            window.dispatchEvent(new CustomEvent('forcePointsUpdate', {
+                detail: { points: availablePoints }
+            }));
             
             if (error.response?.data?.errors) {
                 const errors = error.response.data.errors;
@@ -170,6 +203,10 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                         <span className="text-gray-600">
                             {t.required || "Need"}:
                             <span className="font-bold ml-1">{requiredPoints}</span>
+                        </span>
+                        <span className="text-gray-600">
+                            You have:
+                            <span className="font-bold ml-1 text-blue-600">{availablePoints}</span>
                         </span>
                     </div>
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
