@@ -70,27 +70,15 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
             });
 
             if (response.data.status === "success") {
-                // 🎯 COMPLETELY STOP EVERYTHING and reload
-                setIsClaiming(false);
-                setLoading(false);
+                // 🎯 Simulate a button click that triggers reload
+                setTimeout(() => {
+                    // Create and click a fake button
+                    const button = document.createElement('button');
+                    button.onclick = () => window.location.reload();
+                    button.click();
+                }, 100);
                 
-                // Clear any pending timeouts/events
-                if (typeof window !== 'undefined') {
-                    // Force reload using multiple methods
-                    const reloadPage = () => {
-                        try {
-                            window.location.href = window.location.href;
-                        } catch (e) {
-                            window.location.reload();
-                        }
-                    };
-                    
-                    // Execute in next tick
-                    setTimeout(reloadPage, 10);
-                }
-                
-                // Prevent any further code execution
-                throw new Error('STOP_EXECUTION'); // This will stop everything
+                return;
             }
         } catch (error: any) {
             console.error('Error claiming reward:', error);
