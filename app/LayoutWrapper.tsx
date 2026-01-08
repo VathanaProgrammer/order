@@ -4,6 +4,7 @@ import { IconProvider } from "@/context/IconContext";
 import { usePathname } from "next/navigation";
 import TopNav from "@/components/layouts/TopNav";
 import BottomNav from "@/components/layouts/BottomNav";
+import { AuthProvider } from "./context/AuthContext";
 
 export default function LayoutWrapper({
   children,
@@ -35,6 +36,7 @@ export default function LayoutWrapper({
   const hideBottomBar = noBottomBarRoutes.includes(pathname);
 
   return (
+    <AuthProvider>
     <IconProvider value={{ width: 32, height: 32, color: "blue" }}>
       <div className="flex justify-center items-center h-full bg-gray-200 m-0 p-0">
         <div className="relative p-6 w-full h-full max-w-[430px] bg-white shadow-xl overflow-hidden flex flex-col">
@@ -46,5 +48,6 @@ export default function LayoutWrapper({
         </div>
       </div>
     </IconProvider>
+    </AuthProvider>
   );
 }
