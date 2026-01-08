@@ -10,8 +10,27 @@ import Image from "next/image";
 const TopNav = () => {
   const router = useRouter();
   const { user } = useAuth();
+  const [points, setPoints] = useState(0);
+  const { refreshUser } = useAuth();
 
-  const points = user?.reward_points?.available || 0;
+    // Initialize points
+    useEffect(() => {
+      const currentPoints = user?.reward_points?.available || 0;
+      setPoints(currentPoints);
+    }, [user]);
+    
+    // Listen for points updates
+    useEffect(() => {
+      const handlePointsUpdated = () => {
+        refreshUser();
+      };
+      
+      window.addEventListener('userPointsUpdated', handlePointsUpdated);
+      
+      return () => {
+        window.removeEventListener('userPointsUpdated', handlePointsUpdated);
+      };
+    }, [refreshUser]);
 
   const [location, setLocation] = useState<string>("Fetching location...");
   const [error, setError] = useState<string | null>(null);
