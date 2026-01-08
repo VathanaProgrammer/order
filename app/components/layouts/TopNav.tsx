@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Icon from "../Icon";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -11,134 +11,92 @@ const TopNav = () => {
   const router = useRouter();
   const { user } = useAuth();
   const [displayPoints, setDisplayPoints] = useState(0);
-  const [forceUpdate, setForceUpdate] = useState(0); // Force update counter
-  const lastUpdateRef = useRef<number>(0);
   const [location, setLocation] = useState<string>("Fetching location...");
   const [error, setError] = useState<string | null>(null);
   const { language, toggleLanguage, t } = useLanguage();
 
-  // Initialize points from server
-  useEffect(() => {
-    const points = user?.reward_points?.available || 0;
-    console.log('TopNav: Initial points from server:', points);
-    setDisplayPoints(points);
-    lastUpdateRef.current = points;
-    localStorage.setItem('current_points', points.toString());
+  // Get points from user initially
+  const getInitialPoints = useCallback(() => {
+    return user?.reward_points?.available || 0;
   }, [user]);
 
-  // 🎯 LISTEN FOR ALL POSSIBLE UPDATE EVENTS
+  // Initialize points
   useEffect(() => {
-    console.log('TopNav: Setting up bulletproof update system');
+    const points = getInitialPoints();
+    console.log('TopNav: Initial points:', points);
+    setDisplayPoints(points);
+  }, [getInitialPoints]);
+
+  // 🎯 SIMPLE: Listen for point updates
+  useEffect(() => {
+    console.log('TopNav: Setting up point listener');
     
-    // Function to update points
-    const updatePoints = (newPoints: number) => {
-      console.log('🔄 Updating points to:', newPoints);
-      setDisplayPoints(newPoints);
-      setForceUpdate(prev => prev + 1); // Force re-render
-      lastUpdateRef.current = newPoints;
-    };
-    
-    // Event 1: Custom points display event
     const handleUpdatePoints = (event: any) => {
       const newPoints = event.detail?.points;
       if (newPoints !== undefined) {
-        console.log('🎯 Custom event received:', newPoints);
-        updatePoints(newPoints);
-        localStorage.setItem('current_points', newPoints.toString());
+        console.log('🎯 Points update received:', newPoints);
+        setDisplayPoints(newPoints);
       }
     };
     
-    // Event 2: Generic claim success
-    const handleClaimSuccess = () => {
-      console.log('✅ Claim success event');
-      // Read from localStorage
-      const savedPoints = localStorage.getItem('current_points');
-      if (savedPoints) {
-        const points = parseInt(savedPoints, 10);
-        if (!isNaN(points)) {
-          updatePoints(points);
-        }
-      }
-    };
-    
-    // Event 3: Points updated
-    const handlePointsUpdated = () => {
-      console.log('📊 Points updated event');
-      const savedPoints = localStorage.getItem('current_points');
-      if (savedPoints) {
-        const points = parseInt(savedPoints, 10);
-        if (!isNaN(points)) {
-          updatePoints(points);
-        }
-      }
-    };
-    
-    // Event 4: Final points update
-    const handleFinalUpdate = (event: any) => {
-      const newPoints = event.detail?.points;
-      if (newPoints !== undefined) {
-        console.log('🏁 Final update:', newPoints);
-        updatePoints(newPoints);
-      }
-    };
-    
-    // Event 5: Storage event
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'current_points' && e.newValue) {
-        const points = parseInt(e.newValue, 10);
-        if (!isNaN(points)) {
-          console.log('💾 Storage event:', points);
-          updatePoints(points);
-        }
-      }
-    };
-    
-    // Add ALL event listeners
-    window.addEventListener('updatePointsDisplay', handleUpdatePoints);
-    window.addEventListener('claimSuccess', handleClaimSuccess);
-    window.addEventListener('pointsUpdated', handlePointsUpdated);
-    window.addEventListener('finalPointsUpdate', handleFinalUpdate);
-    window.addEventListener('storage', handleStorageChange);
-    
-    // 🎯 CRITICAL: Auto-check every 100ms (never fails)
-    const interval = setInterval(() => {
-      const savedPoints = localStorage.getItem('current_points');
-      if (savedPoints) {
-        const points = parseInt(savedPoints, 10);
-        if (!isNaN(points) && points !== displayPoints) {
-          console.log('⏰ Auto-check updating:', points);
-          updatePoints(points);
-        }
-      }
-      
-      // Also force update every 5 seconds to catch any missed updates
-      setForceUpdate(prev => prev + 1);
-    }, 100);
-    
-    // Also check on page focus
-    const handlePageFocus = () => {
-      console.log('👀 Page focused, checking points');
-      const savedPoints = localStorage.getItem('current_points');
-      if (savedPoints) {
-        const points = parseInt(savedPoints, 10);
-        if (!isNaN(points)) {
-          updatePoints(points);
-        }
-      }
-    };
-    
-    window.addEventListener('focus', handlePageFocus);
+    window.addEventListener('updatePoints', handleUpdatePoints);
     
     return () => {
-      window.removeEventListener('updatePointsDisplay', handleUpdatePoints);
-      window.removeEventListener('claimSuccess', handleClaimSuccess);
-      window.removeEventListener('pointsUpdated', handlePointsUpdated);
-      window.removeEventListener('finalPointsUpdate', handleFinalUpdate);
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('focus', handlePageFocus);
-      clearInterval(interval);
+      window.removeEventListener('updatePoints', handleUpdatePoints);
     };
-  }, [displayPoints]);
+  }, []);
+
+  // Location handler - SEPARATE from points
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser");
+      setLocation("");
+      return;
+    }
+
+    let isMounted = true;
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        if (!isMounted) return;
+        
+        const { latitude, longitude } = position.coords;
+
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await res.json();
+          const city =
+            data.address.city ||
+            data.address.town ||
+            data.address.village ||
+            "";
+          const country = data.address.country || "";
+          
+          if (isMounted) {
+            setLocation(
+              city && country ? `${city}, ${country}` : "Unknown location"
+            );
+          }
+        } catch (err) {
+          if (isMounted) {
+            setLocation(`Lat: ${latitude}, Lon: ${longitude}`);
+          }
+        }
+      },
+      (err) => {
+        if (isMounted) {
+          setError(err.message);
+          setLocation("");
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleProfileClick = () => {
     if (user) {
@@ -155,44 +113,6 @@ const TopNav = () => {
       router.push("/sign-in");
     }
   };
-
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setTimeout(() => {
-        setError("Geolocation is not supported by your browser");
-        setLocation("");
-      }, 0);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-          );
-          const data = await res.json();
-          const city =
-            data.address.city ||
-            data.address.town ||
-            data.address.village ||
-            "";
-          const country = data.address.country || "";
-          setLocation(
-            city && country ? `${city}, ${country}` : "Unknown location"
-          );
-        } catch (err) {
-          setLocation(`Lat: ${latitude}, Lon: ${longitude}`);
-        }
-      },
-      (err) => {
-        setError(err.message);
-        setLocation("");
-      }
-    );
-  }, []);
 
   return (
     <section className="flex flex-col gap-2">
@@ -245,9 +165,9 @@ const TopNav = () => {
           </p>
         </div>
 
-        {/* 🎯 Points Display - ALWAYS UPDATES */}
+        {/* Points Display - Simple */}
         <div
-          key={`points-${displayPoints}-${forceUpdate}-${Date.now()}-${Math.random()}`}
+          key={`points-${displayPoints}`}
           onClick={() => router.push("/account/reward")}
           className="p-2 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
         >
