@@ -11,6 +11,8 @@ const TopNav = () => {
   const router = useRouter();
   const { user } = useAuth();
 
+  const points = user?.reward_points?.available || 0;
+
   const [location, setLocation] = useState<string>("Fetching location...");
   const [error, setError] = useState<string | null>(null);
   const { language, toggleLanguage, t } = useLanguage();
@@ -71,7 +73,7 @@ const TopNav = () => {
 
   return (
     <section className="flex flex-col gap-2">
-      <div className="flex flex-row justify-between items-center">
+      <div key={`points-${points}`} className="flex flex-row justify-between items-center">
         {/* Logo */}
         <h1 className="text-[32px] font-bold main-text">SOB</h1>
 
@@ -153,7 +155,7 @@ const TopNav = () => {
             width={20}
             height={20}
           />
-          <p className="text-[16px] font-medium ml-1">{user?.reward_points?.available || 0}</p>
+          <p className="text-[16px] font-medium ml-1">{points}</p>
         </div>
 
       </div>
