@@ -69,6 +69,10 @@ const TopNav = () => {
     );
   }, []);
 
+  useEffect(() => {
+    console.log("TopNav user updated:", user?.reward_points);
+  }, [user]);  
+
   return (
     <section className="flex flex-col gap-2">
       <div className="flex flex-row justify-between items-center">
