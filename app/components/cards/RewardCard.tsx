@@ -80,8 +80,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                         <div className="font-bold text-green-600">✅ {t.rewardClaimedSuccess || "Successfully claimed!"}</div>
                         <div>
                             <div><strong>{t.reward || "Reward"}:</strong> {claimData.product_name}</div>
-                            <div><strong>{t.code || "Code"}:</strong> {claimData.reward_code}</div>
-                            <div><strong>{t.validUntil || "Valid until"}:</strong> {new Date(claimData.expiry_date).toLocaleDateString()}</div>
                         </div>
                     </div>,
                     {
@@ -135,7 +133,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
     const pointsNeeded = Math.max(0, requiredPoints - availablePoints);
 
     return (
-        <div className="w-full rounded-xl bg-white border border-gray-200 shadow-md flex flex-col overflow-hidden transition-all hover:shadow-xl hover:border-blue-300">
+        <div key={`${product.id}-${Date.now()}`} className="w-full rounded-xl bg-white border border-gray-200 shadow-md flex flex-col overflow-hidden transition-all hover:shadow-xl hover:border-blue-300">
             {/* Product Image */}
             <div className="relative w-full h-44">
                 <Image
