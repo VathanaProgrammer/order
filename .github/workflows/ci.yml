@@ -24,6 +24,12 @@ jobs:
           script: |
             set -e 
             cd /var/www/order
+            
+            # Fix: Update git SSL configuration
+            git config --global http.postBuffer 524288000
+            git config --global http.sslVerify true
+            git config --global http.sslCAInfo /etc/ssl/certs/ca-certificates.crt
+            
             git pull origin main
             npm install
             npm run build  
