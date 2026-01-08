@@ -44,58 +44,150 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
     const handleClaimReward = async () => {
         if (!user) {
-            //toast.error(t.loginRequired || "Please login first");
+            toast.error(t.loginRequired || "Please login first");
             return;
         }
-
+    
         if (availablePoints < requiredPoints) {
-            //toast.error(t.insufficientPoints || "Insufficient points");
+            toast.error(t.insufficientPoints || "Insufficient points");
             return;
         }
-
+    
         const isConfirmed = window.confirm(
             `${t.confirmClaimReward || "Claim"}: "${product.name}"?\n\n` +
             `${t.thisWillCost || "This will cost"}: ${requiredPoints} ${t.points || "points"}\n` +
             `${t.yourPoints || "Your points"}: ${availablePoints}`
         );
-
+    
         if (!isConfirmed) return;
-
+    
         setIsClaiming(true);
         setLoading(true);
-
+    
         try {
             const response = await api.post('/rewards/claim', {
                 product_id: product.id,
             });
-
+    
             if (response.data.status === "success") {
-                // 🎯 Simulate a button click that triggers reload
-                setTimeout(() => {
-                    // Create and click a fake button
-                    const button = document.createElement('button');
-                    button.onclick = () => window.location.reload();
-                    button.click();
-                }, 100);
+                const claimData = response.data.data;
                 
+                // 🎯 CUSTOM ALERT WITH REFRESH BUTTON
+                showRefreshAlert(
+                    `✅ ${t.rewardClaimedSuccess || "Successfully claimed!"}`,
+                    `You claimed: ${product.name}`,
+                    claimData.reward_code
+                );
+    
+                if (onClaimSuccess) {
+                    onClaimSuccess();
+                }
+                
+                // Don't try to auto-refresh - let user click the button
                 return;
             }
         } catch (error: any) {
             console.error('Error claiming reward:', error);
             
-            // Handle Laravel validation errors
             if (error.response?.data?.errors) {
                 const errors = error.response.data.errors;
                 const firstError = Object.values(errors)[0];
-                //toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
+                toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
             } else if (error.response?.data?.message) {
-                //toast.error(error.response.data.message);
+                toast.error(error.response.data.message);
             } else {
-                //toast.error(t.claimFailed || "Failed to claim reward");
+                toast.error(t.claimFailed || "Failed to claim reward");
             }
         } finally {
             setIsClaiming(false);
             setLoading(false);
+        }
+    };
+    
+    // 🎯 CUSTOM ALERT FUNCTION
+    const showRefreshAlert = (title: string, message: string, rewardCode?: string) => {
+        // Create overlay
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        overlay.style.zIndex = '9999';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        
+        // Create alert box
+        const alertBox = document.createElement('div');
+        alertBox.style.backgroundColor = 'white';
+        alertBox.style.padding = '24px';
+        alertBox.style.borderRadius = '12px';
+        alertBox.style.boxShadow = '0 10px 25px rgba(0,0,0,0.3)';
+        alertBox.style.maxWidth = '400px';
+        alertBox.style.width = '90%';
+        
+        // Add content
+        alertBox.innerHTML = `
+            <div style="text-align: center;">
+                <div style="font-size: 24px; margin-bottom: 8px;">🎉</div>
+                <h3 style="margin: 0 0 12px 0; color: #10b981; font-weight: bold;">${title}</h3>
+                <p style="margin: 0 0 16px 0; color: #4b5563;">${message}</p>
+                
+                ${rewardCode ? `
+                    <div style="background: #f3f4f6; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                        <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Reward Code:</div>
+                        <div style="font-family: monospace; font-size: 16px; font-weight: bold; color: #059669;">${rewardCode}</div>
+                        <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">Copied to clipboard</div>
+                    </div>
+                ` : ''}
+                
+                <button id="refreshBtn" style="
+                    background: linear-gradient(to right, #3b82f6, #1d4ed8);
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    font-size: 16px;
+                    cursor: pointer;
+                    width: 100%;
+                    margin-top: 8px;
+                    transition: all 0.2s;
+                " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                    🔄 Refresh Page to Update Points
+                </button>
+                
+                <div style="margin-top: 12px; font-size: 12px; color: #9ca3af;">
+                    Points will update after refresh
+                </div>
+            </div>
+        `;
+        
+        // Add to page
+        overlay.appendChild(alertBox);
+        document.body.appendChild(overlay);
+        
+        // Add click handler for refresh button
+        setTimeout(() => {
+            const refreshBtn = document.getElementById('refreshBtn');
+            if (refreshBtn) {
+                refreshBtn.onclick = () => {
+                    console.log('Refresh button clicked');
+                    window.location.reload();
+                };
+                
+                // Auto-click after 5 seconds
+                setTimeout(() => {
+                    refreshBtn.click();
+                }, 5000);
+            }
+        }, 100);
+        
+        // Copy reward code if exists
+        if (rewardCode) {
+            navigator.clipboard.writeText(rewardCode);
         }
     };
 
