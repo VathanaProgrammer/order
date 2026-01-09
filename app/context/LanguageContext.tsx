@@ -139,6 +139,7 @@ const translations = {
     claimFirstReward: "Claim your first reward",
     noClaimsYet: "You haven't claimed any rewards yet",
     successfullyClaimed: "Successfully claimed",
+    totalPoints: "Total Reward Points",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -256,11 +257,12 @@ const translations = {
     code: "លេខកូដ",
     validUntil: "មានសុពលភាពដល់",
     totalRewardPoints: "ពិន្ទុយករង្វាន់សរុប",
-    claimNow: "ទាមទារឥឡូវនេះ",
+    claimNow: "ទាមទារឥឡូវ",
     readyToClaim: "រួចរាល់សម្រាប់ការទាមទារ",
     yourClaimedRewards: "រង្វាន់ដែលអ្នកបានទាមទារ",
     claimFirstReward: "ទាមទាររង្វាន់ដំបូងរបស់អ្នក",
     successfullyClaimed: "បានទាមទារដោយជោគជ័យនូវ",
+    totalPoints: "ពិន្ទុយករង្វាន់សរុប",
   },
 };
 
