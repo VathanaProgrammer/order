@@ -80,7 +80,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                             (response.data.message && response.data.message.includes('success'));
             
             if (isSuccess) {
-                toast.success(`🎉 Successfully claimed ${product.name}!`);
+                toast.success(`🎉 {{ t('successfullyClaimed') }} ${product.name}!`);
                 
                 // Small delay then show refresh modal
                 setTimeout(() => {

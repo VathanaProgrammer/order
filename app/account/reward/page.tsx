@@ -104,7 +104,7 @@ const Reward: React.FC = () => {
           <ClaimedRewards />
 
           {/* Transaction History */}
-          <div className="mt-10">
+          {/* <div className="mt-10">
             <h2 className="text-xl font-bold text-gray-700 mb-4">
               {t.transactionHistory || "Points History"}
             </h2>
@@ -162,7 +162,7 @@ const Reward: React.FC = () => {
                 </p>
               </div>
             )}
-          </div>
+          </div> */}
         </div>
       </div>
     </ProtectedRoute>

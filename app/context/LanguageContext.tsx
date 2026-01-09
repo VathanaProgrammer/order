@@ -132,6 +132,13 @@ const translations = {
     rewardDetails: "Reward Details",
     code: "Code",
     validUntil: "Valid until",
+    totalRewardPoints: "Total Reward Points",
+    claimNow: "Claim Now",
+    readyToClaim: "Ready to claim",
+    yourClaimedRewards: "Your claimed rewards",
+    claimFirstReward: "Claim your first reward",
+    noClaimsYet: "You haven't claimed any rewards yet",
+    successfullyClaimed: "Successfully claimed",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -248,6 +255,12 @@ const translations = {
     rewardDetails: "ព័ត៌មានរង្វាន់",
     code: "លេខកូដ",
     validUntil: "មានសុពលភាពដល់",
+    totalRewardPoints: "ពិន្ទុយករង្វាន់សរុប",
+    claimNow: "ទាមទារឥឡូវនេះ",
+    readyToClaim: "រួចរាល់សម្រាប់ការទាមទារ",
+    yourClaimedRewards: "រង្វាន់ដែលអ្នកបានទាមទារ",
+    claimFirstReward: "ទាមទាររង្វាន់ដំបូងរបស់អ្នក",
+    successfullyClaimed: "បានទាមទារដោយជោគជ័យនូវ",
   },
 };
 

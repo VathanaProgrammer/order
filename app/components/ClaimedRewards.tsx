@@ -48,7 +48,7 @@ const ClaimedRewards: React.FC = () => {
         return (
             <div className="mt-8">
                 <h3 className="text-lg font-bold text-gray-700 mb-4">
-                    {t.claimedRewards || "Your Claimed Rewards"}
+                    {t.yourClaimedRewards || "Your Claimed Rewards"}
                 </h3>
                 <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -61,7 +61,7 @@ const ClaimedRewards: React.FC = () => {
         return (
             <div className="mt-8">
                 <h3 className="text-lg font-bold text-gray-700 mb-4">
-                    {t.claimedRewards || "Your Claimed Rewards"}
+                    {t.yourClaimedRewards || "Your Claimed Rewards"}
                 </h3>
                 <div className="bg-white rounded-lg shadow p-8 text-center">
                     <div className="text-gray-400 text-5xl mb-4">🎁</div>
@@ -80,7 +80,7 @@ const ClaimedRewards: React.FC = () => {
         <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-gray-700">
-                    {t.claimedRewards || "Your Claimed Rewards"}
+                    {t.yourClaimedRewards || "Your Claimed Rewards"}
                 </h3>
                 {/* <button 
                     onClick={fetchClaimedRewards}
