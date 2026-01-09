@@ -39,10 +39,10 @@ const ClaimedRewards: React.FC = () => {
         }
     };
 
-    const copyToClipboard = (code: string) => {
-        navigator.clipboard.writeText(code);
-        toast.success(t.copied || "Code copied!");
-    };
+    // const copyToClipboard = (code: string) => {
+    //     navigator.clipboard.writeText(code);
+    //     toast.success(t.copied || "Code copied!");
+    // };
 
     if (loading) {
         return (
@@ -82,12 +82,12 @@ const ClaimedRewards: React.FC = () => {
                 <h3 className="text-lg font-bold text-gray-700">
                     {t.claimedRewards || "Your Claimed Rewards"}
                 </h3>
-                <button 
+                {/* <button 
                     onClick={fetchClaimedRewards}
                     className="text-sm text-blue-600 hover:text-blue-800"
                 >
                     🔄 {t.refresh || "Refresh"}
-                </button>
+                </button> */}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -132,7 +132,7 @@ const ClaimedRewards: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="mb-3">
+                            {/* <div className="mb-3">
                                 <label className="text-sm text-gray-600 block mb-1">
                                     {t.rewardCode || "Reward Code"}:
                                 </label>
@@ -147,9 +147,9 @@ const ClaimedRewards: React.FC = () => {
                                         📋
                                     </button>
                                 </div>
-                            </div>
+                            </div> */}
 
-                            <div className="flex justify-between items-center">
+                            {/* <div className="flex justify-between items-center">
                                 <div>
                                     <div className="text-xs text-gray-500">
                                         {t.expires || "Expires"}: {new Date(reward.expiry_date).toLocaleDateString()}
@@ -170,7 +170,7 @@ const ClaimedRewards: React.FC = () => {
                                         {t.useNow || "Use Now"}
                                     </button>
                                 )}
-                            </div>
+                            </div> */}
                         </div>
                     );
                 })}

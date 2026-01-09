@@ -72,7 +72,7 @@ const Reward: React.FC = () => {
                       ? user.reward_points 
                       : (user?.reward_points as any)?.available || 0}
                   </div>
-                  <div className="text-white/80 text-sm">
+                  {/* <div className="text-white/80 text-sm">
                     {t.availableForRedemption || "Available for redemption"}
                   </div>
                 </div>
@@ -89,7 +89,7 @@ const Reward: React.FC = () => {
                     className="bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm hover:bg-white/30 transition-all"
                   >
                     ❓ {t.howToEarn || "How to earn?"}
-                  </button>
+                  </button> */}
                 </div>
               </div>
             </div>
