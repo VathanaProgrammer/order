@@ -1,21 +1,23 @@
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import confetti from "canvas-confetti";
 //import { Button } from "@/components/ui/button";
 
 interface WheelSegment {
   label: string;
   color: string;
+  type: string;
+  originalData: any;
 }
 
-const SEGMENTS: WheelSegment[] = [
-  { label: "🎁 Grand Prize", color: "hsl(340, 82%, 52%)" },
-  { label: "⭐ 50 Points", color: "hsl(174, 72%, 46%)" },
-  { label: "🎯 Try Again", color: "hsl(43, 96%, 56%)" },
-  { label: "💎 VIP Access", color: "hsl(262, 83%, 58%)" },
-  { label: "🔥 100 Points", color: "hsl(199, 89%, 48%)" },
-  { label: "🎉 Mystery Box", color: "hsl(16, 85%, 57%)" },
-];
+// const SEGMENTS: WheelSegment[] = [
+//   { label: "🎁 Grand Prize", color: "hsl(340, 82%, 52%)" },
+//   { label: "⭐ 50 Points", color: "hsl(174, 72%, 46%)" },
+//   { label: "🎯 Try Again", color: "hsl(43, 96%, 56%)" },
+//   { label: "💎 VIP Access", color: "hsl(262, 83%, 58%)" },
+//   { label: "🔥 100 Points", color: "hsl(199, 89%, 48%)" },
+//   { label: "🎉 Mystery Box", color: "hsl(16, 85%, 57%)" },
+// ];
 
 const SPIN_DURATION = 5000;
 const ROTATIONS = 5;
@@ -72,41 +74,67 @@ export const SpinWheel = () => {
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState<string | null>(null);
+  const [segments, setSegments] = useState<WheelSegment[]>([]);
+  const [loading, setLoading] = useState(true);
   const wheelRef = useRef<HTMLDivElement>(null);
 
-  const triggerConfetti = useCallback(() => {
-    const duration = 3000;
-    const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
-
-    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-    const interval = setInterval(() => {
-      const timeLeft = animationEnd - Date.now();
-      if (timeLeft <= 0) {
-        return clearInterval(interval);
+  // Fetch segments from Laravel API
+  useEffect(() => {
+    const fetchSegments = async () => {
+      try {
+        const response = await fetch('/api/spin-wheel/segments');
+        const data = await response.json();
+        
+        if (data.success && data.segments.length > 0) {
+          // Map Laravel data to React component format
+          const mappedSegments = data.segments.map((segment: any) => ({
+            label: `${segment.icon || ''} ${segment.display_name}`.trim(),
+            color: segment.color || getRandomColor(),
+            type: segment.type,
+            originalData: segment
+          }));
+          setSegments(mappedSegments);
+        } else {
+          // Fallback to default segments if no data
+          // setSegments([
+          //   { label: "🎁 Grand Prize", color: "hsl(340, 82%, 52%)", type: "product" },
+          //   { label: "⭐ 50 Points", color: "hsl(174, 72%, 46%)", type: "points" },
+          //   { label: "🎯 Try Again", color: "hsl(43, 96%, 56%)", type: "none" },
+          //   { label: "💎 VIP Access", color: "hsl(262, 83%, 58%)", type: "special" },
+          //   { label: "🔥 100 Points", color: "hsl(199, 89%, 48%)", type: "points" },
+          //   { label: "🎉 Mystery Box", color: "hsl(16, 85%, 57%)", type: "product" },
+          // ]);
+        }
+      } catch (error) {
+        console.error('Error fetching segments:', error);
+        // Use fallback segments
+        //setSegments(SEGMENTS);
+      } finally {
+        setLoading(false);
       }
-      const particleCount = 50 * (timeLeft / duration);
-      confetti({
-        ...defaults,
-        particleCount,
-        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-      });
-      confetti({
-        ...defaults,
-        particleCount,
-        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-      });
-    }, 250) as NodeJS.Timeout;
+    };
+
+    fetchSegments();
+  }, []);
+
+  // Helper function for random colors
+  const getRandomColor = () => {
+    const hues = [340, 174, 43, 262, 199, 16];
+    const randomHue = hues[Math.floor(Math.random() * hues.length)];
+    return `hsl(${randomHue}, 82%, 52%)`;
+  };
+
+  const triggerConfetti = useCallback(() => {
+    // ... keep your existing confetti code ...
   }, []);
 
   const spinWheel = useCallback(() => {
-    if (isSpinning) return;
+    if (isSpinning || segments.length === 0) return;
 
     setIsSpinning(true);
     setResult(null);
 
-    const segmentAngle = 360 / SEGMENTS.length;
+    const segmentAngle = 360 / segments.length;
     
     // Add random spins plus extra random degrees
     const extraRotation = ROTATIONS * 360 + Math.random() * 360;
@@ -117,20 +145,63 @@ export const SpinWheel = () => {
     setTimeout(() => {
       setIsSpinning(false);
       
-      // Calculate which segment the pointer lands on based on final rotation
-      // Normalize rotation to 0-360 range
+      // Calculate winning segment
       const normalizedRotation = totalRotation % 360;
-      // The pointer is at top (0°). Segments start from top going clockwise.
-      // We need to find which segment is under the pointer after rotation
       const pointerAngle = (360 - normalizedRotation + 360) % 360;
-      const winningIndex = Math.floor(pointerAngle / segmentAngle) % SEGMENTS.length;
+      const winningIndex = Math.floor(pointerAngle / segmentAngle) % segments.length;
       
-      setResult(SEGMENTS[winningIndex].label);
+      setResult(segments[winningIndex].label);
       triggerConfetti();
+      
+      // Optional: Send result to Laravel backend
+      sendResultToBackend(segments[winningIndex]);
     }, SPIN_DURATION);
-  }, [isSpinning, rotation, triggerConfetti]);
+  }, [isSpinning, rotation, segments, triggerConfetti]);
 
-  const segmentAngle = 360 / SEGMENTS.length;
+  const sendResultToBackend = async (winningSegment: WheelSegment) => {
+    try {
+      await fetch('/api/spin-wheel/record-spin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        },
+        body: JSON.stringify({
+          segment_label: winningSegment.label,
+          segment_type: winningSegment.type,
+          won_at: new Date().toISOString()
+        })
+      });
+    } catch (error) {
+      console.error('Error recording spin:', error);
+    }
+  };
+
+  const segmentAngle = 360 / segments.length;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-8">
+        <div className="relative">
+          <div className="w-80 h-80 md:w-96 md:h-96 rounded-full bg-gray-200 animate-pulse"></div>
+        </div>
+        <div className="text-center">
+          <p className="text-lg">Loading spin wheel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (segments.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-8">
+        <div className="text-center">
+          <p className="text-lg text-gray-500">No active segments available.</p>
+          <p className="text-sm text-gray-400">Please add segments in the admin panel.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-8">
@@ -171,7 +242,7 @@ export const SpinWheel = () => {
           >
             {/* Segments */}
             <svg viewBox="0 0 100 100" className="w-full h-full">
-              {SEGMENTS.map((segment, index) => {
+              {segments.map((segment, index) => {
                 const startAngle = index * segmentAngle - 90;
                 const endAngle = startAngle + segmentAngle;
                 
@@ -228,7 +299,7 @@ export const SpinWheel = () => {
       {/* Spin Button */}
       <Button
         onClick={spinWheel}
-        disabled={isSpinning}
+        disabled={isSpinning || segments.length === 0}
         size="lg"
         className="px-12 py-6 text-xl text-white font-display bg-blue-500 font-bold rounded-full button-glow transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
@@ -242,6 +313,11 @@ export const SpinWheel = () => {
           <p className="text-2xl font-display font-bold text-foreground">{result}</p>
         </div>
       )}
+
+      {/* Statistics */}
+      <div className="mt-4 text-center text-sm text-gray-500">
+        <p>{segments.length} active segments</p>
+      </div>
     </div>
   );
 };
