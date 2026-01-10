@@ -1,4 +1,4 @@
-import { SpinWheel } from "@/components/wheel/SpinWheel";
+import { SpinWheel } from "@/components/SpinWheel";
 
 const Index = () => {
   return (
