@@ -126,7 +126,7 @@ export const SpinWheel = () => {
       
       // Fallback: Try alternative endpoint
       try {
-        const fallbackResponse = await api.get("/spin/segments");
+        const fallbackResponse = await api.get("/spin-wheel/segments");
         if (fallbackResponse.data?.segments) {
           const mappedSegments = fallbackResponse.data.segments.map((segment: any) => ({
             id: segment.id,
