@@ -37,7 +37,7 @@ export default function LayoutWrapper({
   return (
     <IconProvider value={{ width: 32, height: 32, color: "blue" }}>
       <div className="flex justify-center items-center h-full bg-gray-200 m-0 p-0">
-        <div className="relative p-6 w-full h-full max-w-[430px] bg-white shadow-xl overflow-hidden flex flex-col">
+        <div className="relative p-10 w-full h-full max-w-[430px] bg-white shadow-xl overflow-hidden flex flex-col">
           {!hideTopBar && <TopNav key={pathname}/>}
           <main className="flex-1 overflow-auto hide-scrollbar">
             {children}

@@ -396,17 +396,6 @@ export const SpinWheel = () => {
 
   return (
     <div className="flex flex-col items-center gap-8 p-4">
-      {/* User Info */}
-      {userId && (
-        <div className="bg-white p-4 rounded-lg shadow-md">
-          <div className="flex flex-col items-center space-y-2">
-            <div className="text-center">
-              <p className="text-sm text-gray-500">User ID</p>
-              <p className="text-xl font-bold text-blue-600">{userId}</p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Points Info */}
       <div className="bg-white p-4 rounded-lg shadow-md w-full max-w-md">
@@ -422,9 +411,6 @@ export const SpinWheel = () => {
               <p className="text-sm text-gray-500">Points per Spin</p>
               <p className="text-2xl font-bold text-red-600">
                 {pointsPerSpin}
-                <span className="text-xs text-gray-500 ml-2">
-                  (set by admin)
-                </span>
               </p>
             </div>
           </div>
@@ -543,23 +529,6 @@ export const SpinWheel = () => {
         {isSpinning ? "Spinning..." : `SPIN (${pointsPerSpin} points)`}
       </Button>
 
-      {/* Debug Info - Remove in production */}
-      <div className="bg-gray-100 p-3 rounded text-xs text-gray-600 max-w-md">
-        <p>Debug Info:</p>
-        <p>Points per spin: {pointsPerSpin} (from eligibility endpoint)</p>
-        <p>Can spin: {canSpin ? 'Yes' : 'No'}</p>
-        <p>Segments: {segments.length}</p>
-        <button 
-          onClick={() => {
-            fetchSpinData();
-            checkSpinEligibility();
-          }}
-          className="mt-2 px-2 py-1 bg-gray-300 rounded text-xs"
-        >
-          Refresh Data
-        </button>
-      </div>
-
       {/* Result Display */}
       {result && (
         <div className="animate-bounce-in bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 shadow-lg border-2 border-green-300">
@@ -574,7 +543,7 @@ export const SpinWheel = () => {
       {/* Statistics */}
       <div className="mt-4 text-center">
         <p className="text-sm text-gray-500">
-          {segments.length} active segments • {pointsPerSpin} points per spin (set by admin)
+          {segments.length} active segments • {pointsPerSpin} points per spin
         </p>
         {!canSpin && (
           <p className="text-sm text-amber-600 mt-1">
