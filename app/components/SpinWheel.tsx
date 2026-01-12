@@ -2,8 +2,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import confetti from "canvas-confetti";
 import api from "@/api/api";
+import { useAuth } from "@/context/AuthContext";
 import { usePoints } from "@/context/PointsContext";
-import { useAuth } from "@/context/AuthContext"; // Use AuthContext instead
 
 interface WheelSegment {
   label: string;
@@ -17,6 +17,8 @@ interface WheelSegment {
 
 const SPIN_DURATION = 5000;
 const ROTATIONS = 5;
+
+// Button component (keep your existing button code)
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -74,10 +76,10 @@ export const SpinWheel = () => {
   const [canSpin, setCanSpin] = useState(true);
   const wheelRef = useRef<HTMLDivElement>(null);
   
-  const { points, updatePoints } = usePoints?.() || {};
-  const { user } = useAuth?.() || {}; // Get user from AuthContext
+  const { points, updatePoints } = usePoints();
+  const { user, refreshUser } = useAuth();
   
-  // Use the correct user ID from AuthContext (ID 7 from your logs)
+  // Get the database user ID (should be 7)
   const userId = user?.id || null;
 
   // Fetch segments from Laravel API
@@ -91,9 +93,11 @@ export const SpinWheel = () => {
         console.log('Spin wheel API response:', response.data);
         
         if (response.data.success) {
+          // Set points per spin
           setPointsPerSpin(response.data.points_per_spin || 5);
           
           if (response.data.segments?.length > 0) {
+            // Map Laravel data to React component format
             const mappedSegments = response.data.segments.map((segment: any) => ({
               id: segment.id,
               label: `${segment.icon || ''} ${segment.display_name}`.trim(),
@@ -143,7 +147,7 @@ export const SpinWheel = () => {
       }
     } catch (error) {
       console.error('Error checking eligibility:', error);
-      // If endpoint doesn't exist, assume user can spin
+      // If endpoint doesn't exist or fails, assume user can spin
       setCanSpin(true);
     }
   }, [userId]);
@@ -187,7 +191,7 @@ export const SpinWheel = () => {
     }
     
     // Check if user has enough points
-    if (points !== undefined && points < pointsPerSpin) {
+    if (points < pointsPerSpin) {
       alert(`You need ${pointsPerSpin} points to spin! You have ${points} points.`);
       return;
     }
@@ -234,32 +238,37 @@ export const SpinWheel = () => {
         return;
       }
 
-      // Prepare request data - use database user ID (7), not Telegram ID
-      const requestData = {
-        user_id: userId, // This should be 7, not 1767855649557
+      // Send to your API endpoint
+      const response = await api.post("/spin/process", {
+        user_id: userId,
         prize_won: winningSegment.display_name
-      };
-
-      console.log('Sending spin request with data:', requestData);
-      const response = await api.post("/spin/process", requestData);
+      });
 
       console.log('Spin API response:', response.data);
       
       if (response.data.success) {
         // Show success message
-        const message = `🎉 Congratulations! You won: ${winningSegment.display_name}`;
-        if (response.data.points_deducted !== undefined && response.data.new_balance !== undefined) {
-          alert(`${message}\n💰 Points deducted: ${response.data.points_deducted}\n💎 New balance: ${response.data.new_balance}`);
-        } else {
-          alert(message);
+        let message = `🎉 Congratulations! You won: ${winningSegment.display_name}`;
+        
+        if (response.data.points_deducted !== undefined) {
+          message += `\n💰 Points deducted: ${response.data.points_deducted}`;
         }
         
-        // Update points in context if available
-        if (updatePoints && response.data.new_balance !== undefined) {
+        if (response.data.new_balance !== undefined) {
+          message += `\n💎 New balance: ${response.data.new_balance}`;
+          
+          // Update points in context
           updatePoints(response.data.new_balance);
         }
         
+        alert(message);
+        
         console.log('Admin notified via Telegram:', response.data.telegram_notified);
+        
+        // Refresh user data to get updated points
+        if (refreshUser) {
+          await refreshUser();
+        }
         
         // Re-check eligibility after spin
         checkSpinEligibility();
@@ -279,11 +288,23 @@ export const SpinWheel = () => {
           errorMessage += `• User ID: ${errorData.errors.user_id[0]}\n`;
           errorMessage += `Current user_id: ${userId}\n`;
           errorMessage += `Please check if user ID ${userId} exists in the database.`;
+        } else if (error.response.data?.message?.includes('user_points')) {
+          // Handle the missing table error
+          errorMessage = `Database error: The user_points table doesn't exist.\n\n`;
+          errorMessage += `Your points are stored in the contacts table as total_rp and total_rp_used.\n`;
+          errorMessage += `Please update your Laravel backend to use the correct table.`;
         }
         alert(errorMessage);
       } else if (error.response) {
         console.error('Error response:', error.response.data);
-        alert('Spin failed: ' + (error.response.data?.message || error.message));
+        
+        // Check for SQL error about missing table
+        if (error.response.data?.message?.includes('user_points') || 
+            error.response.data?.message?.includes('Base table or view not found')) {
+          alert(`Database configuration error:\n\nThe backend is trying to access a 'user_points' table that doesn't exist.\n\nYour points are stored in the 'contacts' table. Please update your Laravel backend.`);
+        } else {
+          alert('Spin failed: ' + (error.response.data?.message || error.message));
+        }
       } else {
         alert('Spin failed! Please try again.');
       }
@@ -326,9 +347,9 @@ export const SpinWheel = () => {
             <p className="text-xl font-bold text-blue-600">
               {userId ? `ID: ${userId}` : 'Not logged in'}
             </p>
-            {userId && (
+            {userId && user?.name && (
               <p className="text-xs text-gray-500 mt-1">
-                Database user ID (from AuthContext)
+                User: {user.name}
               </p>
             )}
           </div>
@@ -342,7 +363,7 @@ export const SpinWheel = () => {
             <div className="text-center">
               <p className="text-sm text-gray-500">Your Points</p>
               <p className="text-2xl font-bold text-blue-600">
-                {points !== undefined ? points : 'Loading...'}
+                {points}
               </p>
             </div>
             <div className="text-center">
@@ -350,7 +371,7 @@ export const SpinWheel = () => {
               <p className="text-2xl font-bold text-red-600">{pointsPerSpin}</p>
             </div>
           </div>
-          {points !== undefined && points < pointsPerSpin && (
+          {points < pointsPerSpin && (
             <p className="text-sm text-red-500 mt-2">
               ⚠️ You need {pointsPerSpin - points} more points to spin!
             </p>
@@ -452,19 +473,24 @@ export const SpinWheel = () => {
       {/* Spin Button */}
       <Button
         onClick={spinWheel}
-        disabled={isSpinning || segments.length === 0 || !userId || (points !== undefined && points < pointsPerSpin) || !canSpin}
+        disabled={isSpinning || segments.length === 0 || !userId || points < pointsPerSpin || !canSpin}
         size="lg"
         className="px-12 py-6 text-xl text-white font-display bg-gradient-to-r from-blue-500 to-purple-600 font-bold rounded-full button-glow transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
         {isSpinning ? "Spinning..." : `SPIN (${pointsPerSpin} points)`}
       </Button>
 
-      {/* Debug Info */}
-      {userId && (
-        <div className="bg-gray-100 p-3 rounded text-xs text-gray-600">
-          <p>Debug: Using database user ID: {userId}</p>
-          <p>Points from context: {points !== undefined ? points : 'Loading...'}</p>
-          <p>Can spin: {canSpin ? 'Yes' : 'No'}</p>
+      {/* Database Error Help */}
+      {!isSpinning && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md">
+          <p className="text-yellow-700 text-sm font-medium mb-2">
+            ⚠️ Database Configuration Needed
+          </p>
+          <p className="text-yellow-600 text-xs">
+            Your Laravel backend is trying to access a 'user_points' table that doesn't exist.<br/>
+            Your points are stored in the 'contacts' table as 'total_rp' and 'total_rp_used'.<br/>
+            Please update your backend to use the correct table.
+          </p>
         </div>
       )}
 
