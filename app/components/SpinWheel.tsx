@@ -90,45 +90,9 @@ export const SpinWheel = () => {
       setLoading(true);
       setFetchError(null);
       console.log('Fetching spin wheel data...');
-      
-      // Fetch data from backend - this endpoint should return both segments and points_per_spin
-      const response = await api.get("/spin-wheel/active-segments");
-      
-      console.log('Spin wheel API response:', response.data);
-      
-      if (response.data.success) {
-        // Set points per spin from backend (set by admin)
-        setPointsPerSpin(response.data.points_per_spin);
-        
-        if (response.data.segments?.length > 0) {
-          // Map Laravel data to React component format
+        const response = await api.get("/spin-wheel/segments");
+        if (response.data?.segments) {
           const mappedSegments = response.data.segments.map((segment: any) => ({
-            id: segment.id,
-            label: `${segment.icon || ''} ${segment.display_name}`.trim(),
-            color: segment.color || getRandomColor(),
-            type: segment.type,
-            display_name: segment.display_name,
-            icon: segment.icon,
-            probability: segment.probability || 0,
-            originalData: segment
-          }));
-          setSegments(mappedSegments);
-        } else {
-          console.warn('No active segments found');
-          setFetchError('No active wheel segments configured. Please contact admin.');
-        }
-      } else {
-        setFetchError(response.data.message || 'Failed to load spin wheel data');
-      }
-    } catch (error: any) {
-      console.error('Error fetching spin wheel data:', error);
-      setFetchError('Failed to connect to server. Please try again.');
-      
-      // Fallback: Try alternative endpoint
-      try {
-        const fallbackResponse = await api.get("/spin-wheel/segments");
-        if (fallbackResponse.data?.segments) {
-          const mappedSegments = fallbackResponse.data.segments.map((segment: any) => ({
             id: segment.id,
             label: `${segment.icon || ''} ${segment.name || segment.display_name}`.trim(),
             color: segment.color || getRandomColor(),
@@ -138,12 +102,11 @@ export const SpinWheel = () => {
             originalData: segment
           }));
           setSegments(mappedSegments);
-          setPointsPerSpin(fallbackResponse.data.points_per_spin || 5);
+          setPointsPerSpin(response.data.points_per_spin || 5);
         }
       } catch (fallbackError) {
         console.error('Fallback fetch also failed:', fallbackError);
-      }
-    } finally {
+      } finally {
       setLoading(false);
     }
   }, []);
