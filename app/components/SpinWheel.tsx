@@ -73,7 +73,7 @@ export const SpinWheel = () => {
   const [result, setResult] = useState<string | null>(null);
   const [segments, setSegments] = useState<WheelSegment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pointsPerSpin, setPointsPerSpin] = useState<number | null>(null); // Will be fetched from backend
+  const [pointsPerSpin, setPointsPerSpin] = useState<number>(50); // Default to 50 based on your API
   const [canSpin, setCanSpin] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const wheelRef = useRef<HTMLDivElement>(null);
@@ -84,41 +84,95 @@ export const SpinWheel = () => {
   // Get the database user ID
   const userId = user?.id || null;
 
-  // Fetch spin wheel data (segments and points per spin) from Laravel API
+  // Fetch spin wheel data from Laravel API
   const fetchSpinData = useCallback(async () => {
     try {
       setLoading(true);
       setFetchError(null);
-      console.log('Fetching spin wheel data...');
-        const response = await api.get("/spin-wheel/segments");
-        if (response.data?.segments) {
-          const mappedSegments = response.data.segments.map((segment: any) => ({
-            id: segment.id,
-            label: `${segment.icon || ''} ${segment.name || segment.display_name}`.trim(),
+      console.log('Fetching spin wheel segments...');
+      
+      // Fetch segments from the correct endpoint
+      const segmentsResponse = await api.get("/spin-wheel/segments");
+      
+      console.log('Spin wheel segments response:', segmentsResponse.data);
+      
+      if (segmentsResponse.data.success) {
+        // Set segments
+        if (segmentsResponse.data.segments?.length > 0) {
+          const mappedSegments = segmentsResponse.data.segments.map((segment: any, index: number) => ({
+            id: segment.id || index,
+            label: `${segment.icon || ''} ${segment.display_name}`.trim(),
             color: segment.color || getRandomColor(),
-            type: segment.type || 'none',
-            display_name: segment.display_name || segment.name,
+            type: segment.type,
+            display_name: segment.display_name,
             icon: segment.icon,
+            probability: segment.probability || 0,
             originalData: segment
           }));
           setSegments(mappedSegments);
-          setPointsPerSpin(response.data.points_per_spin || 5);
+        } else {
+          console.warn('No segments found');
+          setFetchError('No wheel segments configured. Please contact admin.');
         }
-      } catch (fallbackError) {
-        console.error('Fallback fetch also failed:', fallbackError);
-      } finally {
+        
+        // Check if points_per_spin is in the segments response
+        if (segmentsResponse.data.points_per_spin !== undefined) {
+          setPointsPerSpin(segmentsResponse.data.points_per_spin);
+          console.log('Points per spin from segments API:', segmentsResponse.data.points_per_spin);
+        } else {
+          // If not in segments response, fetch from eligibility endpoint
+          console.log('Points per spin not in segments response, checking eligibility endpoint...');
+          await fetchPointsPerSpin();
+        }
+      } else {
+        setFetchError(segmentsResponse.data.message || 'Failed to load spin wheel segments');
+      }
+    } catch (error: any) {
+      console.error('Error fetching spin wheel segments:', error);
+      setFetchError('Failed to connect to server. Please try again.');
+    } finally {
       setLoading(false);
     }
   }, []);
 
+  // Fetch points per spin from eligibility endpoint
+  const fetchPointsPerSpin = useCallback(async () => {
+    if (!userId) return;
+    
+    try {
+      console.log('Fetching points per spin from eligibility endpoint...');
+      const eligibilityResponse = await api.get("/spin/check-eligibility", {
+        params: { user_id: userId }
+      });
+      
+      console.log('Eligibility response:', eligibilityResponse.data);
+      
+      if (eligibilityResponse.data.success && eligibilityResponse.data.points_required !== undefined) {
+        setPointsPerSpin(eligibilityResponse.data.points_required);
+        console.log('Points per spin from eligibility API:', eligibilityResponse.data.points_required);
+      }
+    } catch (error) {
+      console.error('Error fetching points per spin:', error);
+      // Keep default of 50
+    }
+  }, [userId]);
+
+  // Fetch initial data
   useEffect(() => {
     fetchSpinData();
   }, [fetchSpinData]);
 
+  // Fetch points per spin when userId changes
+  useEffect(() => {
+    if (userId) {
+      fetchPointsPerSpin();
+    }
+  }, [userId, fetchPointsPerSpin]);
+
   // Check if user can spin
   const checkSpinEligibility = useCallback(async () => {
-    if (!userId || pointsPerSpin === null) {
-      console.log('User ID or points per spin not found');
+    if (!userId) {
+      console.log('User ID not found, cannot check eligibility');
       return;
     }
     
@@ -127,8 +181,15 @@ export const SpinWheel = () => {
         params: { user_id: userId }
       });
       
+      console.log('Eligibility check response:', response.data);
+      
       if (response.data.success) {
         setCanSpin(response.data.can_spin);
+        
+        // Update points per spin from eligibility response
+        if (response.data.points_required !== undefined) {
+          setPointsPerSpin(response.data.points_required);
+        }
         
         if (!response.data.can_spin) {
           console.log('Cannot spin:', response.data);
@@ -136,8 +197,8 @@ export const SpinWheel = () => {
       }
     } catch (error) {
       console.error('Error checking eligibility:', error);
-      // If endpoint doesn't exist or fails, check based on points
-      if (points !== undefined && pointsPerSpin !== null) {
+      // If endpoint fails, check based on points
+      if (points !== undefined) {
         setCanSpin(points >= pointsPerSpin);
       }
     }
@@ -145,10 +206,10 @@ export const SpinWheel = () => {
 
   // Check eligibility when userId or pointsPerSpin changes
   useEffect(() => {
-    if (userId && pointsPerSpin !== null) {
+    if (userId) {
       checkSpinEligibility();
     }
-  }, [userId, pointsPerSpin, checkSpinEligibility]);
+  }, [userId, checkSpinEligibility]);
 
   const getRandomColor = () => {
     const hues = [340, 174, 43, 262, 199, 16];
@@ -165,7 +226,7 @@ export const SpinWheel = () => {
   }, []);
 
   const spinWheel = useCallback(async () => {
-    if (isSpinning || segments.length === 0 || pointsPerSpin === null) return;
+    if (isSpinning || segments.length === 0) return;
     
     console.log("Spin attempt - Current state:", {
       userId,
@@ -178,12 +239,6 @@ export const SpinWheel = () => {
     // Check if user is authenticated
     if (!userId) {
       alert('Please log in to spin the wheel!');
-      return;
-    }
-    
-    // Check if we have points per spin value
-    if (pointsPerSpin === null) {
-      alert('Spin wheel configuration is loading. Please try again in a moment.');
       return;
     }
     
@@ -212,30 +267,11 @@ export const SpinWheel = () => {
     setTimeout(async () => {
       setIsSpinning(false);
       
-      // Calculate winning segment (considering probabilities if available)
+      // Calculate winning segment
       const normalizedRotation = totalRotation % 360;
       const pointerAngle = (360 - normalizedRotation + 360) % 360;
-      
-      // If probabilities are available, use weighted random selection
-      let winningIndex;
-      if (segments.every(s => s.probability !== undefined)) {
-        // Weighted random selection based on probabilities
-        const totalProbability = segments.reduce((sum, seg) => sum + (seg.probability || 0), 0);
-        let random = Math.random() * totalProbability;
-        
-        for (let i = 0; i < segments.length; i++) {
-          random -= segments[i].probability || 0;
-          if (random <= 0) {
-            winningIndex = i;
-            break;
-          }
-        }
-      } else {
-        // Fallback to equal probability
-        winningIndex = Math.floor(pointerAngle / segmentAngle) % segments.length;
-      }
-      
-      const winningSegment = segments[winningIndex!];
+      const winningIndex = Math.floor(pointerAngle / segmentAngle) % segments.length;
+      const winningSegment = segments[winningIndex];
       
       setResult(winningSegment.display_name);
       triggerConfetti();
@@ -249,8 +285,8 @@ export const SpinWheel = () => {
     try {
       console.log('Sending spin result to backend:', winningSegment);
       
-      if (!userId || pointsPerSpin === null) {
-        alert('User not authenticated or configuration missing!');
+      if (!userId) {
+        alert('User not authenticated!');
         return;
       }
 
@@ -289,11 +325,6 @@ export const SpinWheel = () => {
         // Re-check eligibility after spin
         checkSpinEligibility();
         
-        // Refetch spin data in case admin changed segments
-        setTimeout(() => {
-          fetchSpinData();
-        }, 1000);
-        
       } else {
         alert('Error: ' + response.data.message);
       }
@@ -301,14 +332,12 @@ export const SpinWheel = () => {
       console.error('Error recording spin:', error);
       
       if (error.response?.status === 422) {
-        // Validation error
         const errorData = error.response.data;
         console.error('Validation errors:', errorData.errors);
         
         let errorMessage = 'Validation failed:\n';
         if (errorData.errors?.user_id) {
           errorMessage += `• User ID: ${errorData.errors.user_id[0]}\n`;
-          errorMessage += `Current user_id: ${userId}\n`;
         }
         alert(errorMessage);
       } else if (error.response) {
@@ -327,11 +356,9 @@ export const SpinWheel = () => {
       <div className="flex flex-col items-center justify-center gap-8 p-8">
         <div className="relative">
           <div className="w-80 h-80 md:w-96 md:h-96 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 md:w-20 md:h-20 rounded-full bg-gray-400 animate-pulse"></div>
         </div>
         <div className="text-center">
           <p className="text-lg font-medium">Loading spin wheel...</p>
-          <p className="text-sm text-gray-500 mt-1">Fetching configuration from server</p>
         </div>
       </div>
     );
@@ -360,9 +387,8 @@ export const SpinWheel = () => {
       <div className="flex flex-col items-center justify-center gap-8 p-8">
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 max-w-md text-center">
           <div className="text-yellow-500 text-4xl mb-3">🎰</div>
-          <h3 className="text-lg font-semibold text-yellow-700 mb-2">No Active Segments</h3>
-          <p className="text-yellow-600 mb-2">The spin wheel is not configured yet.</p>
-          <p className="text-sm text-yellow-500">Please contact the administrator to set up wheel segments.</p>
+          <h3 className="text-lg font-semibold text-yellow-700 mb-2">No Segments Configured</h3>
+          <p className="text-yellow-600">The spin wheel is not configured yet.</p>
         </div>
       </div>
     );
@@ -372,56 +398,40 @@ export const SpinWheel = () => {
     <div className="flex flex-col items-center gap-8 p-4">
       {/* User Info */}
       {userId && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg shadow-md border border-blue-100">
+        <div className="bg-white p-4 rounded-lg shadow-md">
           <div className="flex flex-col items-center space-y-2">
             <div className="text-center">
-              <p className="text-sm text-gray-500">Logged in as</p>
-              <p className="text-xl font-bold text-blue-700">
-                {user?.name || `User ID: ${userId}`}
-              </p>
+              <p className="text-sm text-gray-500">User ID</p>
+              <p className="text-xl font-bold text-blue-600">{userId}</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Points Info */}
-      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 w-full max-w-md">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="grid grid-cols-2 gap-6 w-full">
+      <div className="bg-white p-4 rounded-lg shadow-md w-full max-w-md">
+        <div className="flex flex-col items-center space-y-2">
+          <div className="flex items-center space-x-4">
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-2">
-                <span className="text-2xl">💰</span>
-              </div>
-              <p className="text-sm text-gray-500 font-medium">Your Points</p>
-              <p className="text-3xl font-bold text-blue-600 mt-1">
-                {points !== undefined ? points.toLocaleString() : '...'}
+              <p className="text-sm text-gray-500">Your Points</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {points !== undefined ? points.toLocaleString() : 'Loading...'}
               </p>
             </div>
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mb-2">
-                <span className="text-2xl">🎯</span>
-              </div>
-              <p className="text-sm text-gray-500 font-medium">Cost per Spin</p>
-              <p className="text-3xl font-bold text-red-600 mt-1">
-                {pointsPerSpin !== null ? pointsPerSpin.toLocaleString() : '...'}
+              <p className="text-sm text-gray-500">Points per Spin</p>
+              <p className="text-2xl font-bold text-red-600">
+                {pointsPerSpin}
+                <span className="text-xs text-gray-500 ml-2">
+                  (set by admin)
+                </span>
               </p>
             </div>
           </div>
-          
-          {points !== undefined && pointsPerSpin !== null && points < pointsPerSpin && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 w-full">
-              <p className="text-red-700 text-sm font-medium text-center">
-                ⚠️ You need {pointsPerSpin - points} more points to spin!
-              </p>
-            </div>
-          )}
-          
-          {pointsPerSpin === 0 && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 w-full">
-              <p className="text-green-700 text-sm font-medium text-center">
-                🎉 Free spins! No points required
-              </p>
-            </div>
+          {points !== undefined && points < pointsPerSpin && (
+            <p className="text-sm text-red-500 mt-2">
+              ⚠️ You need {pointsPerSpin - points} more points to spin!
+            </p>
           )}
         </div>
       </div>
@@ -429,25 +439,22 @@ export const SpinWheel = () => {
       {/* Wheel Container */}
       <div className="relative">
         {/* Pointer */}
-        <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-30">
-          <div className="w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[30px] border-t-red-500 filter drop-shadow-lg"></div>
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
+          <div className="w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[40px] border-t-foreground drop-shadow-lg" />
         </div>
 
         {/* Outer Ring */}
-        <div className="relative w-80 h-80 md:w-96 md:h-96 rounded-full p-3 bg-gradient-to-br from-gray-900 to-black shadow-2xl">
-          {/* Decorative outer ring */}
-          <div className="absolute inset-0 rounded-full border-4 border-yellow-400/30"></div>
-          
+        <div className="relative w-80 h-80 md:w-96 md:h-96 rounded-full p-3 bg-gradient-to-br from-foreground/90 to-foreground wheel-shadow">
           {/* Decorative dots */}
           <div className="absolute inset-0 rounded-full">
-            {Array.from({ length: 36 }).map((_, i) => (
+            {Array.from({ length: 24 }).map((_, i) => (
               <div
                 key={i}
-                className="absolute w-2 h-2 bg-yellow-400 rounded-full"
+                className="absolute w-3 h-3 bg-accent rounded-full"
                 style={{
                   top: "50%",
                   left: "50%",
-                  transform: `rotate(${i * 10}deg) translateY(-${152}px) translate(-50%, -50%)`,
+                  transform: `rotate(${i * 15}deg) translateY(-${145}px) translate(-50%, -50%)`,
                 }}
               />
             ))}
@@ -490,26 +497,19 @@ export const SpinWheel = () => {
 
                 return (
                   <g key={segment.id || index}>
-                    <path 
-                      d={path} 
-                      fill={segment.color} 
-                      stroke="white" 
-                      strokeWidth="0.5" 
-                      className="transition-opacity hover:opacity-90"
-                    />
+                    <path d={path} fill={segment.color} stroke="white" strokeWidth="0.5" />
                     <text
                       x={textX}
                       y={textY}
                       fill="white"
-                      fontSize="3.5"
+                      fontSize="4"
                       fontWeight="600"
                       textAnchor="middle"
                       dominantBaseline="middle"
                       transform={`rotate(${midAngle + 90}, ${textX}, ${textY})`}
                       style={{ 
-                        fontFamily: "'Fredoka', 'Inter', sans-serif",
-                        textShadow: "0 1px 3px rgba(0,0,0,0.5)",
-                        letterSpacing: "0.5px"
+                        fontFamily: "'Fredoka', sans-serif",
+                        textShadow: "0 1px 2px rgba(0,0,0,0.3)"
                       }}
                     >
                       {segment.label}
@@ -520,8 +520,8 @@ export const SpinWheel = () => {
             </svg>
 
             {/* Center decoration */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 border-4 border-white shadow-2xl flex items-center justify-center">
-              <span className="text-3xl md:text-4xl">🎰</span>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-card to-muted border-4 border-foreground flex items-center justify-center shadow-lg">
+              <span className="text-2xl md:text-3xl">🎰</span>
             </div>
           </div>
         </div>
@@ -534,71 +534,54 @@ export const SpinWheel = () => {
           isSpinning || 
           segments.length === 0 || 
           !userId || 
-          pointsPerSpin === null ||
           (points !== undefined && points < pointsPerSpin) || 
           !canSpin
         }
         size="lg"
-        className="px-14 py-7 text-2xl text-white font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+        className="px-12 py-6 text-xl text-white font-display bg-gradient-to-r from-blue-500 to-purple-600 font-bold rounded-full button-glow transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
-        {isSpinning ? (
-          <span className="flex items-center gap-2">
-            <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Spinning...
-          </span>
-        ) : (
-          `SPIN (${pointsPerSpin} points)`
-        )}
+        {isSpinning ? "Spinning..." : `SPIN (${pointsPerSpin} points)`}
       </Button>
+
+      {/* Debug Info - Remove in production */}
+      <div className="bg-gray-100 p-3 rounded text-xs text-gray-600 max-w-md">
+        <p>Debug Info:</p>
+        <p>Points per spin: {pointsPerSpin} (from eligibility endpoint)</p>
+        <p>Can spin: {canSpin ? 'Yes' : 'No'}</p>
+        <p>Segments: {segments.length}</p>
+        <button 
+          onClick={() => {
+            fetchSpinData();
+            checkSpinEligibility();
+          }}
+          className="mt-2 px-2 py-1 bg-gray-300 rounded text-xs"
+        >
+          Refresh Data
+        </button>
+      </div>
 
       {/* Result Display */}
       {result && (
-        <div className="animate-bounce-in bg-gradient-to-r from-green-100 to-emerald-100 rounded-2xl p-6 shadow-xl border-2 border-green-300 max-w-md">
-          <div className="text-center">
-            <div className="text-green-500 text-4xl mb-2">🎊</div>
-            <p className="text-green-700 text-sm font-medium mb-1">CONGRATULATIONS!</p>
-            <p className="text-2xl font-bold text-gray-800 mb-3">{result}</p>
-            <p className="text-sm text-gray-600">
-              {pointsPerSpin} points deducted • Admin notified
-            </p>
-          </div>
+        <div className="animate-bounce-in bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 shadow-lg border-2 border-green-300">
+          <p className="text-green-600 text-sm font-medium mb-1">🎊 Congratulations!</p>
+          <p className="text-2xl font-display font-bold text-gray-800">{result}</p>
+          <p className="text-sm text-gray-600 mt-2">
+            {pointsPerSpin} points deducted and admin notified via Telegram
+          </p>
         </div>
       )}
 
       {/* Statistics */}
-      <div className="mt-2 text-center">
-        <div className="inline-flex items-center gap-4 bg-gray-50 px-4 py-2 rounded-lg">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 text-sm">Segments:</span>
-            <span className="font-semibold">{segments.length}</span>
-          </div>
-          <div className="h-4 w-px bg-gray-300"></div>
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 text-sm">Cost:</span>
-            <span className="font-semibold text-red-600">{pointsPerSpin} points</span>
-          </div>
-        </div>
-        
+      <div className="mt-4 text-center">
+        <p className="text-sm text-gray-500">
+          {segments.length} active segments • {pointsPerSpin} points per spin (set by admin)
+        </p>
         {!canSpin && (
-          <p className="text-sm text-amber-600 mt-3 bg-amber-50 px-4 py-2 rounded-lg">
-            ⚠️ You cannot spin at the moment. Please check your eligibility.
+          <p className="text-sm text-amber-600 mt-1">
+            ⚠️ You cannot spin at the moment
           </p>
         )}
       </div>
-
-      {/* Refresh Button */}
-      <button
-        onClick={fetchSpinData}
-        className="mt-2 text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-        </svg>
-        Refresh wheel data
-      </button>
     </div>
   );
 };
