@@ -18,7 +18,7 @@ interface WheelSegment {
 const SPIN_DURATION = 5000;
 const ROTATIONS = 5;
 
-// Button component (keep your existing button code)
+// Button component
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -72,7 +72,7 @@ export const SpinWheel = () => {
   const [result, setResult] = useState<string | null>(null);
   const [segments, setSegments] = useState<WheelSegment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pointsPerSpin, setPointsPerSpin] = useState(5);
+  const [pointsPerSpin, setPointsPerSpin] = useState(5); // Will be updated from backend
   const [canSpin, setCanSpin] = useState(true);
   const wheelRef = useRef<HTMLDivElement>(null);
   
@@ -82,18 +82,19 @@ export const SpinWheel = () => {
   // Get the database user ID (should be 7)
   const userId = user?.id || null;
 
-  // Fetch segments from Laravel API
+  // Fetch spin wheel data (segments and points per spin) from Laravel API
   useEffect(() => {
     const fetchSpinData = async () => {
       try {
         console.log('Fetching spin wheel data...');
         
+        // Use the new endpoint that returns both segments and points_per_spin
         const response = await api.get("/spin-wheel/segments");
         
         console.log('Spin wheel API response:', response.data);
         
         if (response.data.success) {
-          // Set points per spin
+          // Set points per spin from backend (set by admin)
           setPointsPerSpin(response.data.points_per_spin || 5);
           
           if (response.data.segments?.length > 0) {
@@ -111,6 +112,9 @@ export const SpinWheel = () => {
           } else {
             console.warn('No active segments found');
           }
+        } else {
+          // Fallback: try the old endpoint if new one fails
+          await fetchSegmentsFallback();
         }
       } catch (error: any) {
         console.error('Error fetching spin wheel data:', error);
@@ -118,8 +122,32 @@ export const SpinWheel = () => {
         if (error.response) {
           console.error('Error response:', error.response.data);
         }
+        
+        // Fallback to old endpoint
+        await fetchSegmentsFallback();
       } finally {
         setLoading(false);
+      }
+    };
+
+    // Fallback function for older API endpoint
+    const fetchSegmentsFallback = async () => {
+      try {
+        const response = await api.get("/spin-wheel/settings");
+        if (response.data) {
+          const mappedSegments = response.data.map((segment: any) => ({
+            id: segment.id,
+            label: `${segment.icon || ''} ${segment.display_name}`.trim(),
+            color: segment.color || getRandomColor(),
+            type: segment.type,
+            display_name: segment.display_name,
+            icon: segment.icon,
+            originalData: segment
+          }));
+          setSegments(mappedSegments);
+        }
+      } catch (fallbackError) {
+        console.error('Fallback fetch also failed:', fallbackError);
       }
     };
 
@@ -288,23 +316,11 @@ export const SpinWheel = () => {
           errorMessage += `• User ID: ${errorData.errors.user_id[0]}\n`;
           errorMessage += `Current user_id: ${userId}\n`;
           errorMessage += `Please check if user ID ${userId} exists in the database.`;
-        } else if (error.response.data?.message?.includes('user_points')) {
-          // Handle the missing table error
-          errorMessage = `Database error: The user_points table doesn't exist.\n\n`;
-          errorMessage += `Your points are stored in the contacts table as total_rp and total_rp_used.\n`;
-          errorMessage += `Please update your Laravel backend to use the correct table.`;
         }
         alert(errorMessage);
       } else if (error.response) {
         console.error('Error response:', error.response.data);
-        
-        // Check for SQL error about missing table
-        if (error.response.data?.message?.includes('user_points') || 
-            error.response.data?.message?.includes('Base table or view not found')) {
-          alert(`Database configuration error:\n\nThe backend is trying to access a 'user_points' table that doesn't exist.\n\nYour points are stored in the 'contacts' table. Please update your Laravel backend.`);
-        } else {
-          alert('Spin failed: ' + (error.response.data?.message || error.message));
-        }
+        alert('Spin failed: ' + (error.response.data?.message || error.message));
       } else {
         alert('Spin failed! Please try again.');
       }
@@ -368,7 +384,12 @@ export const SpinWheel = () => {
             </div>
             <div className="text-center">
               <p className="text-sm text-gray-500">Points per Spin</p>
-              <p className="text-2xl font-bold text-red-600">{pointsPerSpin}</p>
+              <p className="text-2xl font-bold text-red-600">
+                {pointsPerSpin} 
+                <span className="text-xs text-gray-500 ml-2">
+                  (set by admin)
+                </span>
+              </p>
             </div>
           </div>
           {points < pointsPerSpin && (
@@ -480,27 +501,13 @@ export const SpinWheel = () => {
         {isSpinning ? "Spinning..." : `SPIN (${pointsPerSpin} points)`}
       </Button>
 
-      {/* Database Error Help */}
-      {!isSpinning && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md">
-          <p className="text-yellow-700 text-sm font-medium mb-2">
-            ⚠️ Database Configuration Needed
-          </p>
-          <p className="text-yellow-600 text-xs">
-            Your Laravel backend is trying to access a 'user_points' table that doesn't exist.<br/>
-            Your points are stored in the 'contacts' table as 'total_rp' and 'total_rp_used'.<br/>
-            Please update your backend to use the correct table.
-          </p>
-        </div>
-      )}
-
       {/* Result Display */}
       {result && (
         <div className="animate-bounce-in bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 shadow-lg border-2 border-green-300">
           <p className="text-green-600 text-sm font-medium mb-1">🎊 Congratulations!</p>
           <p className="text-2xl font-display font-bold text-gray-800">{result}</p>
           <p className="text-sm text-gray-600 mt-2">
-            Points deducted and admin notified via Telegram
+            {pointsPerSpin} points deducted and admin notified via Telegram
           </p>
         </div>
       )}
@@ -508,7 +515,7 @@ export const SpinWheel = () => {
       {/* Statistics */}
       <div className="mt-4 text-center">
         <p className="text-sm text-gray-500">
-          {segments.length} active segments • {pointsPerSpin} points per spin
+          {segments.length} active segments • {pointsPerSpin} points per spin (set by admin)
         </p>
         {!canSpin && (
           <p className="text-sm text-amber-600 mt-1">
