@@ -76,25 +76,164 @@ export const SpinWheel = () => {
   const { points, updatePoints } = usePoints?.() || {};
   const [userId, setUserId] = useState<number | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Debug function to check all localStorage items
+  const debugLocalStorage = () => {
+    console.log("=== LocalStorage Debug ===");
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        try {
+          const value = localStorage.getItem(key);
+          console.log(`${key}: ${value}`);
+        } catch (error) {
+          console.log(`${key}: [Error reading]`);
+        }
+      }
+    }
+    console.log("=== End Debug ===");
+  };
 
   // Fetch user data from localStorage or session
   useEffect(() => {
-    // Try to get user ID and token from localStorage
-    const storedUser = localStorage.getItem('user');
-    const storedToken = localStorage.getItem('token');
-    
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        setUserId(userData.id || userData.user_id || null);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
+    const fetchUserData = () => {
+      setAuthLoading(true);
+      
+      // Debug: Check what's in localStorage
+      debugLocalStorage();
+      
+      // Common storage keys used by different auth systems
+      const possibleUserKeys = [
+        'user',
+        'userData',
+        'currentUser',
+        'authUser',
+        'user_info',
+        'user_profile',
+        'auth_user'
+      ];
+      
+      const possibleTokenKeys = [
+        'token',
+        'access_token',
+        'auth_token',
+        'jwt',
+        'jwt_token',
+        'bearer_token'
+      ];
+      
+      let foundUser = null;
+      let foundToken = null;
+      
+      // Try to find user data
+      for (const key of possibleUserKeys) {
+        const data = localStorage.getItem(key);
+        if (data) {
+          try {
+            const parsed = JSON.parse(data);
+            console.log(`Found user data in key "${key}":`, parsed);
+            foundUser = parsed;
+            
+            // Extract user ID from common structures
+            if (parsed.id) {
+              setUserId(parsed.id);
+            } else if (parsed.user_id) {
+              setUserId(parsed.user_id);
+            } else if (parsed.userId) {
+              setUserId(parsed.userId);
+            } else if (parsed.data?.id) {
+              setUserId(parsed.data.id);
+            } else if (parsed.user?.id) {
+              setUserId(parsed.user.id);
+            }
+            break;
+          } catch (error) {
+            console.log(`Key "${key}" contains non-JSON data:`, data);
+          }
+        }
       }
-    }
+      
+      // Try to find token
+      for (const key of possibleTokenKeys) {
+        const data = localStorage.getItem(key);
+        if (data) {
+          console.log(`Found token in key "${key}"`);
+          foundToken = data;
+          setToken(data);
+          break;
+        }
+      }
+      
+      // If no user found, check if you're using cookies or sessionStorage
+      if (!foundUser) {
+        console.log("No user found in localStorage, checking sessionStorage...");
+        
+        for (const key of possibleUserKeys) {
+          const data = sessionStorage.getItem(key);
+          if (data) {
+            try {
+              const parsed = JSON.parse(data);
+              console.log(`Found user data in sessionStorage key "${key}":`, parsed);
+              foundUser = parsed;
+              
+              if (parsed.id) setUserId(parsed.id);
+              else if (parsed.user_id) setUserId(parsed.user_id);
+              break;
+            } catch (error) {
+              console.log(`SessionStorage key "${key}" contains non-JSON data`);
+            }
+          }
+        }
+        
+        for (const key of possibleTokenKeys) {
+          const data = sessionStorage.getItem(key);
+          if (data) {
+            console.log(`Found token in sessionStorage key "${key}"`);
+            foundToken = data;
+            setToken(data);
+            break;
+          }
+        }
+      }
+      
+      // Also check for cookies
+      const cookies = document.cookie.split(';');
+      console.log("Cookies:", cookies);
+      
+      // If still no user found, check if user ID is passed via props or context
+      if (!foundUser && !foundToken) {
+        console.log("No authentication data found in storage");
+        console.log("Checking if user is authenticated via API...");
+        
+        // You might want to verify with your backend
+        // api.get("/auth/check").then(response => {
+        //   if (response.data.authenticated) {
+        //     setUserId(response.data.user.id);
+        //   }
+        // }).catch(() => {
+        //   // Not authenticated
+        // });
+      }
+      
+      setAuthLoading(false);
+    };
+
+    fetchUserData();
     
-    if (storedToken) {
-      setToken(storedToken);
-    }
+    // Also listen for storage changes (in case user logs in/out in another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key?.includes('user') || e.key?.includes('token')) {
+        console.log('Storage changed, refetching user data');
+        fetchUserData();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   // Fetch segments from Laravel API
@@ -191,9 +330,21 @@ export const SpinWheel = () => {
   const spinWheel = useCallback(async () => {
     if (isSpinning || segments.length === 0) return;
     
+    // Debug current state
+    console.log("Spin attempt - Current state:", {
+      userId,
+      token,
+      points,
+      pointsPerSpin,
+      canSpin,
+      segmentsCount: segments.length
+    });
+    
     // Check if user is authenticated
     if (!userId) {
       alert('Please log in to spin the wheel!');
+      console.log("No userId found. Available localStorage:");
+      debugLocalStorage();
       return;
     }
     
@@ -234,7 +385,7 @@ export const SpinWheel = () => {
       // Send result to backend to deduct points and notify admin
       await sendResultToBackend(winningSegment);
     }, SPIN_DURATION);
-  }, [isSpinning, rotation, segments, triggerConfetti, points, pointsPerSpin, userId, canSpin]);
+  }, [isSpinning, rotation, segments, triggerConfetti, points, pointsPerSpin, userId, canSpin, token]);
 
   const sendResultToBackend = async (winningSegment: WheelSegment) => {
     try {
@@ -245,16 +396,20 @@ export const SpinWheel = () => {
         return;
       }
 
+      // Prepare headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       // Send to your API endpoint
       const response = await api.post("/spin/process", {
         user_id: userId,
         prize_won: winningSegment.display_name
-      }, {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : undefined,
-          'Content-Type': 'application/json'
-        }
-      });
+      }, { headers });
 
       console.log('Spin API response:', response.data);
       
@@ -314,11 +469,28 @@ export const SpinWheel = () => {
 
   return (
     <div className="flex flex-col items-center gap-8">
+      {/* Debug Info - Remove in production */}
+      <div className="bg-gray-100 p-3 rounded text-xs text-gray-600 max-w-md">
+        <p>Debug Info:</p>
+        <p>User ID: {userId || 'Not found'}</p>
+        <p>Token: {token ? 'Present' : 'Not found'}</p>
+        <p>Auth Loading: {authLoading ? 'Yes' : 'No'}</p>
+        <button 
+          onClick={debugLocalStorage}
+          className="mt-2 px-2 py-1 bg-gray-300 rounded text-xs"
+        >
+          Debug Storage
+        </button>
+      </div>
+
       {/* Authentication Status */}
-      {!userId && (
+      {!authLoading && !userId && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-yellow-700 text-sm font-medium">
             ⚠️ Please log in to spin the wheel!
+          </p>
+          <p className="text-yellow-600 text-xs mt-1">
+            No user authentication data found in browser storage.
           </p>
         </div>
       )}
@@ -440,7 +612,7 @@ export const SpinWheel = () => {
       {/* Spin Button */}
       <Button
         onClick={spinWheel}
-        disabled={isSpinning || segments.length === 0 || !userId || (points !== undefined && points < pointsPerSpin) || !canSpin}
+        disabled={isSpinning || segments.length === 0 || authLoading || !userId || (points !== undefined && points < pointsPerSpin) || !canSpin}
         size="lg"
         className="px-12 py-6 text-xl text-white font-display bg-gradient-to-r from-blue-500 to-purple-600 font-bold rounded-full button-glow transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
