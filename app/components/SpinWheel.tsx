@@ -78,142 +78,82 @@ export const SpinWheel = () => {
   const [token, setToken] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Debug function to check all localStorage items
-  const debugLocalStorage = () => {
-    console.log("=== LocalStorage Debug ===");
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key) {
-        try {
-          const value = localStorage.getItem(key);
-          console.log(`${key}: ${value}`);
-        } catch (error) {
-          console.log(`${key}: [Error reading]`);
-        }
-      }
-    }
-    console.log("=== End Debug ===");
-  };
-
-  // Fetch user data from localStorage or session
+  // Fetch user data from localStorage
   useEffect(() => {
     const fetchUserData = () => {
       setAuthLoading(true);
       
-      // Debug: Check what's in localStorage
-      debugLocalStorage();
+      // Based on your localStorage output, you have:
+      // - update_id: 1767855649557 (this looks like it could be a user ID)
+      // - current_points: 994860
+      // - last_claim_id and last_claim_time
       
-      // Common storage keys used by different auth systems
-      const possibleUserKeys = [
-        'user',
-        'userData',
-        'currentUser',
-        'authUser',
-        'user_info',
-        'user_profile',
-        'auth_user'
-      ];
+      const updateId = localStorage.getItem('update_id');
+      const currentPoints = localStorage.getItem('current_points');
       
+      console.log("Found localStorage data:", {
+        updateId,
+        currentPoints
+      });
+      
+      // Use update_id as user_id since that's what you have
+      if (updateId) {
+        // Convert to number if it's numeric
+        const id = parseInt(updateId);
+        if (!isNaN(id)) {
+          setUserId(id);
+          console.log("Setting userId from update_id:", id);
+        } else {
+          // If it's not numeric, use it as-is
+          setUserId(updateId as any);
+          console.log("Setting userId from update_id (string):", updateId);
+        }
+      }
+      
+      // Check for token in other possible locations
+      // You might not have a token if your API doesn't require authentication
       const possibleTokenKeys = [
         'token',
         'access_token',
         'auth_token',
         'jwt',
-        'jwt_token',
-        'bearer_token'
+        'telegram_data'
       ];
       
-      let foundUser = null;
-      let foundToken = null;
-      
-      // Try to find user data
-      for (const key of possibleUserKeys) {
-        const data = localStorage.getItem(key);
-        if (data) {
-          try {
-            const parsed = JSON.parse(data);
-            console.log(`Found user data in key "${key}":`, parsed);
-            foundUser = parsed;
-            
-            // Extract user ID from common structures
-            if (parsed.id) {
-              setUserId(parsed.id);
-            } else if (parsed.user_id) {
-              setUserId(parsed.user_id);
-            } else if (parsed.userId) {
-              setUserId(parsed.userId);
-            } else if (parsed.data?.id) {
-              setUserId(parsed.data.id);
-            } else if (parsed.user?.id) {
-              setUserId(parsed.user.id);
-            }
-            break;
-          } catch (error) {
-            console.log(`Key "${key}" contains non-JSON data:`, data);
-          }
-        }
-      }
-      
-      // Try to find token
       for (const key of possibleTokenKeys) {
         const data = localStorage.getItem(key);
         if (data) {
-          console.log(`Found token in key "${key}"`);
-          foundToken = data;
           setToken(data);
+          console.log(`Found token in key "${key}"`);
           break;
         }
       }
       
-      // If no user found, check if you're using cookies or sessionStorage
-      if (!foundUser) {
-        console.log("No user found in localStorage, checking sessionStorage...");
-        
-        for (const key of possibleUserKeys) {
-          const data = sessionStorage.getItem(key);
-          if (data) {
-            try {
-              const parsed = JSON.parse(data);
-              console.log(`Found user data in sessionStorage key "${key}":`, parsed);
-              foundUser = parsed;
-              
-              if (parsed.id) setUserId(parsed.id);
-              else if (parsed.user_id) setUserId(parsed.user_id);
-              break;
-            } catch (error) {
-              console.log(`SessionStorage key "${key}" contains non-JSON data`);
-            }
-          }
-        }
-        
-        for (const key of possibleTokenKeys) {
-          const data = sessionStorage.getItem(key);
-          if (data) {
-            console.log(`Found token in sessionStorage key "${key}"`);
-            foundToken = data;
-            setToken(data);
-            break;
+      // Also check sessionStorage
+      if (!updateId) {
+        const sessionUpdateId = sessionStorage.getItem('update_id');
+        if (sessionUpdateId) {
+          const id = parseInt(sessionUpdateId);
+          if (!isNaN(id)) {
+            setUserId(id);
+            console.log("Setting userId from sessionStorage update_id:", id);
           }
         }
       }
       
-      // Also check for cookies
-      const cookies = document.cookie.split(';');
-      console.log("Cookies:", cookies);
-      
-      // If still no user found, check if user ID is passed via props or context
-      if (!foundUser && !foundToken) {
-        console.log("No authentication data found in storage");
-        console.log("Checking if user is authenticated via API...");
-        
-        // You might want to verify with your backend
-        // api.get("/auth/check").then(response => {
-        //   if (response.data.authenticated) {
-        //     setUserId(response.data.user.id);
-        //   }
-        // }).catch(() => {
-        //   // Not authenticated
-        // });
+      // If we still don't have a userId, try to get it from URL parameters
+      // (common in Telegram Mini Apps)
+      if (!updateId) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tgUserId = urlParams.get('tg_user_id') || urlParams.get('user_id') || urlParams.get('id');
+        if (tgUserId) {
+          const id = parseInt(tgUserId);
+          if (!isNaN(id)) {
+            setUserId(id);
+            localStorage.setItem('update_id', tgUserId);
+            console.log("Setting userId from URL params:", id);
+          }
+        }
       }
       
       setAuthLoading(false);
@@ -221,9 +161,9 @@ export const SpinWheel = () => {
 
     fetchUserData();
     
-    // Also listen for storage changes (in case user logs in/out in another tab)
+    // Listen for storage changes
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key?.includes('user') || e.key?.includes('token')) {
+      if (e.key === 'update_id' || e.key?.includes('token')) {
         console.log('Storage changed, refetching user data');
         fetchUserData();
       }
@@ -286,6 +226,7 @@ export const SpinWheel = () => {
   const checkSpinEligibility = useCallback(async () => {
     if (!userId) {
       console.log('User ID not found, cannot check eligibility');
+      // Still allow spinning? This depends on your backend requirements
       return;
     }
     
@@ -303,14 +244,14 @@ export const SpinWheel = () => {
       }
     } catch (error) {
       console.error('Error checking eligibility:', error);
+      // If the endpoint doesn't exist or fails, assume user can spin
+      setCanSpin(true);
     }
   }, [userId]);
 
   // Check eligibility when userId changes
   useEffect(() => {
-    if (userId) {
-      checkSpinEligibility();
-    }
+    checkSpinEligibility();
   }, [userId, checkSpinEligibility]);
 
   const getRandomColor = () => {
@@ -330,27 +271,20 @@ export const SpinWheel = () => {
   const spinWheel = useCallback(async () => {
     if (isSpinning || segments.length === 0) return;
     
-    // Debug current state
     console.log("Spin attempt - Current state:", {
       userId,
-      token,
       points,
       pointsPerSpin,
       canSpin,
       segmentsCount: segments.length
     });
     
-    // Check if user is authenticated
-    if (!userId) {
-      alert('Please log in to spin the wheel!');
-      console.log("No userId found. Available localStorage:");
-      debugLocalStorage();
-      return;
-    }
+    // Check if user has enough points
+    const currentPointsFromStorage = localStorage.getItem('current_points');
+    const userPoints = currentPointsFromStorage ? parseInt(currentPointsFromStorage) : points;
     
-    // Check if user can spin
-    if (points !== undefined && points < pointsPerSpin) {
-      alert(`You need ${pointsPerSpin} points to spin! You have ${points} points.`);
+    if (userPoints !== undefined && userPoints < pointsPerSpin) {
+      alert(`You need ${pointsPerSpin} points to spin! You have ${userPoints} points.`);
       return;
     }
 
@@ -385,15 +319,26 @@ export const SpinWheel = () => {
       // Send result to backend to deduct points and notify admin
       await sendResultToBackend(winningSegment);
     }, SPIN_DURATION);
-  }, [isSpinning, rotation, segments, triggerConfetti, points, pointsPerSpin, userId, canSpin, token]);
+  }, [isSpinning, rotation, segments, triggerConfetti, points, pointsPerSpin, userId, canSpin]);
 
   const sendResultToBackend = async (winningSegment: WheelSegment) => {
     try {
       console.log('Sending spin result to backend:', winningSegment);
       
-      if (!userId) {
-        alert('User not authenticated!');
-        return;
+      // Prepare request data
+      const requestData: any = {
+        prize_won: winningSegment.display_name
+      };
+      
+      // Add user_id if available
+      if (userId) {
+        requestData.user_id = userId;
+      }
+      
+      // Get current points from localStorage for initial value
+      const currentPointsFromStorage = localStorage.getItem('current_points');
+      if (currentPointsFromStorage) {
+        requestData.current_points = parseInt(currentPointsFromStorage);
       }
 
       // Prepare headers
@@ -406,20 +351,30 @@ export const SpinWheel = () => {
       }
 
       // Send to your API endpoint
-      const response = await api.post("/spin/process", {
-        user_id: userId,
-        prize_won: winningSegment.display_name
-      }, { headers });
+      console.log('Sending spin request with data:', requestData);
+      const response = await api.post("/spin/process", requestData, { headers });
 
       console.log('Spin API response:', response.data);
       
       if (response.data.success) {
         // Show success message
-        alert(`🎉 Congratulations! You won: ${winningSegment.display_name}\n💰 Points deducted: ${response.data.points_deducted}\n💎 New balance: ${response.data.new_balance}`);
+        let message = `🎉 Congratulations! You won: ${winningSegment.display_name}`;
+        if (response.data.points_deducted) {
+          message += `\n💰 Points deducted: ${response.data.points_deducted}`;
+        }
+        if (response.data.new_balance !== undefined) {
+          message += `\n💎 New balance: ${response.data.new_balance}`;
+        }
+        alert(message);
         
         // Update points in context if available
         if (updatePoints && response.data.new_balance !== undefined) {
           updatePoints(response.data.new_balance);
+        }
+        
+        // Update localStorage if new_balance is provided
+        if (response.data.new_balance !== undefined) {
+          localStorage.setItem('current_points', response.data.new_balance.toString());
         }
         
         console.log('Admin notified via Telegram:', response.data.telegram_notified);
@@ -467,30 +422,26 @@ export const SpinWheel = () => {
     );
   }
 
+  // Get current points from localStorage as fallback
+  const currentPointsFromStorage = localStorage.getItem('current_points');
+  const displayPoints = points !== undefined ? points : 
+    (currentPointsFromStorage ? parseInt(currentPointsFromStorage) : 'Loading...');
+
   return (
     <div className="flex flex-col items-center gap-8">
       {/* Debug Info - Remove in production */}
       <div className="bg-gray-100 p-3 rounded text-xs text-gray-600 max-w-md">
-        <p>Debug Info:</p>
-        <p>User ID: {userId || 'Not found'}</p>
-        <p>Token: {token ? 'Present' : 'Not found'}</p>
-        <p>Auth Loading: {authLoading ? 'Yes' : 'No'}</p>
-        <button 
-          onClick={debugLocalStorage}
-          className="mt-2 px-2 py-1 bg-gray-300 rounded text-xs"
-        >
-          Debug Storage
-        </button>
+        <p>User Info:</p>
+        <p>User ID: {userId ? `Found (${userId})` : 'Not found (using update_id)'}</p>
+        <p>Points from storage: {currentPointsFromStorage || 'Not found'}</p>
+        <p>Can spin: {canSpin ? 'Yes' : 'No'}</p>
       </div>
 
-      {/* Authentication Status */}
-      {!authLoading && !userId && (
+      {/* Authentication Status - Only show if absolutely no user data */}
+      {!authLoading && !userId && !currentPointsFromStorage && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-yellow-700 text-sm font-medium">
-            ⚠️ Please log in to spin the wheel!
-          </p>
-          <p className="text-yellow-600 text-xs mt-1">
-            No user authentication data found in browser storage.
+            ⚠️ User data not found. Please ensure you're logged in.
           </p>
         </div>
       )}
@@ -502,7 +453,7 @@ export const SpinWheel = () => {
             <div className="text-center">
               <p className="text-sm text-gray-500">Your Points</p>
               <p className="text-2xl font-bold text-blue-600">
-                {points !== undefined ? points : 'Loading...'}
+                {displayPoints}
               </p>
             </div>
             <div className="text-center">
@@ -510,9 +461,9 @@ export const SpinWheel = () => {
               <p className="text-2xl font-bold text-red-600">{pointsPerSpin}</p>
             </div>
           </div>
-          {points !== undefined && points < pointsPerSpin && (
+          {typeof displayPoints === 'number' && displayPoints < pointsPerSpin && (
             <p className="text-sm text-red-500 mt-2">
-              ⚠️ You need {pointsPerSpin - points} more points to spin!
+              ⚠️ You need {pointsPerSpin - displayPoints} more points to spin!
             </p>
           )}
         </div>
@@ -612,7 +563,8 @@ export const SpinWheel = () => {
       {/* Spin Button */}
       <Button
         onClick={spinWheel}
-        disabled={isSpinning || segments.length === 0 || authLoading || !userId || (points !== undefined && points < pointsPerSpin) || !canSpin}
+        disabled={isSpinning || segments.length === 0 || authLoading || 
+          (typeof displayPoints === 'number' && displayPoints < pointsPerSpin) || !canSpin}
         size="lg"
         className="px-12 py-6 text-xl text-white font-display bg-gradient-to-r from-blue-500 to-purple-600 font-bold rounded-full button-glow transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
