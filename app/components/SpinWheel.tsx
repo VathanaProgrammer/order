@@ -283,71 +283,96 @@ export const SpinWheel = () => {
 
   const sendResultToBackend = async (winningSegment: WheelSegment) => {
     try {
-      console.log('Sending spin result to backend:', winningSegment);
-      
-      if (!userId) {
-        alert('User not authenticated!');
-        return;
-      }
+        console.log('Sending spin result to backend:', winningSegment);
+        
+        if (!userId) {
+            alert('User not authenticated!');
+            return;
+        }
 
-      // Send to your API endpoint
-      const response = await api.post("/spin/process", {
-        user_id: userId,
-        prize_won: winningSegment.display_name
-      });
+        // Send to your API endpoint
+        const response = await api.post("/spin/process", {
+            user_id: userId,
+            prize_won: winningSegment.display_name
+        });
 
-      console.log('Spin API response:', response.data);
-      
-      if (response.data.success) {
-        // Show success message
-        let message = `🎉 Congratulations! You won: ${winningSegment.display_name}`;
+        console.log('Spin API response:', response.data);
         
-        if (response.data.points_deducted !== undefined) {
-          message += `\n💰 Points deducted: ${response.data.points_deducted}`;
+        if (response.data.success) {
+            // Check if it's a "none" type (Try Again or similar)
+            const isNoneType = winningSegment.type === 'none' || 
+                              winningSegment.originalData?.type === 'none' ||
+                              winningSegment.display_name?.toLowerCase().includes('try again');
+            
+            if (!isNoneType) {
+                // Show success message for actual prizes
+                let message = `🎉 Congratulations! You won: ${winningSegment.display_name}`;
+                
+                if (response.data.points_deducted !== undefined) {
+                    message += `\n💰 Points deducted: ${response.data.points_deducted}`;
+                }
+                
+                if (response.data.new_balance !== undefined) {
+                    message += `\n💎 New balance: ${response.data.new_balance}`;
+                    
+                    // Update points in context
+                    updatePoints(response.data.new_balance);
+                }
+                
+                alert(message);
+                triggerConfetti();
+            } else {
+                // For "none" type (Try Again), show different message
+                let message = `Better luck next time!`;
+                
+                if (response.data.points_deducted !== undefined) {
+                    message += `\n💰 Points deducted: ${response.data.points_deducted}`;
+                }
+                
+                if (response.data.new_balance !== undefined) {
+                    message += `\n💎 New balance: ${response.data.new_balance}`;
+                    
+                    // Update points in context
+                    updatePoints(response.data.new_balance);
+                }
+                
+                alert(message);
+                // Don't trigger confetti for "none" type
+            }
+            
+            console.log('Admin notified via Telegram:', response.data.telegram_notified);
+            
+            // Refresh user data to get updated points
+            if (refreshUser) {
+                await refreshUser();
+            }
+            
+            // Re-check eligibility after spin
+            checkSpinEligibility();
+            
+        } else {
+            alert('Error: ' + response.data.message);
         }
-        
-        if (response.data.new_balance !== undefined) {
-          message += `\n💎 New balance: ${response.data.new_balance}`;
-          
-          // Update points in context
-          updatePoints(response.data.new_balance);
-        }
-        
-        alert(message);
-        
-        console.log('Admin notified via Telegram:', response.data.telegram_notified);
-        
-        // Refresh user data to get updated points
-        if (refreshUser) {
-          await refreshUser();
-        }
-        
-        // Re-check eligibility after spin
-        checkSpinEligibility();
-        
-      } else {
-        alert('Error: ' + response.data.message);
-      }
     } catch (error: any) {
-      console.error('Error recording spin:', error);
-      
-      if (error.response?.status === 422) {
-        const errorData = error.response.data;
-        console.error('Validation errors:', errorData.errors);
+        console.error('Error recording spin:', error);
         
-        let errorMessage = 'Validation failed:\n';
-        if (errorData.errors?.user_id) {
-          errorMessage += `• User ID: ${errorData.errors.user_id[0]}\n`;
+        if (error.response?.status === 422) {
+            const errorData = error.response.data;
+            console.error('Validation errors:', errorData.errors);
+            
+            let errorMessage = 'Validation failed:\n';
+            if (errorData.errors?.user_id) {
+                errorMessage += `• User ID: ${errorData.errors.user_id[0]}\n`;
+            }
+            alert(errorMessage);
+        } else if (error.response) {
+            console.error('Error response:', error.response.data);
+            alert('Spin failed: ' + (error.response.data?.message || error.message));
+        } else {
+            alert('Spin failed! Please try again.');
         }
-        alert(errorMessage);
-      } else if (error.response) {
-        console.error('Error response:', error.response.data);
-        alert('Spin failed: ' + (error.response.data?.message || error.message));
-      } else {
-        alert('Spin failed! Please try again.');
-      }
     }
-  };
+};
 
   const segmentAngle = segments.length > 0 ? 360 / segments.length : 0;
 
