@@ -2,30 +2,23 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import confetti from "canvas-confetti";
 import api from "@/api/api";
-//import { Button } from "@/components/ui/button";
+import { usePoints } from "@/context/PointsContext"; // If you have points context
 
 interface WheelSegment {
   label: string;
   color: string;
   type: string;
   originalData: any;
+  id: number;
+  display_name: string;
+  icon?: string;
 }
-
-// const SEGMENTS: WheelSegment[] = [
-//   { label: "🎁 Grand Prize", color: "hsl(340, 82%, 52%)" },
-//   { label: "⭐ 50 Points", color: "hsl(174, 72%, 46%)" },
-//   { label: "🎯 Try Again", color: "hsl(43, 96%, 56%)" },
-//   { label: "💎 VIP Access", color: "hsl(262, 83%, 58%)" },
-//   { label: "🔥 100 Points", color: "hsl(199, 89%, 48%)" },
-//   { label: "🎉 Mystery Box", color: "hsl(16, 85%, 57%)" },
-// ];
 
 const SPIN_DURATION = 5000;
 const ROTATIONS = 5;
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
@@ -70,67 +63,117 @@ Button.displayName = "Button";
 
 export { Button, buttonVariants };
 
-
 export const SpinWheel = () => {
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState<string | null>(null);
   const [segments, setSegments] = useState<WheelSegment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pointsPerSpin, setPointsPerSpin] = useState(5);
+  const [canSpin, setCanSpin] = useState(true);
   const wheelRef = useRef<HTMLDivElement>(null);
+  
+  const { points, updatePoints } = usePoints?.() || {};
+  const [userId, setUserId] = useState<number | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+
+  // Fetch user data from localStorage or session
+  useEffect(() => {
+    // Try to get user ID and token from localStorage
+    const storedUser = localStorage.getItem('user');
+    const storedToken = localStorage.getItem('token');
+    
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        setUserId(userData.id || userData.user_id || null);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
+    
+    if (storedToken) {
+      setToken(storedToken);
+    }
+  }, []);
 
   // Fetch segments from Laravel API
   useEffect(() => {
-    const fetchSegments = async () => {
+    const fetchSpinData = async () => {
       try {
-        console.log('Fetching spin wheel segments...');
+        console.log('Fetching spin wheel data...');
         
-        // Use the same api instance as your categories
+        // Get segments and points per spin
         const response = await api.get("/spin-wheel/segments");
         
         console.log('Spin wheel API response:', response.data);
         
-        if (response.data.success && response.data.segments?.length > 0) {
-          // Map Laravel data to React component format
-          const mappedSegments = response.data.segments.map((segment: any) => ({
-            label: `${segment.icon || ''} ${segment.display_name}`.trim(),
-            color: segment.color || getRandomColor(),
-            type: segment.type,
-            originalData: segment
-          }));
-          setSegments(mappedSegments);
-        } else {
-          console.warn('No active segments found or empty response');
-          // You can set fallback segments here if needed
+        if (response.data.success) {
+          // Set points per spin
+          setPointsPerSpin(response.data.points_per_spin || 5);
+          
+          if (response.data.segments?.length > 0) {
+            // Map Laravel data to React component format
+            const mappedSegments = response.data.segments.map((segment: any) => ({
+              id: segment.id,
+              label: `${segment.icon || ''} ${segment.display_name}`.trim(),
+              color: segment.color || getRandomColor(),
+              type: segment.type,
+              display_name: segment.display_name,
+              icon: segment.icon,
+              originalData: segment
+            }));
+            setSegments(mappedSegments);
+          } else {
+            console.warn('No active segments found');
+          }
         }
       } catch (error: any) {
-        console.error('Error fetching spin wheel segments:', error);
+        console.error('Error fetching spin wheel data:', error);
         
-        // Log detailed error info
         if (error.response) {
-          // The request was made and the server responded with a status code
           console.error('Error response status:', error.response.status);
           console.error('Error response data:', error.response.data);
-          console.error('Error response headers:', error.response.headers);
-        } else if (error.request) {
-          // The request was made but no response was received
-          console.error('No response received:', error.request);
-        } else {
-          // Something happened in setting up the request
-          console.error('Error setting up request:', error.message);
         }
-        
-        // Optional: Use fallback segments
-        // setSegments(getFallbackSegments());
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSegments();
+    fetchSpinData();
   }, []);
 
-  // Helper function for random colors
+  // Check if user can spin
+  const checkSpinEligibility = useCallback(async () => {
+    if (!userId) {
+      console.log('User ID not found, cannot check eligibility');
+      return;
+    }
+    
+    try {
+      const response = await api.get("/spin/check-eligibility", {
+        params: { user_id: userId }
+      });
+      
+      if (response.data.success) {
+        setCanSpin(response.data.can_spin);
+        
+        if (!response.data.can_spin) {
+          console.log('Cannot spin:', response.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking eligibility:', error);
+    }
+  }, [userId]);
+
+  // Check eligibility when userId changes
+  useEffect(() => {
+    if (userId) {
+      checkSpinEligibility();
+    }
+  }, [userId, checkSpinEligibility]);
+
   const getRandomColor = () => {
     const hues = [340, 174, 43, 262, 199, 16];
     const randomHue = hues[Math.floor(Math.random() * hues.length)];
@@ -138,11 +181,32 @@ export const SpinWheel = () => {
   };
 
   const triggerConfetti = useCallback(() => {
-    // ... keep your existing confetti code ...
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
   }, []);
 
-  const spinWheel = useCallback(() => {
+  const spinWheel = useCallback(async () => {
     if (isSpinning || segments.length === 0) return;
+    
+    // Check if user is authenticated
+    if (!userId) {
+      alert('Please log in to spin the wheel!');
+      return;
+    }
+    
+    // Check if user can spin
+    if (points !== undefined && points < pointsPerSpin) {
+      alert(`You need ${pointsPerSpin} points to spin! You have ${points} points.`);
+      return;
+    }
+
+    if (!canSpin) {
+      alert('You cannot spin at this time. Please check your eligibility.');
+      return;
+    }
 
     setIsSpinning(true);
     setResult(null);
@@ -155,38 +219,70 @@ export const SpinWheel = () => {
 
     setRotation(totalRotation);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       setIsSpinning(false);
       
       // Calculate winning segment
       const normalizedRotation = totalRotation % 360;
       const pointerAngle = (360 - normalizedRotation + 360) % 360;
       const winningIndex = Math.floor(pointerAngle / segmentAngle) % segments.length;
+      const winningSegment = segments[winningIndex];
       
-      setResult(segments[winningIndex].label);
+      setResult(winningSegment.label);
       triggerConfetti();
       
-      // Optional: Send result to Laravel backend
-      sendResultToBackend(segments[winningIndex]);
+      // Send result to backend to deduct points and notify admin
+      await sendResultToBackend(winningSegment);
     }, SPIN_DURATION);
-  }, [isSpinning, rotation, segments, triggerConfetti]);
+  }, [isSpinning, rotation, segments, triggerConfetti, points, pointsPerSpin, userId, canSpin]);
 
   const sendResultToBackend = async (winningSegment: WheelSegment) => {
     try {
-      await fetch('/api/spin-wheel/record-spin', {
-        method: 'POST',
+      console.log('Sending spin result to backend:', winningSegment);
+      
+      if (!userId) {
+        alert('User not authenticated!');
+        return;
+      }
+
+      // Send to your API endpoint
+      const response = await api.post("/spin/process", {
+        user_id: userId,
+        prize_won: winningSegment.display_name
+      }, {
         headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-        },
-        body: JSON.stringify({
-          segment_label: winningSegment.label,
-          segment_type: winningSegment.type,
-          won_at: new Date().toISOString()
-        })
+          'Authorization': token ? `Bearer ${token}` : undefined,
+          'Content-Type': 'application/json'
+        }
       });
-    } catch (error) {
+
+      console.log('Spin API response:', response.data);
+      
+      if (response.data.success) {
+        // Show success message
+        alert(`🎉 Congratulations! You won: ${winningSegment.display_name}\n💰 Points deducted: ${response.data.points_deducted}\n💎 New balance: ${response.data.new_balance}`);
+        
+        // Update points in context if available
+        if (updatePoints && response.data.new_balance !== undefined) {
+          updatePoints(response.data.new_balance);
+        }
+        
+        console.log('Admin notified via Telegram:', response.data.telegram_notified);
+        
+        // Re-check eligibility after spin
+        checkSpinEligibility();
+      } else {
+        alert('Error: ' + response.data.message);
+      }
+    } catch (error: any) {
       console.error('Error recording spin:', error);
+      
+      if (error.response) {
+        console.error('Error response:', error.response.data);
+        alert('Spin failed: ' + (error.response.data?.message || error.message));
+      } else {
+        alert('Spin failed! Please try again.');
+      }
     }
   };
 
@@ -218,6 +314,38 @@ export const SpinWheel = () => {
 
   return (
     <div className="flex flex-col items-center gap-8">
+      {/* Authentication Status */}
+      {!userId && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-yellow-700 text-sm font-medium">
+            ⚠️ Please log in to spin the wheel!
+          </p>
+        </div>
+      )}
+
+      {/* Points Info */}
+      <div className="bg-white p-4 rounded-lg shadow-md">
+        <div className="flex flex-col items-center space-y-2">
+          <div className="flex items-center space-x-4">
+            <div className="text-center">
+              <p className="text-sm text-gray-500">Your Points</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {points !== undefined ? points : 'Loading...'}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-500">Points per Spin</p>
+              <p className="text-2xl font-bold text-red-600">{pointsPerSpin}</p>
+            </div>
+          </div>
+          {points !== undefined && points < pointsPerSpin && (
+            <p className="text-sm text-red-500 mt-2">
+              ⚠️ You need {pointsPerSpin - points} more points to spin!
+            </p>
+          )}
+        </div>
+      </div>
+
       {/* Wheel Container */}
       <div className="relative">
         {/* Pointer */}
@@ -312,24 +440,34 @@ export const SpinWheel = () => {
       {/* Spin Button */}
       <Button
         onClick={spinWheel}
-        disabled={isSpinning || segments.length === 0}
+        disabled={isSpinning || segments.length === 0 || !userId || (points !== undefined && points < pointsPerSpin) || !canSpin}
         size="lg"
-        className="px-12 py-6 text-xl text-white font-display bg-blue-500 font-bold rounded-full button-glow transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+        className="px-12 py-6 text-xl text-white font-display bg-gradient-to-r from-blue-500 to-purple-600 font-bold rounded-full button-glow transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
-        {isSpinning ? "Spinning..." : "SPIN TO WIN!"}
+        {isSpinning ? "Spinning..." : `SPIN (${pointsPerSpin} points)`}
       </Button>
 
       {/* Result Display */}
       {result && (
-        <div className="animate-bounce-in bg-card rounded-2xl p-6 shadow-lg border-2 border-accent">
-          <p className="text-muted-foreground text-sm font-medium mb-1">🎊 Congratulations!</p>
-          <p className="text-2xl font-display font-bold text-foreground">{result}</p>
+        <div className="animate-bounce-in bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 shadow-lg border-2 border-green-300">
+          <p className="text-green-600 text-sm font-medium mb-1">🎊 Congratulations!</p>
+          <p className="text-2xl font-display font-bold text-gray-800">{result}</p>
+          <p className="text-sm text-gray-600 mt-2">
+            Points deducted and admin notified via Telegram
+          </p>
         </div>
       )}
 
       {/* Statistics */}
-      <div className="mt-4 text-center text-sm text-gray-500">
-        <p>{segments.length} active segments</p>
+      <div className="mt-4 text-center">
+        <p className="text-sm text-gray-500">
+          {segments.length} active segments • {pointsPerSpin} points per spin
+        </p>
+        {!canSpin && (
+          <p className="text-sm text-amber-600 mt-1">
+            ⚠️ You cannot spin at the moment
+          </p>
+        )}
       </div>
     </div>
   );
