@@ -20,7 +20,7 @@ const Index = () => {
           <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground mb-3">
             {t.luckyDraw}
           </h1>
-          <p className="text-muted-foreground text-lg max-w-md">
+          <p className="text-muted-foreground text-lg max-w-md m-3">
             {t.spinSubtitle}
           </p>
         </div>

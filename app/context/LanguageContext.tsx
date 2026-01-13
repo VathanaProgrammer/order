@@ -277,6 +277,7 @@ const translations = {
     yourPoints: "ពិន្ទុរបស់អ្នក",
     pointsPerSpin: "ពិន្ទុក្នុងមួយការបង្វិល",
     spinning: "កំពុងបង្វិល...",
+    luckyDraw: "ការបង្វិលសំណាង",
   },
 };
 
