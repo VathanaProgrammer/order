@@ -71,9 +71,10 @@ export const SpinWheel = () => {
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState<string | null>(null);
+  const [winningSegment, setWinningSegment] = useState<WheelSegment | null>(null);
   const [segments, setSegments] = useState<WheelSegment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pointsPerSpin, setPointsPerSpin] = useState<number>(50); // Default to 50 based on your API
+  const [pointsPerSpin, setPointsPerSpin] = useState<number>(50);
   const [canSpin, setCanSpin] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const wheelRef = useRef<HTMLDivElement>(null);
@@ -81,23 +82,49 @@ export const SpinWheel = () => {
   const { points, updatePoints } = usePoints();
   const { user, refreshUser } = useAuth();
   
-  // Get the database user ID
   const userId = user?.id || null;
 
-  // Fetch spin wheel data from Laravel API
+// Calculate winning segment based on probability
+const getWinningSegmentByProbability = useCallback(() => {
+  if (segments.length === 0) return null;
+  
+  // Get total probability
+  const totalProbability = segments.reduce((sum, segment) => sum + (segment.probability || 0), 0);
+  
+  // If probabilities are not set or invalid, use equal distribution
+  if (totalProbability <= 0) {
+    const randomIndex = Math.floor(Math.random() * segments.length);
+    return segments[randomIndex];
+  }
+  
+  // Generate random number between 0 and total probability
+  const random = Math.random() * totalProbability;
+  let cumulativeProbability = 0;
+  
+  // Find which segment the random number falls into
+  for (const segment of segments) {
+    cumulativeProbability += segment.probability || 0;
+    if (random <= cumulativeProbability) {
+      return segment;
+    }
+  }
+  
+  // Fallback to last segment (should never reach here if probabilities sum correctly)
+  return segments[segments.length - 1];
+}, [segments]);
+
+  // Fetch spin wheel data
   const fetchSpinData = useCallback(async () => {
     try {
       setLoading(true);
       setFetchError(null);
       console.log('Fetching spin wheel segments...');
       
-      // Fetch segments from the correct endpoint
       const segmentsResponse = await api.get("/spin-wheel/segments");
       
       console.log('Spin wheel segments response:', segmentsResponse.data);
       
       if (segmentsResponse.data.success) {
-        // Set segments
         if (segmentsResponse.data.segments?.length > 0) {
           const mappedSegments = segmentsResponse.data.segments.map((segment: any, index: number) => ({
             id: segment.id || index,
@@ -109,19 +136,23 @@ export const SpinWheel = () => {
             probability: segment.probability || 0,
             originalData: segment
           }));
+          
+          // Log probabilities for debugging
+          console.log('Segment probabilities:', mappedSegments.map((s: { display_name: any; probability: any; }) => ({ 
+            name: s.display_name, 
+            probability: s.probability 
+          })));
+          
           setSegments(mappedSegments);
         } else {
           console.warn('No segments found');
           setFetchError('No wheel segments configured. Please contact admin.');
         }
         
-        // Check if points_per_spin is in the segments response
         if (segmentsResponse.data.points_per_spin !== undefined) {
           setPointsPerSpin(segmentsResponse.data.points_per_spin);
           console.log('Points per spin from segments API:', segmentsResponse.data.points_per_spin);
         } else {
-          // If not in segments response, fetch from eligibility endpoint
-          console.log('Points per spin not in segments response, checking eligibility endpoint...');
           await fetchPointsPerSpin();
         }
       } else {
@@ -135,7 +166,6 @@ export const SpinWheel = () => {
     }
   }, []);
 
-  // Fetch points per spin from eligibility endpoint
   const fetchPointsPerSpin = useCallback(async () => {
     if (!userId) return;
     
@@ -153,23 +183,19 @@ export const SpinWheel = () => {
       }
     } catch (error) {
       console.error('Error fetching points per spin:', error);
-      // Keep default of 50
     }
   }, [userId]);
 
-  // Fetch initial data
   useEffect(() => {
     fetchSpinData();
   }, [fetchSpinData]);
 
-  // Fetch points per spin when userId changes
   useEffect(() => {
     if (userId) {
       fetchPointsPerSpin();
     }
   }, [userId, fetchPointsPerSpin]);
 
-  // Check if user can spin
   const checkSpinEligibility = useCallback(async () => {
     if (!userId) {
       console.log('User ID not found, cannot check eligibility');
@@ -186,7 +212,6 @@ export const SpinWheel = () => {
       if (response.data.success) {
         setCanSpin(response.data.can_spin);
         
-        // Update points per spin from eligibility response
         if (response.data.points_required !== undefined) {
           setPointsPerSpin(response.data.points_required);
         }
@@ -197,14 +222,12 @@ export const SpinWheel = () => {
       }
     } catch (error) {
       console.error('Error checking eligibility:', error);
-      // If endpoint fails, check based on points
       if (points !== undefined) {
         setCanSpin(points >= pointsPerSpin);
       }
     }
   }, [userId, points, pointsPerSpin]);
 
-  // Check eligibility when userId or pointsPerSpin changes
   useEffect(() => {
     if (userId) {
       checkSpinEligibility();
@@ -236,13 +259,11 @@ export const SpinWheel = () => {
       segmentsCount: segments.length
     });
     
-    // Check if user is authenticated
     if (!userId) {
       alert('Please log in to spin the wheel!');
       return;
     }
     
-    // Check if user has enough points
     if (points !== undefined && points < pointsPerSpin) {
       alert(`You need ${pointsPerSpin} points to spin! You have ${points} points.`);
       return;
@@ -255,124 +276,166 @@ export const SpinWheel = () => {
 
     setIsSpinning(true);
     setResult(null);
+    setWinningSegment(null);
 
-    const segmentAngle = 360 / segments.length;
+    // Get winning segment based on probability FIRST
+    const winningSegmentByProbability = getWinningSegmentByProbability();
     
-    // Add random spins plus extra random degrees
-    const extraRotation = ROTATIONS * 360 + Math.random() * 360;
-    const totalRotation = rotation + extraRotation;
+    // Handle null case
+    if (!winningSegmentByProbability) {
+      setIsSpinning(false);
+      alert('Error: Could not determine winning segment. Please try again.');
+      return;
+    }
+    
+    setWinningSegment(winningSegmentByProbability);
+    setResult(winningSegmentByProbability.display_name);
+    
+    console.log('Selected by probability:', {
+      segment: winningSegmentByProbability.display_name,
+      probability: winningSegmentByProbability.probability,
+      type: winningSegmentByProbability.type
+    });
 
-    setRotation(totalRotation);
+    // Calculate visual rotation to land on the winning segment
+    const segmentIndex = segments.findIndex(s => s.id === winningSegmentByProbability.id);
+    
+    // If segment not found (should not happen), fallback to random
+    if (segmentIndex === -1) {
+      console.warn('Winning segment not found in segments array, using random index');
+      const randomIndex = Math.floor(Math.random() * segments.length);
+      const randomSegment = segments[randomIndex];
+      setWinningSegment(randomSegment);
+      setResult(randomSegment.display_name);
+      
+      // Continue with the random segment
+      const segmentAngle = 360 / segments.length;
+      const targetSegmentMiddle = (randomIndex * segmentAngle) + (segmentAngle / 2);
+      const extraRotations = ROTATIONS * 360;
+      const currentNormalizedRotation = rotation % 360;
+      const rotationToTarget = 360 - targetSegmentMiddle;
+      const totalRotation = rotation + extraRotations + rotationToTarget;
+      
+      setRotation(totalRotation);
+    } else {
+      // Normal flow with found segment
+      const segmentAngle = 360 / segments.length;
+      
+      // Target angle (middle of the winning segment)
+      const targetSegmentMiddle = (segmentIndex * segmentAngle) + (segmentAngle / 2);
+      
+      // Add extra rotations for visual effect
+      const extraRotations = ROTATIONS * 360;
+      
+      // Calculate total rotation needed
+      const currentNormalizedRotation = rotation % 360;
+      const rotationToTarget = 360 - targetSegmentMiddle;
+      const totalRotation = rotation + extraRotations + rotationToTarget;
+      
+      setRotation(totalRotation);
+    }
 
     setTimeout(async () => {
       setIsSpinning(false);
       
-      // Calculate winning segment
-      const normalizedRotation = totalRotation % 360;
-      const pointerAngle = (360 - normalizedRotation + 360) % 360;
-      const winningIndex = Math.floor(pointerAngle / segmentAngle) % segments.length;
-      const winningSegment = segments[winningIndex];
+      // Get current winning segment (in case it was changed in the if/else above)
+      const currentWinningSegment = winningSegmentByProbability || winningSegment;
+      if (!currentWinningSegment) return;
       
-      setResult(winningSegment.display_name);
-      triggerConfetti();
+      // Check if it's not a "none" type before triggering confetti
+      const isNoneType = currentWinningSegment.type === 'none' || 
+                         currentWinningSegment.originalData?.type === 'none' ||
+                         currentWinningSegment.display_name?.toLowerCase().includes('try again');
       
-      // Send result to backend to deduct points and notify admin
-      await sendResultToBackend(winningSegment);
+      if (!isNoneType) {
+        triggerConfetti();
+      }
+      
+      // Send result to backend
+      await sendResultToBackend(currentWinningSegment);
     }, SPIN_DURATION);
-  }, [isSpinning, rotation, segments, triggerConfetti, points, pointsPerSpin, userId, canSpin]);
+  }, [isSpinning, rotation, segments, getWinningSegmentByProbability, triggerConfetti, points, pointsPerSpin, userId, canSpin, winningSegment]);
 
   const sendResultToBackend = async (winningSegment: WheelSegment) => {
     try {
-        console.log('Sending spin result to backend:', winningSegment);
-        
-        if (!userId) {
-            alert('User not authenticated!');
-            return;
-        }
+      console.log('Sending spin result to backend:', winningSegment);
+      
+      if (!userId) {
+        alert('User not authenticated!');
+        return;
+      }
 
-        // Send to your API endpoint
-        const response = await api.post("/spin/process", {
-            user_id: userId,
-            prize_won: winningSegment.display_name
-        });
+      const response = await api.post("/spin/process", {
+        user_id: userId,
+        prize_won: winningSegment.display_name
+      });
 
-        console.log('Spin API response:', response.data);
+      console.log('Spin API response:', response.data);
+      
+      if (response.data.success) {
+        const isNoneType = winningSegment.type === 'none' || 
+                          winningSegment.originalData?.type === 'none' ||
+                          winningSegment.display_name?.toLowerCase().includes('try again');
         
-        if (response.data.success) {
-            // Check if it's a "none" type (Try Again or similar)
-            const isNoneType = winningSegment.type === 'none' || 
-                              winningSegment.originalData?.type === 'none' ||
-                              winningSegment.display_name?.toLowerCase().includes('try again');
-            
-            if (!isNoneType) {
-                // Show success message for actual prizes
-                let message = `🎉 Congratulations! You won: ${winningSegment.display_name}`;
-                
-                if (response.data.points_deducted !== undefined) {
-                    message += `\n💰 Points deducted: ${response.data.points_deducted}`;
-                }
-                
-                if (response.data.new_balance !== undefined) {
-                    message += `\n💎 New balance: ${response.data.new_balance}`;
-                    
-                    // Update points in context
-                    updatePoints(response.data.new_balance);
-                }
-                
-                alert(message);
-                triggerConfetti();
-            } else {
-                // For "none" type (Try Again), show different message
-                let message = `Better luck next time!`;
-                
-                if (response.data.points_deducted !== undefined) {
-                    message += `\n💰 Points deducted: ${response.data.points_deducted}`;
-                }
-                
-                if (response.data.new_balance !== undefined) {
-                    message += `\n💎 New balance: ${response.data.new_balance}`;
-                    
-                    // Update points in context
-                    updatePoints(response.data.new_balance);
-                }
-                
-                alert(message);
-                // Don't trigger confetti for "none" type
-            }
-            
-            console.log('Admin notified via Telegram:', response.data.telegram_notified);
-            
-            // Refresh user data to get updated points
-            if (refreshUser) {
-                await refreshUser();
-            }
-            
-            // Re-check eligibility after spin
-            checkSpinEligibility();
-            
+        if (!isNoneType) {
+          let message = `🎉 Congratulations! You won: ${winningSegment.display_name}`;
+          
+          if (response.data.points_deducted !== undefined) {
+            message += `\n💰 Points deducted: ${response.data.points_deducted}`;
+          }
+          
+          if (response.data.new_balance !== undefined) {
+            message += `\n💎 New balance: ${response.data.new_balance}`;
+            updatePoints(response.data.new_balance);
+          }
+          
+          alert(message);
         } else {
-            alert('Error: ' + response.data.message);
+          let message = `Better luck next time!`;
+          
+          if (response.data.points_deducted !== undefined) {
+            message += `\n💰 Points deducted: ${response.data.points_deducted}`;
+          }
+          
+          if (response.data.new_balance !== undefined) {
+            message += `\n💎 New balance: ${response.data.new_balance}`;
+            updatePoints(response.data.new_balance);
+          }
+          
+          alert(message);
         }
+        
+        console.log('Admin notified via Telegram:', response.data.telegram_notified);
+        
+        if (refreshUser) {
+          await refreshUser();
+        }
+        
+        checkSpinEligibility();
+        
+      } else {
+        alert('Error: ' + response.data.message);
+      }
     } catch (error: any) {
-        console.error('Error recording spin:', error);
+      console.error('Error recording spin:', error);
+      
+      if (error.response?.status === 422) {
+        const errorData = error.response.data;
+        console.error('Validation errors:', errorData.errors);
         
-        if (error.response?.status === 422) {
-            const errorData = error.response.data;
-            console.error('Validation errors:', errorData.errors);
-            
-            let errorMessage = 'Validation failed:\n';
-            if (errorData.errors?.user_id) {
-                errorMessage += `• User ID: ${errorData.errors.user_id[0]}\n`;
-            }
-            alert(errorMessage);
-        } else if (error.response) {
-            console.error('Error response:', error.response.data);
-            alert('Spin failed: ' + (error.response.data?.message || error.message));
-        } else {
-            alert('Spin failed! Please try again.');
+        let errorMessage = 'Validation failed:\n';
+        if (errorData.errors?.user_id) {
+          errorMessage += `• User ID: ${errorData.errors.user_id[0]}\n`;
         }
+        alert(errorMessage);
+      } else if (error.response) {
+        console.error('Error response:', error.response.data);
+        alert('Spin failed: ' + (error.response.data?.message || error.message));
+      } else {
+        alert('Spin failed! Please try again.');
+      }
     }
-};
+  };
 
   const segmentAngle = segments.length > 0 ? 360 / segments.length : 0;
 
@@ -421,7 +484,6 @@ export const SpinWheel = () => {
 
   return (
     <div className="flex flex-col items-center gap-8 p-4">
-
       {/* Points Info */}
       <div className="bg-white p-4 rounded-lg shadow-md w-full max-w-md">
         <div className="flex flex-col items-center space-y-2">
@@ -482,7 +544,7 @@ export const SpinWheel = () => {
                 : "none",
             }}
           >
-            {/* Segments */}
+            {/* Segments - Now visual only, probabilities control actual win */}
             <svg viewBox="0 0 100 100" className="w-full h-full">
               {segments.map((segment, index) => {
                 const startAngle = index * segmentAngle - 90;
@@ -500,7 +562,6 @@ export const SpinWheel = () => {
                 
                 const path = `M 50 50 L ${x1} ${y1} A 50 50 0 ${largeArc} 1 ${x2} ${y2} Z`;
                 
-                // Text position
                 const midAngle = startAngle + segmentAngle / 2;
                 const midRad = (midAngle * Math.PI) / 180;
                 const textX = 50 + 32 * Math.cos(midRad);
@@ -554,13 +615,29 @@ export const SpinWheel = () => {
         {isSpinning ? "Spinning..." : `SPIN (${pointsPerSpin} points)`}
       </Button>
 
+      {/* Probability Info (for debugging) */}
+      <div className="mt-2 text-center text-sm text-gray-500">
+        <p>Total probability: {segments.reduce((sum, s) => sum + (s.probability || 0), 0)}%</p>
+        <p>Segments: {segments.length}</p>
+      </div>
+
       {/* Result Display */}
-      {result && (
+      {result && winningSegment && winningSegment.type !== 'none' && (
         <div className="animate-bounce-in bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 shadow-lg border-2 border-green-300">
           <p className="text-green-600 text-sm font-medium mb-1">🎊 Congratulations!</p>
           <p className="text-2xl font-display font-bold text-gray-800">{result}</p>
           <p className="text-sm text-gray-600 mt-2">
             {pointsPerSpin} points deducted and admin notified via Telegram
+          </p>
+        </div>
+      )}
+
+      {result && winningSegment && winningSegment.type === 'none' && (
+        <div className="animate-bounce-in bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl p-6 shadow-lg border-2 border-yellow-300">
+          <p className="text-yellow-600 text-sm font-medium mb-1">🎯 Try Again!</p>
+          <p className="text-2xl font-display font-bold text-gray-800">Better luck next time!</p>
+          <p className="text-sm text-gray-600 mt-2">
+            {pointsPerSpin} points deducted
           </p>
         </div>
       )}
