@@ -1,3 +1,4 @@
+"use client";
 import { SpinWheel } from "@/components/SpinWheel";
 import { useLanguage } from "@/context/LanguageContext";
 
