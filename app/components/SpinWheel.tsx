@@ -624,7 +624,7 @@ const getWinningSegmentByProbability = useCallback(() => {
       </div> */}
 
       {/* Result Display */}
-      {result && winningSegment && winningSegment.type !== 'none' && (
+      {!isSpinning && result && winningSegment && winningSegment.type !== 'none' && (
         <div className="animate-bounce-in bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 shadow-lg border-2 border-green-300">
           <p className="text-green-600 text-sm font-medium mb-1">🎊 {t.congratulations}</p>
           <p className="text-2xl font-display font-bold text-gray-800">{result}</p>
@@ -634,7 +634,7 @@ const getWinningSegmentByProbability = useCallback(() => {
         </div>
       )}
 
-      {result && winningSegment && winningSegment.type === 'none' && (
+      {!isSpinning && result && winningSegment && winningSegment.type === 'none' && (
         <div className="animate-bounce-in bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl p-6 shadow-lg border-2 border-yellow-300">
           <p className="text-yellow-600 text-sm font-medium mb-1">🎯 {t.tryAgain}</p>
           <p className="text-2xl font-display font-bold text-gray-800">Better luck next time!</p>

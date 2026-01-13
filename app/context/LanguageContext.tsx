@@ -278,6 +278,7 @@ const translations = {
     pointsPerSpin: "ពិន្ទុក្នុងមួយការបង្វិល",
     spinning: "កំពុងបង្វិល...",
     luckyDraw: "ការបង្វិលសំណាង",
+    tryAgain: "ព្យាយាមម្តងទៀត",
   },
 };
 
