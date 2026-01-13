@@ -4,6 +4,7 @@ import confetti from "canvas-confetti";
 import api from "@/api/api";
 import { useAuth } from "@/context/AuthContext";
 import { usePoints } from "@/context/PointsContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface WheelSegment {
   id: number;
@@ -78,6 +79,7 @@ export const SpinWheel = () => {
   const [canSpin, setCanSpin] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const wheelRef = useRef<HTMLDivElement>(null);
+  const { t } = useLanguage();
   
   const { points, updatePoints } = usePoints();
   const { user, refreshUser } = useAuth();
@@ -489,13 +491,13 @@ const getWinningSegmentByProbability = useCallback(() => {
         <div className="flex flex-col items-center space-y-2">
           <div className="flex items-center space-x-4">
             <div className="text-center">
-              <p className="text-sm text-gray-500">Your Points</p>
+              <p className="text-sm text-gray-500">{t.yourPoints}</p>
               <p className="text-2xl font-bold text-blue-600">
                 {points !== undefined ? points.toLocaleString() : 'Loading...'}
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-500">Points per Spin</p>
+              <p className="text-sm text-gray-500">{t.pointsPerSpin}</p>
               <p className="text-2xl font-bold text-red-600">
                 {pointsPerSpin}
               </p>
@@ -612,19 +614,19 @@ const getWinningSegmentByProbability = useCallback(() => {
         size="lg"
         className="px-12 py-6 text-xl text-white font-display bg-gradient-to-r from-blue-500 to-purple-600 font-bold rounded-full button-glow transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
-        {isSpinning ? "Spinning..." : `SPIN (${pointsPerSpin} points)`}
+        {isSpinning ? t.spinning : t.spinNow}
       </Button>
 
       {/* Probability Info (for debugging) */}
-      <div className="mt-2 text-center text-sm text-gray-500">
+      {/* <div className="mt-2 text-center text-sm text-gray-500">
         <p>Total probability: {segments.reduce((sum, s) => sum + (s.probability || 0), 0)}%</p>
         <p>Segments: {segments.length}</p>
-      </div>
+      </div> */}
 
       {/* Result Display */}
       {result && winningSegment && winningSegment.type !== 'none' && (
         <div className="animate-bounce-in bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 shadow-lg border-2 border-green-300">
-          <p className="text-green-600 text-sm font-medium mb-1">🎊 Congratulations!</p>
+          <p className="text-green-600 text-sm font-medium mb-1">🎊 {t.congratulations}</p>
           <p className="text-2xl font-display font-bold text-gray-800">{result}</p>
           <p className="text-sm text-gray-600 mt-2">
             {pointsPerSpin} points deducted and admin notified via Telegram
@@ -634,7 +636,7 @@ const getWinningSegmentByProbability = useCallback(() => {
 
       {result && winningSegment && winningSegment.type === 'none' && (
         <div className="animate-bounce-in bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl p-6 shadow-lg border-2 border-yellow-300">
-          <p className="text-yellow-600 text-sm font-medium mb-1">🎯 Try Again!</p>
+          <p className="text-yellow-600 text-sm font-medium mb-1">🎯 {t.tryAgain}</p>
           <p className="text-2xl font-display font-bold text-gray-800">Better luck next time!</p>
           <p className="text-sm text-gray-600 mt-2">
             {pointsPerSpin} points deducted
@@ -643,7 +645,7 @@ const getWinningSegmentByProbability = useCallback(() => {
       )}
 
       {/* Statistics */}
-      <div className="mt-4 text-center">
+      {/* <div className="mt-4 text-center">
         <p className="text-sm text-gray-500">
           {segments.length} active segments • {pointsPerSpin} points per spin
         </p>
@@ -652,7 +654,7 @@ const getWinningSegmentByProbability = useCallback(() => {
             ⚠️ You cannot spin at the moment
           </p>
         )}
-      </div>
+      </div> */}
     </div>
   );
 };

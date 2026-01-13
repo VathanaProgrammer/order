@@ -140,6 +140,14 @@ const translations = {
     noClaimsYet: "You haven't claimed any rewards yet",
     successfullyClaimed: "Successfully claimed",
     totalPoints: "Total Reward Points",
+    luckeyDraw: "Lucky Draw",
+    spinSubtitle: "Spin the wheel and test your luck! Every spin is a chance to win amazing prizes.",
+    congratulations: "Congratulations!",
+    yourPoints: "Your points",
+    pointsPerSpin: "Points per spin",
+    spinNow: "SPIN NOW",
+    spinning: "Spinning...",
+    tryAgain: "Try Again",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -263,6 +271,12 @@ const translations = {
     claimFirstReward: "ទាមទាររង្វាន់ដំបូងរបស់អ្នក",
     successfullyClaimed: "បានទាមទារដោយជោគជ័យនូវ",
     totalPoints: "ពិន្ទុយករង្វាន់សរុប",
+    spinSubtitle: "បង្វិលកង់ហើយសាកល្បងសំណាងរបស់អ្នក! ការបង្វិលរាល់ដងគឺជាឱកាសក្នុងការឈ្នះរង្វាន់អស្ចារ្យ",
+    congratulations: "អបអរសាទរ",
+    spinNow: "បង្វិលឥឡូវ",
+    yourPoints: "ពិន្ទុរបស់អ្នក",
+    pointsPerSpin: "ពិន្ទុក្នុងមួយការបង្វិល",
+    spinning: "កំពុងបង្វិល...",
   },
 };
 

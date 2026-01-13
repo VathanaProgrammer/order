@@ -1,6 +1,8 @@
 import { SpinWheel } from "@/components/SpinWheel";
+import { useLanguage } from "@/context/LanguageContext";
 
 const Index = () => {
+  const { t } = useLanguage();
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-start p-6">
       {/* Background decoration */}
@@ -15,10 +17,10 @@ const Index = () => {
         {/* Header */}
         <div className="text-center mb-4">
           <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground mb-3">
-            Lucky Draw
+            {t.luckyDraw}
           </h1>
           <p className="text-muted-foreground text-lg max-w-md">
-            Spin the wheel and test your luck! Every spin is a chance to win amazing prizes.
+            {t.spinSubtitle}
           </p>
         </div>
 
@@ -26,9 +28,9 @@ const Index = () => {
         <SpinWheel />
 
         {/* Footer */}
-        <p className="text-sm text-muted-foreground/60 mt-8">
+        {/* <p className="text-sm text-muted-foreground/60 mt-8">
           Each spin is completely random • Good luck! 🍀
-        </p>
+        </p> */}
       </div>
     </div>
   );
