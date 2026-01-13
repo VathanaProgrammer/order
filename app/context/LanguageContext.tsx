@@ -140,7 +140,7 @@ const translations = {
     noClaimsYet: "You haven't claimed any rewards yet",
     successfullyClaimed: "Successfully claimed",
     totalPoints: "Total Reward Points",
-    luckeyDraw: "Lucky Draw",
+    luckyDraw: "Lucky Draw",
     spinSubtitle: "Spin the wheel and test your luck! Every spin is a chance to win amazing prizes.",
     congratulations: "Congratulations!",
     yourPoints: "Your points",
