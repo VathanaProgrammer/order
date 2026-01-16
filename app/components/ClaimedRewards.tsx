@@ -90,7 +90,7 @@ const ClaimedRewards: React.FC = () => {
                 </button> */}
             </div>
 
-            <div className="">
+            <div className=" space-y-3">
                 {claimedRewards.map((reward) => {
                     const isExpired = new Date(reward.expiry_date) < new Date();
                     const isUsed = reward.status === 'used';
