@@ -43,9 +43,9 @@ const BottomNav: React.FC = () => {
       if (cart.length > 0 && rewards.length > 0) {
         errors.push("Cannot mix products and rewards!");
       }
-      if (cart.length === 0 && rewards.length === 0) errors.push("Cart is empty!");
-      if (isPaymentMissing) errors.push("Please select a payment method!");
-      if (isAddressMissing) errors.push("Please select a shipping address!");
+      if (cart.length === 0 && rewards.length === 0) errors.push(t.yourCartIsEmpty);
+      if (isPaymentMissing) errors.push(t.pleaseSelectAPaymentMethod);
+      if (isAddressMissing) errors.push(t.pleaseSelectAShippingAddress);
 
       if (errors.length > 0) {
         errors.forEach((err) => toast.error(err));

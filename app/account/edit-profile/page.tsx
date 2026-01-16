@@ -163,14 +163,6 @@ const EditProfileForm = () => {
     setSuccess(null);
   };
 
-  const handleDebug = () => {
-    console.log("Current user data:", user);
-    console.log("Form data:", formData);
-    console.log("Original data:", originalData);
-    console.log("Profile image URL:", profileImageUrl);
-    alert(`User Data:\nID: ${user?.id}\nName: ${user?.name}\nPhone: ${user?.phone}\nMobile: ${user?.mobile}\nProfile URL: ${user?.profile_url}\nFull Image URL: ${profileImageUrl}`);
-  };
-
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -227,9 +219,6 @@ const EditProfileForm = () => {
               <p className="font-semibold text-gray-800">{user.name || "No name"}</p>
               <p className="text-sm text-gray-600">
                 {t.phone}: {displayPhone}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                User ID: {user.id} | Image: {user.profile_url ? '✅' : '❌ None'}
               </p>
             </div>
           </div>
