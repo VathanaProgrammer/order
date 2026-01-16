@@ -16,7 +16,7 @@ jobs:
 
       # SSH into your server and deploy
       - name: SSH build and restart
-        uses: appleboy/ssh-action@v1.8.0
+        uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_IP }} 
           username: ${{ secrets.SERVER_USER }}
