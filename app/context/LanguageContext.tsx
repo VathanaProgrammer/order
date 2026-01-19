@@ -149,7 +149,8 @@ const translations = {
     spinning: "Spinning...",
     tryAgain: "Try Again",
     pleaseSelectAShippingAddress: "Please select a shipping address!",
-    pleaseSelectAPaymentMethod: "Please select a payment method!"
+    pleaseSelectAPaymentMethod: "Please select a payment method!",
+    addToCart: "Add to Cart",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -283,6 +284,7 @@ const translations = {
     tryAgain: "ព្យាយាមម្តងទៀត",
     pleaseSelectAShippingAddress: "សូមជ្រើសរើសអាសយដ្ឋានដឹកជញ្ជូនរបស់អ្នក!",
     pleaseSelectAPaymentMethod: "សូមជ្រើសរើសមធ្យោបាយទូទាត់របស់អ្នក!",
+    addToCart: "បន្ថែមទៅកន្ត្រក",
   },
 };
 

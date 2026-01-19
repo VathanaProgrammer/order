@@ -64,7 +64,7 @@ const Product: React.FC<ProductProps> = ({ id, title, price, image }) => {
         <div className="px-3 pb-3">
           <button
             onClick={handleIncrement}
-            className="w-full py-2 bg-blue-600 rounded text-white hover:bg-blue-700"
+            className="w-full py-1 bg-blue-600 rounded text-white hover:bg-blue-700"
           >
             Add to Cart
           </button>
