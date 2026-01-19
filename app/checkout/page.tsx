@@ -9,6 +9,7 @@ import { useLoading } from "@/context/LoadingContext";
 import api from "@/api/api";
 import { toast } from "react-toastify";
 import { useLanguage } from "@/context/LanguageContext";
+import { useRouter } from "next/navigation";
 
 // Define the API Address type based on your ShippingAddressPage
 type APIAddress = {
@@ -29,6 +30,7 @@ const containerStyle = { width: "100%", height: "400px" };
 
 const CombinedCheckoutPage = () => {
   const { user } = useAuth();
+  const router = useRouter();
   const {
     cart,
     total,
@@ -40,6 +42,7 @@ const CombinedCheckoutPage = () => {
     detectCurrentLocation,
     paymentMethod,
     setPaymentMethod,
+    placeOrder,
   } = useCheckout();
 
   const { setLoading } = useLoading();
@@ -56,6 +59,7 @@ const CombinedCheckoutPage = () => {
   });
   const [showQRPopup, setShowQRPopup] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const { t } = useLanguage();
 
   const paymentMethods = [
@@ -99,7 +103,7 @@ const CombinedCheckoutPage = () => {
       setTempAddress(prev => ({
         ...prev,
         api_user_id: user.id,
-        phone: user.phone || user.mobile || "" // Try both phone and mobile fields
+        phone: user.phone || user.mobile || ""
       }));
     }
   }, [user]);
@@ -114,68 +118,6 @@ const CombinedCheckoutPage = () => {
       toast.error(err.message || "Failed to detect location");
     } finally {
       setIsDetectingLocation(false);
-    }
-  };
-
-  // Save current location as a permanent address
-  const handleSaveCurrentLocation = async () => {
-    if (!currentAddress || !currentAddress.coordinates) {
-      toast.error("No current location detected");
-      return;
-    }
-
-    if (!user?.id) {
-      toast.error("User not authenticated");
-      return;
-    }
-
-    // Get user's phone number - check both phone and mobile fields
-    const userPhone = user?.phone || user?.mobile;
-    if (!userPhone) {
-      toast.error("Please add your phone number in your account settings");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Prepare address data using only coordinates and user's phone
-      const addressData: APIAddress = {
-        label: "Current Location",
-        phone: userPhone, // Use phone from user account
-        details: `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
-        coordinates: currentAddress.coordinates,
-        api_user_id: user.id,
-      };
-
-      console.log("Saving current location with data:", addressData);
-
-      // Save to backend
-      const res = await api.post("/addresses", addressData);
-      
-      // Convert API response to ExtendedAddress
-      const apiResponse = res.data?.data;
-      const newAddress: ExtendedAddress = {
-        ...apiResponse,
-        id: apiResponse.id,
-        label: apiResponse.label,
-        phone: apiResponse.phone,
-        details: apiResponse.details,
-        coordinates: apiResponse.coordinates,
-        api_user_id: apiResponse.api_user_id,
-      };
-      
-      // Update saved addresses list
-      setSavedAddresses(prev => [...prev, newAddress]);
-      
-      // Select the newly saved address
-      setSelectedAddress(newAddress);
-      
-      toast.success("Current location saved!");
-    } catch (err: any) {
-      console.error("Save address error:", err);
-      toast.error(err.response?.data?.message || "Failed to save current location");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -233,13 +175,11 @@ const CombinedCheckoutPage = () => {
       // Prepare the address data - use user's phone from account
       const addressData: APIAddress = {
         label: tempAddress.label,
-        phone: userPhone, // Always use phone from user account
+        phone: userPhone,
         details: tempAddress.details,
         coordinates: tempAddress.coordinates,
         api_user_id: tempAddress.api_user_id,
       };
-
-      console.log("Saving new address with data:", addressData);
 
       // Save address to backend
       const res = await api.post("/addresses", addressData);
@@ -302,11 +242,93 @@ const CombinedCheckoutPage = () => {
     }
   };
 
+  // Handle checkout button click
+  const handleCheckout = async () => {
+    if (cart.length === 0) {
+      toast.error("Your cart is empty");
+      return;
+    }
+
+    if (!selectedAddress) {
+      toast.error("Please select a shipping address");
+      return;
+    }
+
+    if (!paymentMethod) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
+    setIsSubmittingOrder(true);
+    try {
+      // Prepare order data based on backend requirements
+      const orderData: any = {
+        api_user_id: user?.id,
+        address_type: selectedAddress === "current" ? "current" : "saved",
+        paymentMethod: paymentMethod,
+        total_qty: cart.reduce((sum, item) => sum + item.qty, 0),
+        total: total,
+        items: cart.map(item => ({
+          product_id: item.id,
+          qty: item.qty,
+          price_at_order: item.price,
+          total_line: item.price * item.qty,
+          image_url: item.image || null,
+        })),
+      };
+
+      // Handle address data based on selection
+      if (selectedAddress === "current") {
+        // For current address, send address data directly
+        if (!currentAddress?.coordinates) {
+          toast.error("Please detect your current location first");
+          setIsSubmittingOrder(false);
+          return;
+        }
+
+        const userPhone = user?.phone || user?.mobile;
+        if (!userPhone) {
+          toast.error("Please add your phone number in your account settings");
+          setIsSubmittingOrder(false);
+          return;
+        }
+
+        orderData.address = {
+          label: "Current Location",
+          phone: userPhone,
+          details: `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
+          coordinates: currentAddress.coordinates,
+        };
+      } else {
+        // For saved address, send the saved address ID
+        orderData.saved_address_id = (selectedAddress as ExtendedAddress).id;
+      }
+
+      console.log("Submitting order with data:", orderData);
+
+      // Call the placeOrder function from context
+      const result = await placeOrder(orderData);
+      
+      if (result.success) {
+        toast.success("Order placed successfully!");
+        // Redirect to order confirmation page
+        router.push(`/order-confirmation/${result.order_id}`);
+      } else {
+        toast.error(result.message || "Failed to place order");
+      }
+    } catch (error: any) {
+      console.error("Checkout error:", error);
+      toast.error(error.response?.data?.message || "Failed to place order");
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
+
   // Get user's phone for display
   const userPhone = user?.phone || user?.mobile;
 
   return (
-    <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar">
+    <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar pb-24">
       <Header title={t.checkout} />
 
       {/* ===== Order Summary ===== */}
@@ -346,10 +368,20 @@ const CombinedCheckoutPage = () => {
             </div>
           </div>
         ))}
+        
+        {/* Total Section */}
+        {cart.length > 0 && (
+          <div className="pt-4 border-t border-gray-300">
+            <div className="flex justify-between items-center">
+              <span className="text-lg font-semibold">{t.total}:</span>
+              <span className="text-2xl font-bold text-blue-600">${total.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Shipping Address */}
-      <section className="flex flex-col gap-3 mt-6">
+      <section className="flex flex-col gap-3">
         <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
 
         {/* Current Location Option */}
@@ -405,33 +437,16 @@ const CombinedCheckoutPage = () => {
                       {t.phone}
                     </label>
                     <div className="w-full p-3 border rounded-lg bg-gray-50">
-                      {userPhone}
+                      {userPhone} (will be used for delivery)
                     </div>
                   </div>
                 )}
               </div>
               
-              {/* Save Current Location Button */}
-              <button
-                onClick={handleSaveCurrentLocation}
-                disabled={isDetectingLocation || !userPhone}
-                className="mt-4 w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isDetectingLocation ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    {t.detecting}
-                  </>
-                ) : !userPhone ? (
-                  <>
-                    ⚠️ {t.addPhoneNumberFirst}
-                  </>
-                ) : (
-                  <>
-                    💾 {t.saveThisLocation}
-                  </>
-                )}
-              </button>
+              <div className="mt-4 text-sm text-gray-500">
+                <p>✓ This location will be sent automatically with your order</p>
+                <p>✓ No need to save it separately</p>
+              </div>
             </div>
           )}
         </div>
@@ -565,7 +580,7 @@ const CombinedCheckoutPage = () => {
         )}
       </section>
 
-      {/* Map Modal - Unchanged */}
+      {/* Map Modal */}
       {showMap && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg max-h-[90vh] overflow-auto">
@@ -636,8 +651,8 @@ const CombinedCheckoutPage = () => {
         </div>
       )}
 
-      {/* Payment Method - Unchanged */}
-      <section className="flex flex-col gap-3 mt-6">
+      {/* Payment Method */}
+      <section className="flex flex-col gap-3">
         <h2 className="text-2xl font-semibold text-gray-800">{t.paymentMethod}</h2>
         {paymentMethods.map((method) => (
           <div
@@ -669,7 +684,7 @@ const CombinedCheckoutPage = () => {
         ))}
       </section>
 
-      {/* QR Popup Modal - Unchanged */}
+      {/* QR Popup Modal */}
       {showQRPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
@@ -726,6 +741,35 @@ const CombinedCheckoutPage = () => {
                 {t.close || "Close"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Button */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg">
+          <div className="max-w-md mx-auto">
+            <button
+              onClick={handleCheckout}
+              disabled={!selectedAddress || !paymentMethod || isSubmittingOrder}
+              className="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-bold text-lg disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isSubmittingOrder ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  {t.processingOrder || "Processing Order..."}
+                </>
+              ) : (
+                <>
+                  🛒 {t.placeOrder || "Place Order"} - ${total.toFixed(2)}
+                </>
+              )}
+            </button>
+            <p className="text-xs text-gray-500 text-center mt-2">
+              {selectedAddress === "current" 
+                ? "✓ Current location will be sent automatically" 
+                : "✓ Selected address will be used"}
+            </p>
           </div>
         </div>
       )}
