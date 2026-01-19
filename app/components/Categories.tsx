@@ -35,16 +35,18 @@ const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) =
   const allCategories = [{ id: 0, name: t.all }, ...categories];
 
   return (
-    <section className="flex overflow-auto hide-scrollbar gap-4 flex-row items-center mt-4">
+    <section className="flex flex-col gap-4 mt-4">
       {allCategories.map((cat) => (
         <div
           key={cat.id}
           onClick={() => onSelect(cat.name)}
-          className={`px-4 py-2 text-[16px] max-h-[50px] font-medium rounded-[5px] cursor-pointer ${
+          className={`px-4 py-2 text-[16px] font-medium rounded-[5px] cursor-pointer flex items-center justify-center min-h-[50px] w-[50px] ${
             selectedCategory === cat.name ? "bg-blue-600 text-white" : "bg-gray-500 text-white"
           }`}
         >
-          {cat.name}
+          <span className="transform -rotate-90 whitespace-nowrap">
+            {cat.name}
+          </span>
         </div>
       ))}
     </section>

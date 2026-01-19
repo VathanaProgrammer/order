@@ -167,7 +167,7 @@ const translations = {
     home: "ទំព័រដើម",
     chat: "សារ",
     total: "សរុប",
-    checkout: "ទូទាត់",
+    checkout: "កម្ម៉ង់",
     redeemYourRewards: "ប្ដូរពិន្ទុយករង្វាន់",
     myAccount: "គណនីរបស់ខ្ញុំ",
     profileInformation: "ព័ត៌មានគណនី",
