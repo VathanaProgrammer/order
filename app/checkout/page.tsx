@@ -42,7 +42,7 @@ const CombinedCheckoutPage = () => {
     detectCurrentLocation,
     paymentMethod,
     setPaymentMethod,
-  } = useCheckout(); // Removed placeOrder from context
+  } = useCheckout();
 
   const { setLoading } = useLoading();
 
@@ -102,10 +102,40 @@ const CombinedCheckoutPage = () => {
       setTempAddress(prev => ({
         ...prev,
         api_user_id: user.id,
-        phone: user.phone || user.mobile || ""
+        phone: getPhoneFromUser(user) || ""
       }));
     }
   }, [user]);
+
+  // Helper function to get phone from user
+  const getPhoneFromUser = (userData: any): string | null => {
+    console.log("User object for phone extraction:", userData);
+    
+    // Try different possible phone fields
+    if (userData.phone && userData.phone.trim() !== "") {
+      console.log("Found phone in user.phone:", userData.phone);
+      return userData.phone;
+    }
+    
+    if (userData.mobile && userData.mobile.trim() !== "") {
+      console.log("Found phone in user.mobile:", userData.mobile);
+      return userData.mobile;
+    }
+    
+    // Check if contact object exists
+    if (userData.contact?.mobile && userData.contact.mobile.trim() !== "") {
+      console.log("Found phone in user.contact.mobile:", userData.contact.mobile);
+      return userData.contact.mobile;
+    }
+    
+    if (userData.contact?.phone && userData.contact.phone.trim() !== "") {
+      console.log("Found phone in user.contact.phone:", userData.contact.phone);
+      return userData.contact.phone;
+    }
+    
+    console.log("No phone found in user object");
+    return null;
+  };
 
   const handleDetectCurrentLocation = async () => {
     setIsDetectingLocation(true);
@@ -162,8 +192,8 @@ const CombinedCheckoutPage = () => {
       return;
     }
 
-    // Get user's phone number - check both phone and mobile fields
-    const userPhone = user?.phone || user?.mobile;
+    // Get user's phone number
+    const userPhone = getPhoneFromUser(user);
     if (!userPhone) {
       toast.error("Please add your phone number in your account settings");
       return;
@@ -179,6 +209,8 @@ const CombinedCheckoutPage = () => {
         coordinates: tempAddress.coordinates,
         api_user_id: tempAddress.api_user_id,
       };
+
+      console.log("Saving address with data:", addressData);
 
       // Save address to backend
       const res = await api.post("/addresses", addressData);
@@ -261,6 +293,9 @@ const CombinedCheckoutPage = () => {
     setIsSubmittingOrder(true);
     setLoading(true);
     try {
+      // Get user's phone number
+      const userPhone = getPhoneFromUser(user);
+      
       // Prepare order data based on backend requirements
       const orderData: any = {
         api_user_id: user?.id,
@@ -287,7 +322,6 @@ const CombinedCheckoutPage = () => {
           return;
         }
 
-        const userPhone = user?.phone || user?.mobile;
         if (!userPhone) {
           toast.error("Please add your phone number in your account settings");
           setIsSubmittingOrder(false);
@@ -297,10 +331,18 @@ const CombinedCheckoutPage = () => {
 
         orderData.address = {
           label: "Current Location",
-          phone: userPhone,
+          phone: userPhone, // Make sure this is NOT null
           details: `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
           coordinates: currentAddress.coordinates,
         };
+
+        console.log("Order data with current address:", {
+          ...orderData,
+          address: {
+            ...orderData.address,
+            phone: userPhone // Log phone to verify
+          }
+        });
       } else {
         // For saved address, send the saved address ID
         orderData.saved_address_id = (selectedAddress as ExtendedAddress).id;
@@ -332,7 +374,7 @@ const CombinedCheckoutPage = () => {
   };
 
   // Get user's phone for display
-  const userPhone = user?.phone || user?.mobile;
+  const userPhone = getPhoneFromUser(user);
 
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar pb-24">
@@ -438,7 +480,7 @@ const CombinedCheckoutPage = () => {
                   </div>
                 </div>
 
-                {userPhone && (
+                {userPhone ? (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {t.phone}
@@ -446,6 +488,12 @@ const CombinedCheckoutPage = () => {
                     <div className="w-full p-3 border rounded-lg bg-gray-50">
                       {userPhone} (will be used for delivery)
                     </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-yellow-700 text-sm">
+                      ⚠️ Please add your phone number in your account settings
+                    </p>
                   </div>
                 )}
               </div>
@@ -510,7 +558,7 @@ const CombinedCheckoutPage = () => {
             ) : (
               <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-yellow-700 text-sm">
-                  ⚠️ {t.pleaseAddPhoneNumber || "Please add your phone number in your account settings"}
+                  ⚠️ Please add your phone number in your account settings
                 </p>
               </div>
             )}
