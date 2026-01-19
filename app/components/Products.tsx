@@ -56,21 +56,6 @@ const Products: React.FC<ProductsProps> = ({
 
   return (
     <div className="mt-2 p-2">
-      {/* Stats bar */}
-      <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-blue-800">
-            Showing {filteredProducts.length} products
-            {selectedCategory !== "All" && selectedCategory !== "ទាំងអស់" && ` in ${selectedCategory}`}
-          </span>
-          
-          {hasSearch && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-              "{searchQuery}"
-            </span>
-          )}
-        </div>
-      </div>
 
       {/* Products grid */}
       <div className="grid grid-cols-2 gap-4">
