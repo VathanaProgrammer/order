@@ -49,7 +49,7 @@ const CombinedCheckoutPage = () => {
   const [showMap, setShowMap] = useState(false);
   const [tempAddress, setTempAddress] = useState<Partial<APIAddress>>({
     label: "",
-    phone: user?.phone || "",
+    phone: "",
     details: "",
     coordinates: { lat: 11.567, lng: 104.928 },
     api_user_id: user?.id,
@@ -99,7 +99,7 @@ const CombinedCheckoutPage = () => {
       setTempAddress(prev => ({
         ...prev,
         api_user_id: user.id,
-        phone: user.phone || prev.phone
+        phone: user.phone || user.mobile || "" // Try both phone and mobile fields
       }));
     }
   }, [user]);
@@ -129,7 +129,9 @@ const CombinedCheckoutPage = () => {
       return;
     }
 
-    if (!user?.phone) {
+    // Get user's phone number - check both phone and mobile fields
+    const userPhone = user?.phone || user?.mobile;
+    if (!userPhone) {
       toast.error("Please add your phone number in your account settings");
       return;
     }
@@ -139,11 +141,13 @@ const CombinedCheckoutPage = () => {
       // Prepare address data using only coordinates and user's phone
       const addressData: APIAddress = {
         label: "Current Location",
-        phone: user.phone, // Use phone from user account
+        phone: userPhone, // Use phone from user account
         details: `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
         coordinates: currentAddress.coordinates,
         api_user_id: user.id,
       };
+
+      console.log("Saving current location with data:", addressData);
 
       // Save to backend
       const res = await api.post("/addresses", addressData);
@@ -217,7 +221,9 @@ const CombinedCheckoutPage = () => {
       return;
     }
 
-    if (!user?.phone) {
+    // Get user's phone number - check both phone and mobile fields
+    const userPhone = user?.phone || user?.mobile;
+    if (!userPhone) {
       toast.error("Please add your phone number in your account settings");
       return;
     }
@@ -227,11 +233,13 @@ const CombinedCheckoutPage = () => {
       // Prepare the address data - use user's phone from account
       const addressData: APIAddress = {
         label: tempAddress.label,
-        phone: user.phone, // Always use phone from user account
+        phone: userPhone, // Always use phone from user account
         details: tempAddress.details,
         coordinates: tempAddress.coordinates,
         api_user_id: tempAddress.api_user_id,
       };
+
+      console.log("Saving new address with data:", addressData);
 
       // Save address to backend
       const res = await api.post("/addresses", addressData);
@@ -258,7 +266,7 @@ const CombinedCheckoutPage = () => {
       // Reset temp address
       setTempAddress({
         label: "",
-        phone: user.phone || "",
+        phone: userPhone,
         details: "",
         coordinates: { lat: 11.567, lng: 104.928 },
         api_user_id: user?.id,
@@ -293,6 +301,9 @@ const CombinedCheckoutPage = () => {
       toast.error("Failed to download QR code");
     }
   };
+
+  // Get user's phone for display
+  const userPhone = user?.phone || user?.mobile;
 
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar">
@@ -388,13 +399,13 @@ const CombinedCheckoutPage = () => {
                   </div>
                 </div>
 
-                {user?.phone && (
+                {userPhone && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {t.phone}
                     </label>
                     <div className="w-full p-3 border rounded-lg bg-gray-50">
-                      {user.phone}
+                      {userPhone}
                     </div>
                   </div>
                 )}
@@ -403,13 +414,17 @@ const CombinedCheckoutPage = () => {
               {/* Save Current Location Button */}
               <button
                 onClick={handleSaveCurrentLocation}
-                disabled={isDetectingLocation || !user?.phone}
+                disabled={isDetectingLocation || !userPhone}
                 className="mt-4 w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isDetectingLocation ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                     {t.detecting}
+                  </>
+                ) : !userPhone ? (
+                  <>
+                    ⚠️ {t.addPhoneNumberFirst}
                   </>
                 ) : (
                   <>
@@ -461,14 +476,20 @@ const CombinedCheckoutPage = () => {
               />
             </div>
             
-            {user?.phone && (
+            {userPhone ? (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {t.phone}
                 </label>
                 <div className="w-full p-3 border rounded-lg bg-gray-50">
-                  {user.phone} (from your account)
+                  {userPhone} (from your account)
                 </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-yellow-700 text-sm">
+                  ⚠️ {t.pleaseAddPhoneNumber || "Please add your phone number in your account settings"}
+                </p>
               </div>
             )}
             
@@ -512,7 +533,7 @@ const CombinedCheckoutPage = () => {
               <button
                 onClick={handleSaveNewAddress}
                 className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={!tempAddress.label?.trim() || !tempAddress.details?.trim() || !tempAddress.coordinates || !user?.phone}
+                disabled={!tempAddress.label?.trim() || !tempAddress.details?.trim() || !tempAddress.coordinates || !userPhone}
               >
                 {t.saveAddress}
               </button>
@@ -521,7 +542,7 @@ const CombinedCheckoutPage = () => {
                   setIsAdding(false);
                   setTempAddress({
                     label: "",
-                    phone: user?.phone || "",
+                    phone: userPhone || "",
                     details: "",
                     coordinates: { lat: 11.567, lng: 104.928 },
                     api_user_id: user?.id,
