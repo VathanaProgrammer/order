@@ -33,6 +33,8 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
   const { setLoading } = useLoading();
   const { t } = useLanguage();
 
+  const localCache = useRef<Map<string, ProductData[]>>(new Map());
+
   // Function to cancel ongoing requests
   const cancelRequest = useCallback(() => {
     if (timeoutRef.current) {
@@ -46,6 +48,16 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
 
   // Fetch products with API filtering
   const fetchProducts = useCallback(async (category: string, search: string) => {
+
+    const cacheKey = `${category}-${search}`;
+  
+    if (!search.trim() && localCache.current.has(cacheKey)) {
+      const cached = localCache.current.get(cacheKey)!;
+      setProducts(cached);
+      setIsEmpty(cached.length === 0);
+      return;
+    }
+    
     // Cancel any ongoing request
     cancelRequest();
     
@@ -80,6 +92,10 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
         const res = await api.get<{ status: string; data: ProductData[] }>(url, {
           signal: abortControllerRef.current?.signal,
         });
+
+        if (!search.trim()) {
+          localCache.current.set(cacheKey, res.data.data);
+        }
         
         if (res.data.status === 'success') {
           setProducts(res.data.data);
