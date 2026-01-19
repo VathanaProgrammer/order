@@ -55,7 +55,7 @@ const Products: React.FC<ProductsProps> = ({
   }
 
   return (
-    <div className="mt-2 p-2">
+    <div className="p-2">
 
       {/* Products grid */}
       <div className="grid grid-cols-2 gap-4">
