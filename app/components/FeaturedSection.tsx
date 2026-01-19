@@ -20,7 +20,7 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({ products }) => {
   }
 
   return (
-    <section className="mt-2">
+    <section className="mt-2!">
       <h2 className="text-xl font-bold text-gray-700 mb-2">
         Featured Products
       </h2>

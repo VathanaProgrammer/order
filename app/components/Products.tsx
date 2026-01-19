@@ -130,7 +130,7 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
   // Show loading skeleton only for initial load or when we have no products
   if (isLoading && products.length === 0) {
     return (
-      <div className="mt-4">
+      <div className="mt-2">
         <div className="grid grid-cols-2 gap-4">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="animate-pulse">
@@ -147,7 +147,7 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
   // Show error state
   if (hasError && products.length === 0) {
     return (
-      <div className="mt-2 text-center py-12">
+      <div className="mt-2! text-center py-12">
         <div className="text-red-400 mb-4">
           <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -188,7 +188,7 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
   }
 
   return (
-    <div className="mt-4">
+    <div className="mt-2">
       {/* Loading indicator when filtering (with existing products) */}
       {isLoading && products.length > 0 && (
         <div className="mb-4 p-2 bg-yellow-50 border border-yellow-100 rounded-lg">
@@ -243,7 +243,7 @@ const Products: React.FC<ProductsProps> = ({ selectedCategory, searchQuery }) =>
 
       {/* Load more indicator at bottom */}
       {isLoading && (
-        <div className="mt-4 text-center">
+        <div className="mt-2 text-center">
           <div className="inline-flex items-center gap-2 text-gray-500">
             <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
