@@ -3,6 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import { useCheckout } from "@/context/CheckOutContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 // Add onAdd to the ProductProps type
 type ProductProps = {
@@ -14,6 +15,7 @@ type ProductProps = {
 
 const Product: React.FC<ProductProps> = ({ id, title, price, image }) => {
   const { cart, addToCart } = useCheckout();
+  const { t } = useLanguage();
 
   const cartItem = cart.find((item) => item.id === id);
   const qty = cartItem?.qty || 0;
@@ -66,7 +68,7 @@ const Product: React.FC<ProductProps> = ({ id, title, price, image }) => {
             onClick={handleIncrement}
             className="w-full py-1 bg-blue-600 rounded text-white hover:bg-blue-700"
           >
-            Add to Cart
+            {t.addToCart}
           </button>
         </div>
       ) : (
