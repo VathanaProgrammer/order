@@ -42,7 +42,7 @@ const Product: React.FC<ProductProps> = ({ id, title, price, image }) => {
 
   return (
     <div className="w-full rounded-xl bg-gray-50 border border-gray-200 shadow-md flex flex-col overflow-hidden transition hover:shadow-lg">
-      <div className="relative w-full h-44">
+      <div className="relative w-full h-26">
         <Image
           src={displayImage}
           alt={title}
