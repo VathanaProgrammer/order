@@ -44,7 +44,7 @@ const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) =
             selectedCategory === cat.name ? "bg-blue-600 text-white" : "bg-gray-500 text-white"
           }`}
         >
-          <span className="transform -rotate-90 whitespace-nowrap">
+          <span className="">
             {cat.name}
           </span>
         </div>
