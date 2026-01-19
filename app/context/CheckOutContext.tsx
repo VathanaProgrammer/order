@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, ReactNode, useState } from "react";
+import { createContext, useContext, ReactNode, useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "./AuthContext";
 import { toast } from "react-toastify";
@@ -73,12 +73,25 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   const [currentAddress, setCurrentAddress] = useState<Address>({
     label: "Current Location",
     details: "",
-    phone: "",
+    phone: user?.phone || user?.mobile || "", // Initialize with user's phone
     coordinates: { lat: 0, lng: 0 },
   });
 
   const [paymentMethod, setPaymentMethod] = useState("QR");
   const userPoints = user?.reward_points?.available || 0;
+
+  // Update currentAddress phone when user changes
+  useEffect(() => {
+    if (user) {
+      const userPhone = user.phone || user.mobile;
+      if (userPhone && userPhone !== currentAddress.phone) {
+        setCurrentAddress(prev => ({
+          ...prev,
+          phone: userPhone
+        }));
+      }
+    }
+  }, [user]);
 
   const recalcTotal = (items: CartItem[]) => items.reduce((sum, i) => sum + i.price * i.qty, 0);
   const recalcTotalPoints = (items: RewardItem[]) => items.reduce((sum, i) => sum + i.points_at_reward * i.qty, 0);
@@ -192,8 +205,20 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         toast.error("Current address coordinates not set!");
         return;
       }
+      
+      // Get user's phone number
+      const userPhone = user?.phone || user?.mobile;
+      if (!userPhone) {
+        toast.error("Please add your phone number in your account settings");
+        return;
+      }
+      
       const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
-      addressToSend = { ...currentAddress, short_address };
+      addressToSend = { 
+        ...currentAddress, 
+        short_address,
+        phone: userPhone // Use user's phone from account
+      };
     } else {
       addressToSend = selectedAddress as Address;
     }
@@ -221,6 +246,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     };
 
     try {
+      console.log("Sending order with payload:", payload);
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
         withCredentials: true,
         headers: { Accept: "application/json" },
@@ -232,8 +258,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}`);
       }
     } catch (err: any) {
-      toast.error("Order failed. Please try again.");
-      console.error(err);
+      console.error("Order error:", err.response?.data || err);
+      toast.error(err.response?.data?.message || "Order failed. Please try again.");
     }
   };
 
@@ -281,6 +307,9 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         async (position) => {
           const { latitude, longitude } = position.coords;
           const coordinates = { lat: latitude, lng: longitude };
+
+          // Get user's phone number
+          const userPhone = user?.phone || user?.mobile;
   
           try {
             // Get human-readable short address using your existing utility
@@ -289,7 +318,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
             const currentAddr: Address = {
               label: "Current Location",
               details: short_address || "Your current position",
-              phone: "", // User can edit if needed, or prompt later
+              phone: userPhone || "", // Set user's phone from account
               coordinates,
               short_address,
             };
@@ -301,7 +330,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
             const fallbackAddr: Address = {
               label: "Current Location",
               details: "Detected location",
-              phone: "",
+              phone: userPhone || "",
               coordinates,
             };
             setCurrentAddress(fallbackAddr);
