@@ -140,7 +140,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
 
                 {/* Product Info */}
                 <div className="p-2 flex flex-col flex-1">
-                    <h3 className="font-bold text-gray-800 text-base mb-1.5 line-clamp-2 min-h-[3rem] truncate">
+                    <h3 className="font-bold text-gray-800 text-base mb-1.5 line-clamp-2 truncate">
                         {product.name || "Reward Item"}
                     </h3>
 
