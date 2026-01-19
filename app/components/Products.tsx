@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import Product from "./cards/ProductCard";
-import { useLoading } from "@/context/LoadingContext";
 import { useLanguage } from "@/context/LanguageContext";
 
 export interface ProductData {
@@ -19,18 +18,15 @@ export interface ProductData {
 interface ProductsProps {
   selectedCategory: string;
   searchQuery: string;
-  allProducts: ProductData[];  // All products
-  filteredProducts: ProductData[]; // Pre-filtered products
-  products: ProductData[];
-  totalProducts: number;
-  categoryMap: Record<number, string>;
+  allProducts: ProductData[];
+  filteredProducts: ProductData[];
 }
 
 const Products: React.FC<ProductsProps> = ({ 
   selectedCategory, 
   searchQuery,
   allProducts,
-  filteredProducts ,
+  filteredProducts 
 }) => {
   const { t } = useLanguage();
   const isEmpty = filteredProducts.length === 0;
@@ -62,30 +58,22 @@ const Products: React.FC<ProductsProps> = ({
     <div className="mt-2 p-2">
       {/* Stats bar */}
       <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-blue-800">
-              Showing {filteredProducts.length} of {allProducts.length} products
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-blue-800">
+            Showing {filteredProducts.length} of {allProducts.length} products
+          </span>
+          
+          {selectedCategory !== "All" && selectedCategory !== "ទាំងអស់" && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+              {selectedCategory}
             </span>
-            
-            {selectedCategory !== "All" && selectedCategory !== "ទាំងអស់" && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                </svg>
-                {selectedCategory}
-              </span>
-            )}
-            
-            {hasSearch && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                </svg>
-                "{searchQuery}"
-              </span>
-            )}
-          </div>
+          )}
+          
+          {hasSearch && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+              "{searchQuery}"
+            </span>
+          )}
         </div>
       </div>
 

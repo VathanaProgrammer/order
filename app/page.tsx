@@ -16,9 +16,8 @@ interface ProductData {
     name: string;
     price: string | number | null;
     image_url?: string;
-    category_id?: number; // Check if this exists
+    category_id?: number;
   };
-  // Check if your API returns category_id here
   category_id?: number;
 }
 
@@ -36,36 +35,69 @@ export default function ProductPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Debug: Log to see what's happening
+  console.log("Current state:", {
+    allProductsCount: allProducts.length,
+    categoriesCount: categories.length,
+    selectedCategory,
+    isLoading,
+    error
+  });
+
   // Fetch all data once
   useEffect(() => {
     async function fetchAllData() {
       try {
         setIsLoading(true);
+        setError(null);
+        
+        console.log("Starting data fetch...");
         
         // Fetch products and categories in parallel
         const [productsRes, categoriesRes] = await Promise.all([
-          api.get<{ status: string; data: ProductData[] }>("/product/all"),
-          api.get<{ status: string; data: CategoryData[] }>("/category/all")
+          api.get("/product/all"),
+          api.get("/category/all")
         ]);
         
-        if (productsRes.data.status === 'success' && categoriesRes.data.status === 'success') {
-          setAllProducts(productsRes.data.data);
-          setCategories(categoriesRes.data.data);
+        console.log("Products API response:", productsRes.data);
+        console.log("Categories API response:", categoriesRes.data);
+        
+        // Check if responses have data arrays directly
+        const productsData = Array.isArray(productsRes.data) 
+          ? productsRes.data 
+          : (productsRes.data.data || []);
+        
+        const categoriesData = Array.isArray(categoriesRes.data)
+          ? categoriesRes.data
+          : (categoriesRes.data.data || []);
+        
+        console.log(`Parsed: ${productsData.length} products, ${categoriesData.length} categories`);
+        
+        if (productsData.length > 0) {
+          setAllProducts(productsData);
+        }
+        
+        if (categoriesData.length > 0) {
+          setCategories(categoriesData);
           
           // Create a mapping of category ID to category name
           const map: Record<number, string> = {};
-          categoriesRes.data.data.forEach(cat => {
+          categoriesData.forEach((cat: CategoryData) => {
             map[cat.id] = cat.name;
           });
           setCategoryMap(map);
-          
-          console.log(`Loaded ${productsRes.data.data.length} products and ${categoriesRes.data.data.length} categories`);
-        } else {
-          throw new Error("Failed to load data");
+          console.log("Category map:", map);
         }
+        
+        // Check if we got any data
+        if (productsData.length === 0 && categoriesData.length === 0) {
+          setError("No data available");
+        }
+        
       } catch (err: any) {
         console.error("Error fetching data:", err);
-        setError("Failed to load products. Please try again.");
+        console.error("Error details:", err.response?.data || err.message);
+        setError(`Failed to load: ${err.message}`);
       } finally {
         setIsLoading(false);
       }
@@ -74,21 +106,58 @@ export default function ProductPage() {
     fetchAllData();
   }, []);
 
+  // Debug: Check first product structure
+  useEffect(() => {
+    if (allProducts.length > 0) {
+      console.log("First product structure:", allProducts[0]);
+      console.log("Product keys:", Object.keys(allProducts[0]));
+      console.log("Product.product keys:", Object.keys(allProducts[0].product));
+      
+      // Check for category info in different possible locations
+      const firstProduct = allProducts[0];
+      console.log("Possible category locations:", {
+        direct: firstProduct.category_id,
+        inProduct: firstProduct.product.category_id,
+        productObject: firstProduct.product
+      });
+    }
+  }, [allProducts]);
+
   // Filter products based on category and search
   const filteredProducts = allProducts.filter(product => {
-    // Get category ID from product (adjust based on your API structure)
-    const categoryId = product.product.category_id || product.category_id;
+    // Debug each product
+    if (selectedCategory !== "All" && selectedCategory !== "ទាំងអស់") {
+      console.log(`Filtering for category: ${selectedCategory}`);
+      console.log("Current product:", product);
+    }
+    
+    // Get category ID from product - check multiple possible locations
+    const categoryId = product.category_id || 
+                      product.product.category_id || 
+                      (product.product as any).category?.id; // If category is an object
+    
+    // Get category name if available
+    const categoryName = categoryId ? categoryMap[categoryId] : undefined;
+    
+    console.log(`Product ${product.product.name}: categoryId=${categoryId}, categoryName=${categoryName}`);
     
     // Check category match
     let matchesCategory = true;
     if (selectedCategory !== "All" && selectedCategory !== "ទាំងអស់") {
-      // Find the category by name to get its ID
-      const selectedCat = categories.find(cat => cat.name === selectedCategory);
-      if (selectedCat) {
-        matchesCategory = categoryId === selectedCat.id;
-      } else {
-        matchesCategory = false;
+      // Option 1: Compare by category name
+      if (categoryName) {
+        matchesCategory = categoryName === selectedCategory;
+      } 
+      // Option 2: Find category ID from selected name and compare
+      else {
+        const selectedCat = categories.find(cat => cat.name === selectedCategory);
+        if (selectedCat && categoryId) {
+          matchesCategory = categoryId === selectedCat.id;
+        } else {
+          matchesCategory = false;
+        }
       }
+      console.log(`Category match for ${product.product.name}: ${matchesCategory}`);
     }
     
     // Check search match
@@ -97,6 +166,8 @@ export default function ProductPage() {
     
     return matchesCategory && matchesSearch;
   });
+
+  console.log(`Filtered products: ${filteredProducts.length} of ${allProducts.length}`);
 
   return (
     <div className="flex flex-col flex-1 hide-scrollbar">
@@ -117,14 +188,9 @@ export default function ProductPage() {
         {/* Show loading state */}
         {isLoading ? (
           <div className="flex-1 p-4">
-            <div className="grid grid-cols-2 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="bg-gray-200 h-48 rounded-lg"></div>
-                  <div className="mt-2 h-4 bg-gray-200 rounded w-3/4"></div>
-                  <div className="mt-1 h-3 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              ))}
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <p className="mt-2 text-gray-600">Loading products...</p>
             </div>
           </div>
         ) : error ? (
@@ -146,15 +212,19 @@ export default function ProductPage() {
           </div>
         ) : (
           <div className="flex-1">
+            {/* Debug info - remove in production */}
+            <div className="p-2 bg-yellow-50 border border-yellow-200 text-xs">
+              <p>Debug: {allProducts.length} total products, {filteredProducts.length} filtered</p>
+              <p>Selected: {selectedCategory}, Search: {searchQuery || '(none)'}</p>
+              <p>Categories loaded: {categories.map(c => c.name).join(', ')}</p>
+            </div>
+            
             {/* Pass data to Products component */}
             <Products 
-              allProducts={allProducts}
-              filteredProducts={filteredProducts}
               selectedCategory={selectedCategory} 
               searchQuery={searchQuery}
-              products={filteredProducts}
-              totalProducts={allProducts.length}
-              categoryMap={categoryMap}
+              allProducts={allProducts}
+              filteredProducts={filteredProducts}
             />
           </div>
         )}
