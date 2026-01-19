@@ -21,13 +21,16 @@ interface ProductsProps {
   searchQuery: string;
   allProducts: ProductData[];  // All products
   filteredProducts: ProductData[]; // Pre-filtered products
+  products: ProductData[];
+  totalProducts: number;
+  categoryMap: Record<number, string>;
 }
 
 const Products: React.FC<ProductsProps> = ({ 
   selectedCategory, 
   searchQuery,
   allProducts,
-  filteredProducts 
+  filteredProducts ,
 }) => {
   const { t } = useLanguage();
   const isEmpty = filteredProducts.length === 0;

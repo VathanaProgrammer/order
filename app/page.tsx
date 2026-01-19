@@ -7,7 +7,7 @@ import RewardSection from "./components/RewardSection";
 import { useState, useEffect } from "react";
 import api from "@/api/api";
 
-interface AllProductsData {
+interface ProductData {
   id: number;
   is_active: number;
   product_id: number;
@@ -16,57 +16,82 @@ interface AllProductsData {
     name: string;
     price: string | number | null;
     image_url?: string;
-    category?: string;
+    category_id?: number; // Check if this exists
   };
-  // Add category info if available
-  category?: string;
+  // Check if your API returns category_id here
   category_id?: number;
+}
+
+interface CategoryData {
+  id: number;
+  name: string;
 }
 
 export default function ProductPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [allProducts, setAllProducts] = useState<AllProductsData[]>([]);
+  const [allProducts, setAllProducts] = useState<ProductData[]>([]);
+  const [categories, setCategories] = useState<CategoryData[]>([]);
+  const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch all products once on component mount
+  // Fetch all data once
   useEffect(() => {
-    async function fetchAllProducts() {
+    async function fetchAllData() {
       try {
         setIsLoading(true);
-        setError(null);
         
-        // Fetch all products (no category filter)
-        const res = await api.get<{ status: string; data: AllProductsData[] }>("/product/all");
+        // Fetch products and categories in parallel
+        const [productsRes, categoriesRes] = await Promise.all([
+          api.get<{ status: string; data: ProductData[] }>("/product/all"),
+          api.get<{ status: string; data: CategoryData[] }>("/category/all")
+        ]);
         
-        if (res.data.status === 'success') {
-          setAllProducts(res.data.data);
-          console.log(`Loaded ${res.data.data.length} total products`);
+        if (productsRes.data.status === 'success' && categoriesRes.data.status === 'success') {
+          setAllProducts(productsRes.data.data);
+          setCategories(categoriesRes.data.data);
+          
+          // Create a mapping of category ID to category name
+          const map: Record<number, string> = {};
+          categoriesRes.data.data.forEach(cat => {
+            map[cat.id] = cat.name;
+          });
+          setCategoryMap(map);
+          
+          console.log(`Loaded ${productsRes.data.data.length} products and ${categoriesRes.data.data.length} categories`);
         } else {
-          throw new Error("Failed to load products");
+          throw new Error("Failed to load data");
         }
       } catch (err: any) {
-        console.error("Error fetching all products:", err);
+        console.error("Error fetching data:", err);
         setError("Failed to load products. Please try again.");
       } finally {
         setIsLoading(false);
       }
     }
 
-    fetchAllProducts();
-  }, []); // Empty dependency array = run once on mount
+    fetchAllData();
+  }, []);
 
-  // Filter products by selected category and search
+  // Filter products based on category and search
   const filteredProducts = allProducts.filter(product => {
-    // Filter by category if needed
-    // Note: This requires your API to return category info
-    // If not, you'll need to fetch category mapping separately
-    const matchesCategory = selectedCategory === "All" || 
-                           selectedCategory === "ទាំងអស់" ||
-                           product.product.category === selectedCategory;
+    // Get category ID from product (adjust based on your API structure)
+    const categoryId = product.product.category_id || product.category_id;
     
-    // Filter by search
+    // Check category match
+    let matchesCategory = true;
+    if (selectedCategory !== "All" && selectedCategory !== "ទាំងអស់") {
+      // Find the category by name to get its ID
+      const selectedCat = categories.find(cat => cat.name === selectedCategory);
+      if (selectedCat) {
+        matchesCategory = categoryId === selectedCat.id;
+      } else {
+        matchesCategory = false;
+      }
+    }
+    
+    // Check search match
     const matchesSearch = !searchQuery || 
                          product.product.name.toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -121,12 +146,15 @@ export default function ProductPage() {
           </div>
         ) : (
           <div className="flex-1">
-            {/* Pass filtered products to Products component */}
+            {/* Pass data to Products component */}
             <Products 
-              selectedCategory={selectedCategory} 
-              searchQuery={searchQuery}
               allProducts={allProducts}
               filteredProducts={filteredProducts}
+              selectedCategory={selectedCategory} 
+              searchQuery={searchQuery}
+              products={filteredProducts}
+              totalProducts={allProducts.length}
+              categoryMap={categoryMap}
             />
           </div>
         )}
