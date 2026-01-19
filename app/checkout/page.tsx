@@ -461,49 +461,6 @@ const CombinedCheckoutPage = () => {
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
             )}
           </div>
-
-          {/* Current Location Details (if selected) */}
-          {selectedAddress === "current" && currentAddress && currentAddress.coordinates && (
-            <div className="bg-white p-4 border rounded-xl border-blue-500">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-blue-500">📍</span>
-                <p className="font-semibold">Current Location Selected</p>
-              </div>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.coordinates}
-                  </label>
-                  <div className="w-full p-3 border rounded-lg bg-gray-50">
-                    {currentAddress.coordinates.lat.toFixed(6)}, {currentAddress.coordinates.lng.toFixed(6)}
-                  </div>
-                </div>
-
-                {userPhone ? (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.phone}
-                    </label>
-                    <div className="w-full p-3 border rounded-lg bg-gray-50">
-                      {userPhone} (will be used for delivery)
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-yellow-700 text-sm">
-                      ⚠️ Please add your phone number in your account settings
-                    </p>
-                  </div>
-                )}
-              </div>
-              
-              <div className="mt-4 text-sm text-gray-500">
-                <p>✓ This location will be sent automatically with your order</p>
-                <p>✓ No need to save it separately</p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Saved Addresses */}
