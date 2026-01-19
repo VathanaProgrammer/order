@@ -42,8 +42,7 @@ const CombinedCheckoutPage = () => {
     detectCurrentLocation,
     paymentMethod,
     setPaymentMethod,
-    placeOrder,
-  } = useCheckout();
+  } = useCheckout(); // Removed placeOrder from context
 
   const { setLoading } = useLoading();
 
@@ -242,7 +241,7 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Handle checkout button click
+  // Handle checkout button click - Direct API call
   const handleCheckout = async () => {
     if (cart.length === 0) {
       toast.error("Your cart is empty");
@@ -260,6 +259,7 @@ const CombinedCheckoutPage = () => {
     }
 
     setIsSubmittingOrder(true);
+    setLoading(true);
     try {
       // Prepare order data based on backend requirements
       const orderData: any = {
@@ -283,6 +283,7 @@ const CombinedCheckoutPage = () => {
         if (!currentAddress?.coordinates) {
           toast.error("Please detect your current location first");
           setIsSubmittingOrder(false);
+          setLoading(false);
           return;
         }
 
@@ -290,6 +291,7 @@ const CombinedCheckoutPage = () => {
         if (!userPhone) {
           toast.error("Please add your phone number in your account settings");
           setIsSubmittingOrder(false);
+          setLoading(false);
           return;
         }
 
@@ -306,21 +308,26 @@ const CombinedCheckoutPage = () => {
 
       console.log("Submitting order with data:", orderData);
 
-      // Call the placeOrder function from context
-      const result = await placeOrder(orderData);
+      // Direct API call to place order
+      const response = await api.post("/orders", orderData);
       
-      if (result.success) {
+      if (response.data.success) {
         toast.success("Order placed successfully!");
         // Redirect to order confirmation page
-        router.push(`/order-confirmation/${result.order_id}`);
+        if (response.data.order_id) {
+          router.push(`/order-confirmation/${response.data.order_id}`);
+        } else {
+          router.push("/order-confirmation");
+        }
       } else {
-        toast.error(result.message || "Failed to place order");
+        toast.error(response.data.message || "Failed to place order");
       }
     } catch (error: any) {
       console.error("Checkout error:", error);
       toast.error(error.response?.data?.message || "Failed to place order");
     } finally {
       setIsSubmittingOrder(false);
+      setLoading(false);
     }
   };
 
