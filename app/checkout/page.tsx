@@ -49,14 +49,13 @@ const CombinedCheckoutPage = () => {
   const [showMap, setShowMap] = useState(false);
   const [tempAddress, setTempAddress] = useState<Partial<APIAddress>>({
     label: "",
-    phone: "",
+    phone: user?.phone || "",
     details: "",
     coordinates: { lat: 11.567, lng: 104.928 },
     api_user_id: user?.id,
   });
   const [showQRPopup, setShowQRPopup] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [isSavingCurrentAddress, setIsSavingCurrentAddress] = useState(false);
   const { t } = useLanguage();
 
   const paymentMethods = [
@@ -99,7 +98,8 @@ const CombinedCheckoutPage = () => {
     if (user && !tempAddress.api_user_id) {
       setTempAddress(prev => ({
         ...prev,
-        api_user_id: user.id
+        api_user_id: user.id,
+        phone: user.phone || prev.phone
       }));
     }
   }, [user]);
@@ -119,13 +119,8 @@ const CombinedCheckoutPage = () => {
 
   // Save current location as a permanent address
   const handleSaveCurrentLocation = async () => {
-    if (!currentAddress) {
+    if (!currentAddress || !currentAddress.coordinates) {
       toast.error("No current location detected");
-      return;
-    }
-
-    if (!currentAddress.details?.trim()) {
-      toast.error("Please add address details");
       return;
     }
 
@@ -134,13 +129,18 @@ const CombinedCheckoutPage = () => {
       return;
     }
 
-    setIsSavingCurrentAddress(true);
+    if (!user?.phone) {
+      toast.error("Please add your phone number in your account settings");
+      return;
+    }
+
+    setLoading(true);
     try {
-      // Prepare address data from current location
+      // Prepare address data using only coordinates and user's phone
       const addressData: APIAddress = {
-        label: currentAddress.label || "Current Location",
-        phone: currentAddress.phone || "",
-        details: currentAddress.details,
+        label: "Current Location",
+        phone: user.phone, // Use phone from user account
+        details: `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
         coordinates: currentAddress.coordinates,
         api_user_id: user.id,
       };
@@ -166,12 +166,12 @@ const CombinedCheckoutPage = () => {
       // Select the newly saved address
       setSelectedAddress(newAddress);
       
-      toast.success("Address saved successfully!");
+      toast.success("Current location saved!");
     } catch (err: any) {
       console.error("Save address error:", err);
-      toast.error(err.response?.data?.message || "Failed to save address");
+      toast.error(err.response?.data?.message || "Failed to save current location");
     } finally {
-      setIsSavingCurrentAddress(false);
+      setLoading(false);
     }
   };
 
@@ -202,7 +202,7 @@ const CombinedCheckoutPage = () => {
 
   // Save new address to backend
   const handleSaveNewAddress = async () => {
-    if (!tempAddress.label?.trim() || !tempAddress.phone?.trim() || !tempAddress.details?.trim()) {
+    if (!tempAddress.label?.trim() || !tempAddress.details?.trim()) {
       toast.error("Please fill all required fields");
       return;
     }
@@ -217,12 +217,17 @@ const CombinedCheckoutPage = () => {
       return;
     }
 
+    if (!user?.phone) {
+      toast.error("Please add your phone number in your account settings");
+      return;
+    }
+
     setLoading(true);
     try {
-      // Prepare the address data matching your API structure
+      // Prepare the address data - use user's phone from account
       const addressData: APIAddress = {
         label: tempAddress.label,
-        phone: tempAddress.phone,
+        phone: user.phone, // Always use phone from user account
         details: tempAddress.details,
         coordinates: tempAddress.coordinates,
         api_user_id: tempAddress.api_user_id,
@@ -235,7 +240,6 @@ const CombinedCheckoutPage = () => {
       const apiResponse = res.data?.data;
       const newAddress: ExtendedAddress = {
         ...apiResponse,
-        // Ensure all required ContextAddress properties are present
         id: apiResponse.id,
         label: apiResponse.label,
         phone: apiResponse.phone,
@@ -254,16 +258,14 @@ const CombinedCheckoutPage = () => {
       // Reset temp address
       setTempAddress({
         label: "",
-        phone: "",
+        phone: user.phone || "",
         details: "",
         coordinates: { lat: 11.567, lng: 104.928 },
         api_user_id: user?.id,
       });
-      
-      //toast.success("Address saved successfully!");
     } catch (err: any) {
       console.error("Save address error:", err);
-      //toast.error(err.response?.data?.message || "Failed to save address");
+      toast.error(err.response?.data?.message || "Failed to save address");
     } finally {
       setLoading(false);
     }
@@ -285,7 +287,7 @@ const CombinedCheckoutPage = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      //toast.success("QR code downloaded successfully!");
+      toast.success("QR code downloaded successfully!");
     } catch (error) {
       console.error("Download failed:", error);
       toast.error("Failed to download QR code");
@@ -369,7 +371,7 @@ const CombinedCheckoutPage = () => {
           </div>
 
           {/* Current Location Details (if selected) */}
-          {selectedAddress === "current" && currentAddress && (
+          {selectedAddress === "current" && currentAddress && currentAddress.coordinates && (
             <div className="bg-white p-4 border rounded-xl border-blue-500">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-blue-500">📍</span>
@@ -379,81 +381,39 @@ const CombinedCheckoutPage = () => {
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.label} *
+                    {t.coordinates}
                   </label>
-                  <input
-                    type="text"
-                    placeholder="Home, Work, etc."
-                    required
-                    value={currentAddress.label || ""}
-                    onChange={(e) =>
-                      setCurrentAddress({
-                        ...currentAddress,
-                        label: e.target.value,
-                      })
-                    }
-                    className="w-full p-3 border rounded-lg"
-                  />
+                  <div className="w-full p-3 border rounded-lg bg-gray-50">
+                    {currentAddress.coordinates.lat.toFixed(6)}, {currentAddress.coordinates.lng.toFixed(6)}
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.phone} *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder={t.phone}
-                    value={currentAddress.phone || ""}
-                    onChange={(e) =>
-                      setCurrentAddress({
-                        ...currentAddress,
-                        phone: e.target.value,
-                      })
-                    }
-                    className="w-full p-3 border rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.details || "Address Details"} *
-                  </label>
-                  <textarea
-                    placeholder={t.details}
-                    value={currentAddress.details || ""}
-                    onChange={(e) =>
-                      setCurrentAddress({
-                        ...currentAddress,
-                        details: e.target.value,
-                      })
-                    }
-                    className="w-full p-3 border rounded-lg"
-                    rows={3}
-                  />
-                </div>
+                {user?.phone && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {t.phone}
+                    </label>
+                    <div className="w-full p-3 border rounded-lg bg-gray-50">
+                      {user.phone}
+                    </div>
+                  </div>
+                )}
               </div>
               
-              {currentAddress.coordinates && (
-                <p className="text-xs text-gray-400 mt-3">
-                  {t.coordinates}: {currentAddress.coordinates.lat.toFixed(6)}, {currentAddress.coordinates.lng.toFixed(6)}
-                </p>
-              )}
-
               {/* Save Current Location Button */}
               <button
                 onClick={handleSaveCurrentLocation}
-                disabled={!currentAddress.details?.trim() || !currentAddress.label?.trim() || !currentAddress.phone?.trim()|| isSavingCurrentAddress}
+                disabled={isDetectingLocation || !user?.phone}
                 className="mt-4 w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isSavingCurrentAddress ? (
+                {isDetectingLocation ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    {t.saving}
+                    {t.detecting}
                   </>
                 ) : (
                   <>
-                    💾 {t.saveThisAddress}
+                    💾 {t.saveThisLocation}
                   </>
                 )}
               </button>
@@ -501,18 +461,16 @@ const CombinedCheckoutPage = () => {
               />
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.phone} *
-              </label>
-              <input
-                type="text"
-                placeholder={t.phone}
-                value={tempAddress.phone || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            {user?.phone && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t.phone}
+                </label>
+                <div className="w-full p-3 border rounded-lg bg-gray-50">
+                  {user.phone} (from your account)
+                </div>
+              </div>
+            )}
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -554,7 +512,7 @@ const CombinedCheckoutPage = () => {
               <button
                 onClick={handleSaveNewAddress}
                 className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={!tempAddress.label?.trim() || !tempAddress.phone?.trim() || !tempAddress.details?.trim() || !tempAddress.coordinates}
+                disabled={!tempAddress.label?.trim() || !tempAddress.details?.trim() || !tempAddress.coordinates || !user?.phone}
               >
                 {t.saveAddress}
               </button>
@@ -563,7 +521,7 @@ const CombinedCheckoutPage = () => {
                   setIsAdding(false);
                   setTempAddress({
                     label: "",
-                    phone: "",
+                    phone: user?.phone || "",
                     details: "",
                     coordinates: { lat: 11.567, lng: 104.928 },
                     api_user_id: user?.id,
@@ -586,7 +544,7 @@ const CombinedCheckoutPage = () => {
         )}
       </section>
 
-      {/* Map Modal */}
+      {/* Map Modal - Unchanged */}
       {showMap && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg max-h-[90vh] overflow-auto">
@@ -657,7 +615,7 @@ const CombinedCheckoutPage = () => {
         </div>
       )}
 
-      {/* Payment Method */}
+      {/* Payment Method - Unchanged */}
       <section className="flex flex-col gap-3 mt-6">
         <h2 className="text-2xl font-semibold text-gray-800">{t.paymentMethod}</h2>
         {paymentMethods.map((method) => (
@@ -690,7 +648,7 @@ const CombinedCheckoutPage = () => {
         ))}
       </section>
 
-      {/* QR Popup Modal */}
+      {/* QR Popup Modal - Unchanged */}
       {showQRPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
