@@ -133,7 +133,7 @@ const translations = {
     code: "Code",
     validUntil: "Valid until",
     totalRewardPoints: "Total Reward Points",
-    claimNow: "Claim Now",
+    claimNow: "Claim",
     readyToClaim: "Ready to claim",
     yourClaimedRewards: "Your claimed rewards",
     claimFirstReward: "Claim your first reward",

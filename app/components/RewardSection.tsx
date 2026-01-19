@@ -42,8 +42,8 @@ const RewardSection: React.FC<RewardSectionProps> = ({ onClaimSuccess }) => {
   if (!products || products.length === 0) return null;
 
   return (
-    <section className="mt-4">
-      <h2 className="text-xl font-bold text-gray-700 mb-2">
+    <section className="mt-2">
+      <h2 className="text-lg font-bold text-gray-700 mb-2">
         {t.redeemYourRewards}
       </h2>
 

@@ -118,7 +118,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
         <>
             <div className="w-full rounded-xl bg-white border border-gray-200 shadow-md flex flex-col overflow-hidden transition-all hover:shadow-xl hover:border-blue-300">
                 {/* Product Image */}
-                <div className="relative w-full h-44">
+                <div className="relative w-full h-26">
                     <Image
                         src={displayImage}
                         alt={product.name || "Reward product"}
@@ -139,13 +139,13 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                 </div>
 
                 {/* Product Info */}
-                <div className="p-4 flex flex-col flex-1">
+                <div className="p-2 flex flex-col flex-1">
                     <h3 className="font-bold text-gray-800 text-base mb-3 line-clamp-2 min-h-[3rem]">
                         {product.name || "Reward Item"}
                     </h3>
 
                     {/* Points Progress Bar */}
-                    <div className="mb-4">
+                    {/* <div className="mb-4">
                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                             <div 
                                 className={`h-full rounded-full transition-all duration-500 ${
@@ -158,14 +158,14 @@ const RewardCard: React.FC<RewardCardProps> = ({ product, onClaimSuccess }) => {
                                 }}
                             />
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* Claim Button */}
                     <button
                         onClick={handleClaimReward}
                         disabled={isClaiming || !canClaim}
                         className={`
-                            w-full py-3 px-4 rounded-lg font-bold text-sm transition-all
+                            w-full py-1 px-1 rounded-lg font-bold text-sm transition-all
                             ${isClaiming
                                 ? 'bg-gray-400 cursor-not-allowed'
                                 : canClaim
