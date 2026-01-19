@@ -43,7 +43,7 @@ const RewardSection: React.FC<RewardSectionProps> = ({ onClaimSuccess }) => {
 
   return (
     <section className="mt-2">
-      <h2 className="text-lg font-bold text-gray-700 mb-2">
+      <h2 className="text-md font-bold text-gray-700 mb-2">
         {t.redeemYourRewards}
       </h2>
 

@@ -9,9 +9,9 @@ type SearchBarProps = {
 const SearchBar: React.FC<SearchBarProps> = ({ onSearch }) => {
   const { language, t } = useLanguage();
   return (
-    <div className="relative w-full mt-4 rounded-[5px] bg-gray-500 h-[45px] flex items-center">
+    <div className="relative w-full mt-4 rounded-[5px] bg-gray-500 h-[35px] flex items-center">
       <div className="absolute left-3">
-        <Icon icon={ICONS.SEARCH} width={20} height={20} className="text-gray-200" />
+        <Icon icon={ICONS.SEARCH} width={15} height={15} className="text-gray-200" />
       </div>
       <input
         type="search"

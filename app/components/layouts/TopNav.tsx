@@ -78,12 +78,12 @@ const TopNav = () => {
             <Image src={SpinWheelPic} alt="wheel" width={20} height={20} />
           </button>
 
-          <button onClick={toggleLanguage} className="p-1 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition">
+          <button onClick={toggleLanguage} className="p-1 text-sm flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition">
             {language === "en" ? "ភាសាខ្មែរ" : "English"}
           </button>
 
           <div onClick={handleProfileClick} className="p-1 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition">
-            <Icon className="text-gray-500" icon="mdi:account" width={26} height={26} />
+            <Icon className="text-gray-500" icon="mdi:account" width={18} height={18} />
           </div>
         </div>
       </div>
