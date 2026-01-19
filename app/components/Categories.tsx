@@ -35,7 +35,7 @@ const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) =
   const allCategories = [{ id: 0, name: t.all }, ...categories];
 
   return (
-    <section className="flex flex-col gap-4 mt-4">
+    <section className="flex flex-col gap-4 mt-2 mb-1">
       {allCategories.map((cat) => (
         <div
           key={cat.id}
