@@ -751,35 +751,6 @@ const CombinedCheckoutPage = () => {
           </div>
         </div>
       )}
-
-      {/* Checkout Button */}
-      {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg">
-          <div className="max-w-md mx-auto">
-            <button
-              onClick={handleCheckout}
-              disabled={!selectedAddress || !paymentMethod || isSubmittingOrder}
-              className="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-bold text-lg disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isSubmittingOrder ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  {t.processingOrder || "Processing Order..."}
-                </>
-              ) : (
-                <>
-                  🛒 {t.placeOrder || "Place Order"} - ${total.toFixed(2)}
-                </>
-              )}
-            </button>
-            <p className="text-xs text-gray-500 text-center mt-2">
-              {selectedAddress === "current" 
-                ? "✓ Current location will be sent automatically" 
-                : "✓ Selected address will be used"}
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
