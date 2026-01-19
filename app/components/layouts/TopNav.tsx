@@ -71,7 +71,7 @@ const TopNav = () => {
   return (
     <section className="flex flex-col gap-1">
       <div className="flex flex-row justify-between items-center">
-        <h1 className="text-[25px] font-bold main-text">SOB</h1>
+        <h1 className="text-[18px] font-bold main-text">SOB</h1>
 
         <div className="flex flex-row gap-2">
           <button onClick={handleWheelClick} className="p-1 flex items-center rounded-[10px] cursor-pointer transition">
@@ -91,7 +91,7 @@ const TopNav = () => {
       <div className="flex flex-row justify-between items-center mt-1">
         <div className="flex items-center gap-1">
           <Icon icon="mdi:map-marker-outline" width={18} height={18} className="text-gray-600" />
-          <p className="text-[13px] font-medium text-gray-600">
+          <p className="text-[10px] font-medium text-gray-600">
             {t.yourCurrentLocationIs} {location}
           </p>
         </div>
@@ -99,10 +99,10 @@ const TopNav = () => {
         {/* Points - Now updates instantly every time */}
         <div
           onClick={() => router.push("/account/reward")}
-          className="p-2 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
+          className="p-1 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
         >
-          <Icon className="text-white" icon="vaadin:database" width={20} height={20} />
-          <p className="text-[16px] font-medium ml-1">
+          <Icon className="text-white" icon="vaadin:database" width={15} height={15} />
+          <p className="text-[12px] font-medium ml-1">
             {points.toLocaleString()}
           </p>
         </div>
