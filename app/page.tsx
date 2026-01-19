@@ -27,7 +27,7 @@ export default function ProductPage() {
         </div>
       </div>
 
-      <div className="flex flex-col flex-1 overflow-y-auto">
+      <div className="flex flex-1 overflow-y-auto">
         <Categories selectedCategory={selectedCategory} onSelect={setSelectedCategory} />
         <FeaturedSection products={featuredProducts} />
         <Products selectedCategory={selectedCategory} searchQuery={searchQuery} />
