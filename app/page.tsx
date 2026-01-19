@@ -6,6 +6,7 @@ import Products from "@/components/Products";
 import RewardSection from "./components/RewardSection";
 import { useState, useEffect, useCallback } from "react";
 import api from "@/api/api";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface ProductData {
   id: number;
@@ -25,7 +26,8 @@ interface CategoryData {
 }
 
 export default function ProductPage() {
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const { t } = useLanguage();
+  const [selectedCategory, setSelectedCategory] = useState<string>(t.all);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [allProducts, setAllProducts] = useState<ProductData[]>([]);
   const [categories, setCategories] = useState<CategoryData[]>([]);
