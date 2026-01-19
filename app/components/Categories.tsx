@@ -15,7 +15,9 @@ type CategoryData = {
 };
 
 const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) => {
-  const [categories, setCategories] = useState<CategoryData[]>([]);
+  const [categories, setCategories] = useState<CategoryData[]>([
+    { id: 0, name: "ទាំងអស់" || "All" },
+  ]);
   const { t } = useLanguage();
 
   useEffect(() => {
