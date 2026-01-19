@@ -12,7 +12,7 @@ const TopNav = () => {
   const router = useRouter();
   const { user } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
-  const { points } = usePoints();  // ← Just read from context
+  const { points } = usePoints(); 
 
   const [location, setLocation] = React.useState<string>("Fetching location...");
   const [error, setError] = React.useState<string | null>(null);
@@ -69,26 +69,26 @@ const TopNav = () => {
   };
 
   return (
-    <section className="flex flex-col gap-2">
+    <section className="flex flex-col gap-1">
       <div className="flex flex-row justify-between items-center">
-        <h1 className="text-[32px] font-bold main-text">SOB</h1>
+        <h1 className="text-[25px] font-bold main-text">SOB</h1>
 
         <div className="flex flex-row gap-2">
-          <button onClick={handleWheelClick} className="p-2 flex items-center rounded-[10px] cursor-pointer transition">
-            <Image src={SpinWheelPic} alt="wheel" width={40} height={40} />
+          <button onClick={handleWheelClick} className="p-1 flex items-center rounded-[10px] cursor-pointer transition">
+            <Image src={SpinWheelPic} alt="wheel" width={20} height={20} />
           </button>
 
-          <button onClick={toggleLanguage} className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition">
+          <button onClick={toggleLanguage} className="p-1 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition">
             {language === "en" ? "ភាសាខ្មែរ" : "English"}
           </button>
 
-          <div onClick={handleProfileClick} className="p-2 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition">
+          <div onClick={handleProfileClick} className="p-1 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition">
             <Icon className="text-gray-500" icon="mdi:account" width={26} height={26} />
           </div>
         </div>
       </div>
 
-      <div className="flex flex-row justify-between items-center mt-2">
+      <div className="flex flex-row justify-between items-center mt-1">
         <div className="flex items-center gap-1">
           <Icon icon="mdi:map-marker-outline" width={18} height={18} className="text-gray-600" />
           <p className="text-[13px] font-medium text-gray-600">
