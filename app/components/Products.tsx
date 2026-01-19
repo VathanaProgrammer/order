@@ -60,14 +60,9 @@ const Products: React.FC<ProductsProps> = ({
       <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
         <div className="flex items-center gap-4">
           <span className="text-sm text-blue-800">
-            Showing {filteredProducts.length} of {allProducts.length} products
+            Showing {filteredProducts.length} products
+            {selectedCategory !== "All" && selectedCategory !== "ទាំងអស់" && ` in ${selectedCategory}`}
           </span>
-          
-          {selectedCategory !== "All" && selectedCategory !== "ទាំងអស់" && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-              {selectedCategory}
-            </span>
-          )}
           
           {hasSearch && (
             <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">

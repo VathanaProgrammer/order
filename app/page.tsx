@@ -4,7 +4,7 @@ import SearchBar from "@/components/SearchBar";
 import Categories from "@/components/Categories";
 import Products from "@/components/Products";
 import RewardSection from "./components/RewardSection";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import api from "@/api/api";
 
 interface ProductData {
@@ -16,16 +16,6 @@ interface ProductData {
     name: string;
     price: string | number | null;
     image_url?: string;
-    category_id?: number;
-    category?: {  // Check if category is an object
-      id: number;
-      name: string;
-    };
-  };
-  category_id?: number;
-  category?: {  // Check if category is an object at top level
-    id: number;
-    name: string;
   };
 }
 
@@ -41,105 +31,102 @@ export default function ProductPage() {
   const [categories, setCategories] = useState<CategoryData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Cache for category-specific products
+  const [categoryCache, setCategoryCache] = useState<Record<string, ProductData[]>>({});
 
-  // Fetch all data once
+  // Fetch categories on mount
   useEffect(() => {
-    async function fetchAllData() {
+    async function fetchCategories() {
       try {
-        setIsLoading(true);
-        setError(null);
-        
-        console.log("Fetching data...");
-        
-        // Fetch products and categories in parallel
-        const [productsRes, categoriesRes] = await Promise.all([
-          api.get("/product/all"),
-          api.get("/category/all")
-        ]);
-        
-        console.log("RAW Products response:", productsRes.data);
-        console.log("RAW Categories response:", categoriesRes.data);
-        
-        // Handle different response formats
-        const productsData = Array.isArray(productsRes.data) 
-          ? productsRes.data 
-          : (productsRes.data?.data || productsRes.data || []);
-        
-        const categoriesData = Array.isArray(categoriesRes.data)
-          ? categoriesRes.data
-          : (categoriesRes.data?.data || categoriesRes.data || []);
-        
-        console.log(`Parsed: ${productsData.length} products, ${categoriesData.length} categories`);
-        console.log("First product:", productsData[0]);
-        console.log("Categories:", categoriesData);
-        
-        setAllProducts(productsData);
+        const res = await api.get("/category/all");
+        const categoriesData = Array.isArray(res.data)
+          ? res.data
+          : (res.data?.data || res.data || []);
         setCategories(categoriesData);
-        
-        if (productsData.length === 0) {
-          setError("No products available");
-        }
-        
-      } catch (err: any) {
-        console.error("Error fetching data:", err);
-        setError(`Failed to load: ${err.message}`);
-      } finally {
-        setIsLoading(false);
+      } catch (err) {
+        console.error("Failed to fetch categories:", err);
       }
     }
-
-    fetchAllData();
+    fetchCategories();
   }, []);
 
-  // Filter products based on category and search
-  const filteredProducts = allProducts.filter(product => {
-    // Try to get category name from product
-    let productCategoryName = "";
+  // Fetch products based on selected category
+  const fetchProducts = useCallback(async (category: string, search: string) => {
+    setIsLoading(true);
+    setError(null);
     
-    // Check all possible locations for category info
-    if (product.category?.name) {
-      // Case 1: category is an object with name
-      productCategoryName = product.category.name;
-    } else if (product.product.category?.name) {
-      // Case 2: category is nested in product object
-      productCategoryName = product.product.category.name;
-    } else if (product.category_id || product.product.category_id) {
-      // Case 3: We have category_id, need to find name from categories list
-      const categoryId = product.category_id || product.product.category_id;
-      const foundCategory = categories.find(cat => cat.id === categoryId);
-      if (foundCategory) {
-        productCategoryName = foundCategory.name;
+    try {
+      let products: ProductData[] = [];
+      
+      // Check cache first
+      if (categoryCache[category] && !search) {
+        console.log(`Using cache for ${category}`);
+        setAllProducts(categoryCache[category]);
+        setIsLoading(false);
+        return;
       }
-    }
-    
-    console.log(`Product: ${product.product.name}, Category: ${productCategoryName || 'No category found'}`);
-    
-    // Check category match
-    let matchesCategory = true;
-    if (selectedCategory !== "All" && selectedCategory !== "ទាំងអស់") {
-      if (productCategoryName) {
-        // Compare category names (case-insensitive, trim whitespace)
-        matchesCategory = productCategoryName.trim().toLowerCase() === selectedCategory.trim().toLowerCase();
-      } else {
-        // No category info found for this product
-        matchesCategory = false;
+      
+      // Build URL based on category
+      let url = "/product/all";
+      const params = new URLSearchParams();
+      
+      if (category !== "All" && category !== "ទាំងអស់") {
+        params.append('category', category);
       }
-      console.log(`Category match for "${product.product.name}": ${matchesCategory} (${productCategoryName} vs ${selectedCategory})`);
+      
+      if (search.trim()) {
+        params.append('search', search);
+      }
+      
+      const queryString = params.toString();
+      if (queryString) {
+        url += `?${queryString}`;
+      }
+      
+      console.log(`Fetching from: ${url}`);
+      
+      const res = await api.get(url);
+      const productsData = Array.isArray(res.data)
+        ? res.data
+        : (res.data?.data || res.data || []);
+      
+      console.log(`Fetched ${productsData.length} products for category: ${category}`);
+      
+      setAllProducts(productsData);
+      
+      // Cache the results if not searching
+      if (!search.trim() && category !== "All" && category !== "ទាំងអស់") {
+        setCategoryCache(prev => ({
+          ...prev,
+          [category]: productsData
+        }));
+      }
+      
+    } catch (err: any) {
+      console.error("Error fetching products:", err);
+      setError(`Failed to load products: ${err.message}`);
+    } finally {
+      setIsLoading(false);
     }
-    
-    // Check search match
-    const matchesSearch = !searchQuery || 
-                         product.product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return matchesCategory && matchesSearch;
-  });
+  }, [categoryCache]);
 
-  console.log(`=== FILTER RESULTS ===`);
-  console.log(`Total products: ${allProducts.length}`);
-  console.log(`Filtered products: ${filteredProducts.length}`);
-  console.log(`Selected category: ${selectedCategory}`);
-  console.log(`Search query: ${searchQuery}`);
-  console.log(`Categories available: ${categories.map(c => c.name).join(', ')}`);
+  // Fetch products when category or search changes
+  useEffect(() => {
+    if (categories.length > 0) {
+      fetchProducts(selectedCategory, searchQuery);
+    }
+  }, [selectedCategory, searchQuery, categories.length, fetchProducts]);
+
+  // Handle category selection
+  const handleCategorySelect = (category: string) => {
+    console.log(`Category selected: ${category}`);
+    setSelectedCategory(category);
+    // Search will be cleared when changing categories
+    setSearchQuery("");
+  };
+
+  console.log(`Current: Category="${selectedCategory}", Search="${searchQuery}", Products=${allProducts.length}`);
 
   return (
     <div className="flex flex-col flex-1 hide-scrollbar">
@@ -154,15 +141,20 @@ export default function ProductPage() {
       <div className="flex flex-1 overflow-y-auto">
         <Categories 
           selectedCategory={selectedCategory} 
-          onSelect={setSelectedCategory} 
+          onSelect={handleCategorySelect} 
         />
         
         {/* Show loading state */}
         {isLoading ? (
           <div className="flex-1 p-4">
-            <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              <p className="mt-2 text-gray-600">Loading products...</p>
+            <div className="grid grid-cols-2 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="bg-gray-200 h-48 rounded-lg"></div>
+                  <div className="mt-2 h-4 bg-gray-200 rounded w-3/4"></div>
+                  <div className="mt-1 h-3 bg-gray-200 rounded w-1/2"></div>
+                </div>
+              ))}
             </div>
           </div>
         ) : error ? (
@@ -175,7 +167,7 @@ export default function ProductPage() {
               </div>
               <h3 className="text-lg font-medium text-gray-700">{error}</h3>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => fetchProducts(selectedCategory, searchQuery)}
                 className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
               >
                 Retry
@@ -184,32 +176,11 @@ export default function ProductPage() {
           </div>
         ) : (
           <div className="flex-1">
-            {/* Temporary: Show all products for debugging */}
-            {selectedCategory !== "All" && selectedCategory !== "ទាំងអស់" && filteredProducts.length === 0 && (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 mb-4">
-                <h3 className="font-medium text-yellow-800">Debug Info</h3>
-                <p className="text-sm text-yellow-700">
-                  Showing all {allProducts.length} products because no category info found.
-                  Check if products have category data.
-                </p>
-                <button 
-                  onClick={() => {
-                    // Temporarily show all products
-                    setSelectedCategory("All");
-                  }}
-                  className="mt-2 px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600"
-                >
-                  Show All Products
-                </button>
-              </div>
-            )}
-            
-            {/* Pass data to Products component - use filtered or all if no category */}
             <Products 
               selectedCategory={selectedCategory} 
               searchQuery={searchQuery}
               allProducts={allProducts}
-              filteredProducts={filteredProducts.length > 0 ? filteredProducts : allProducts}
+              filteredProducts={allProducts} // Since API already filtered
             />
           </div>
         )}
