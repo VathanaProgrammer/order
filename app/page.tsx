@@ -24,11 +24,11 @@ export default function ProductPage() {
       <div className="sticky top-0 z-20 bg-white">
         <div className="pb-2">
           <SearchBar onSearch={(value) => setSearchQuery(value)} />
-          <Categories selectedCategory={selectedCategory} onSelect={setSelectedCategory} />
         </div>
       </div>
 
-      <div>
+      <div className="flex flex-col flex-1 overflow-y-auto">
+        <Categories selectedCategory={selectedCategory} onSelect={setSelectedCategory} />
         <FeaturedSection products={featuredProducts} />
         <Products selectedCategory={selectedCategory} searchQuery={searchQuery} />
       </div>
