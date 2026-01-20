@@ -380,27 +380,27 @@ const getWinningSegmentByProbability = useCallback(() => {
                           winningSegment.display_name?.toLowerCase().includes('try again');
         
         if (!isNoneType) {
-          let message = `🎉 Congratulations! You won: ${winningSegment.display_name}`;
+          let message = `🎉 ${t.congratulationsYouWon}: ${winningSegment.display_name}`;
           
           if (response.data.points_deducted !== undefined) {
-            message += `\n💰 Points deducted: ${response.data.points_deducted}`;
+            message += `\n💰 ${t.pointsDeducted}: ${response.data.points_deducted}`;
           }
           
           if (response.data.new_balance !== undefined) {
-            message += `\n💎 New balance: ${response.data.new_balance}`;
+            message += `\n💎 ${t.newBalance}: ${response.data.new_balance}`;
             updatePoints(response.data.new_balance);
           }
           
           alert(message);
         } else {
-          let message = `Better luck next time!`;
+          let message = t.betterLuckNextTime;
           
           if (response.data.points_deducted !== undefined) {
-            message += `\n💰 Points deducted: ${response.data.points_deducted}`;
+            message += `\n💰 ${t.pointsDeducted}: ${response.data.points_deducted}`;
           }
           
           if (response.data.new_balance !== undefined) {
-            message += `\n💎 New balance: ${response.data.new_balance}`;
+            message += `\n💎 ${t.newBalance}: ${response.data.new_balance}`;
             updatePoints(response.data.new_balance);
           }
           
@@ -505,7 +505,7 @@ const getWinningSegmentByProbability = useCallback(() => {
           </div>
           {points !== undefined && points < pointsPerSpin && (
             <p className="text-sm text-red-500 mt-2">
-              ⚠️ You need {pointsPerSpin - points} more points to spin!
+              ⚠️ {t.youNeed} {pointsPerSpin - points} {t.morePointsToSpin}
             </p>
           )}
         </div>

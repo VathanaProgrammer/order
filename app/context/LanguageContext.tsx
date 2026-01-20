@@ -153,6 +153,10 @@ const translations = {
     addToCart: "Add to Cart",
     betterLuckNextTime: "Better luck next time!",
     pointsDeducted: "points Deducted",
+    congratulationsYouWon: "Congratulations! You won",
+    newBalance: "New Balance",
+    youNeed: "You need",
+    morePointsToSpin: "more points to spin!"
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -289,6 +293,10 @@ const translations = {
     addToCart: "បន្ថែមទៅកន្ត្រក",
     betterLuckNextTime: "សូមសំណាងល្អនៅពេលក្រោយ!",
     pointsDeducted: "ពិន្ទុបានដកចេញ",
+    congratulationsYouWon: "អបអរសាទរ! អ្នកបានឈ្នះ",
+    newBalance: "សមតុល្យថ្មី",
+    youNeed: "អ្នកត្រូវការ",
+    morePointsToSpin: "ពិន្ទុបន្ថែមដើម្បីបង្វិល!"
   },
 };
 
