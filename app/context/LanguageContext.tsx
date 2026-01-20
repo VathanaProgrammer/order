@@ -151,6 +151,8 @@ const translations = {
     pleaseSelectAShippingAddress: "Please select a shipping address!",
     pleaseSelectAPaymentMethod: "Please select a payment method!",
     addToCart: "Add to Cart",
+    betterLuckNextTime: "Better luck next time!",
+    pointsDeducted: "points Deducted",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -285,6 +287,8 @@ const translations = {
     pleaseSelectAShippingAddress: "សូមជ្រើសរើសអាសយដ្ឋានដឹកជញ្ជូនរបស់អ្នក!",
     pleaseSelectAPaymentMethod: "សូមជ្រើសរើសមធ្យោបាយទូទាត់របស់អ្នក!",
     addToCart: "បន្ថែមទៅកន្ត្រក",
+    betterLuckNextTime: "សូមសំណាងល្អនៅពេលក្រោយ!",
+    pointsDeducted: "ពិន្ទុបានដកចេញ",
   },
 };
 
