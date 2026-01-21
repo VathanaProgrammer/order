@@ -52,69 +52,55 @@ const initializeAuth = () => {
 // Initialize on module load
 initializeAuth();
 
-// Add request interceptor with detailed logging
 api.interceptors.request.use(
   (config) => {
     const safari = isSafari();
-    
+    const token = safariToken || localStorage.getItem('auth_token');
+
     console.log(`📤 [${config.method?.toUpperCase()}] ${config.baseURL}${config.url}`);
-    console.log('🔧 Request config:', {
-      isSafari: safari,
-      hasToken: !!safariToken,
-      withCredentials: config.withCredentials,
-      headers: config.headers
-    });
-    
-    if (safari && safariToken) {
-      config.headers['Authorization'] = `Bearer ${safariToken}`;
+
+    if (token) {
+      if (safari) {
+        if (config.method === 'get') {
+          // Workaround for Axios + Safari/iOS bug: Authorization header often dropped on GET
+          config.params = config.params || {};
+          config.params.token = token;
+          console.log('Safari GET workaround → using ?token=... instead of header');
+        } else {
+          // POST/PUT/DELETE → still use Bearer header
+          config.headers = config.headers || {};
+          config.headers['Authorization'] = `Bearer ${token}`;
+          console.log('Safari non-GET → using Authorization: Bearer');
+        }
+      } else {
+        // Non-Safari → always use Bearer header
+        config.headers = config.headers || {};
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
+    } else {
+      console.log('No token available for this request');
     }
-    
-    // Ensure proper content type for POST requests
+
+    console.log('🔧 Final request config:', {
+      isSafari: safari,
+      method: config.method,
+      usingQueryToken: !!config.params?.token,
+      authHeader: config.headers?.['Authorization'],
+      withCredentials: config.withCredentials,
+    });
+
+    // Content-Type for POST/PUT
     if (config.method === 'post' || config.method === 'put') {
       if (!config.headers['Content-Type']) {
         config.headers['Content-Type'] = 'application/json';
       }
     }
-    
+
     return config;
   },
   (error) => {
-    console.error('📤 Request error:', error);
+    console.error('📤 Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
-
-// Response interceptor
-api.interceptors.response.use(
-  (response) => {
-    console.log(`✅ [${response.status}] ${response.config.url}`);
-    console.log('📥 Response data:', response.data);
-    
-    const safari = isSafari();
-    const url = response.config.url || '';
-    
-    // Store new token from login response
-    if (safari && url.includes('login') && response.data?.token) {
-      const newToken = response.data.token;
-      safariToken = newToken;
-      localStorage.setItem('auth_token', newToken);
-      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      console.log('🔑 New token saved from login');
-    }
-    
-    return response;
-  },
-  async (error) => {
-    console.error('🔴 Response error:', {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data
-    });
-    
-    return Promise.reject(error);
-  }
-);
-
 export default api;
