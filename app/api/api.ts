@@ -5,26 +5,17 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
-// Add request interceptor for cache busting
+// Attach token automatically
 api.interceptors.request.use((config) => {
-  // Add timestamp to all GET requests to prevent caching
-  if (config.method === 'get') {
-    // Add cache busting parameter
-    config.params = {
-      ...config.params,
-      _t: Date.now(), // Always changing
-      _rand: Math.random().toString(36).substring(2, 9) // Random string
-    };
-    
-    // Add cache control headers
-    config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
-    config.headers['Pragma'] = 'no-cache';
-    config.headers['Expires'] = '0';
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
-  
   return config;
 });
 

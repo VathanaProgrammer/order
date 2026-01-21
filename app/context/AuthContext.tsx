@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const fetchUser = async () => {
       try {
         console.log('🔄 Fetching user on mount...');
-        const res = await api.get("/user", { withCredentials: true });
+        const res = await api.get("/user");
         
         console.log('📥 User API response:', res.data);
         
@@ -188,23 +188,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (phone: string, username: string) => {
     setLoading(true);
     try {
-      const res = await api.post(
-        "/login",
-        { phone, name: username },
-        { withCredentials: true }
-      );
-
-      console.log('Login response:', res.data);
-      
-      if (res.data.success && res.data.user) {
-        const userData = extractUserFromResponse(res.data);
-        if (userData) {
-          setUser(userData);
-          await refreshUser(); // Force a refresh after login
-          router.push("/");
-        } else {
-          throw new Error("Invalid user data in response");
-        }
+      const res = await api.post("/login", {
+        phone,
+        name: username,
+      });
+  
+      console.log("Login response:", res.data);
+  
+      if (res.data.success && res.data.token) {
+        // ✅ Store JWT
+        localStorage.setItem("token", res.data.token);
+  
+        // ✅ Set default Authorization header
+        api.defaults.headers.common.Authorization =
+          `Bearer ${res.data.token}`;
+  
+        // ✅ Now refresh user using JWT
+        await refreshUser();
+  
+        router.push("/");
       } else {
         throw new Error(res.data.message || "Login failed");
       }
@@ -215,11 +217,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     }
   };
+  
 
   // 🔹 Logout
   const logout = async () => {
     try {
-      await api.post("/logout", {}, { withCredentials: true });
+      await api.post("/logout", {});
     } catch (error) {
       console.error("Logout error:", error);
     }
