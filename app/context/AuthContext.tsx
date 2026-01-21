@@ -5,6 +5,7 @@ import {
   useEffect,
   useContext,
   ReactNode,
+  useRef,
 } from "react";
 import api, { isSafari } from "@/api/api";
 import { useRouter } from "next/navigation";
@@ -38,21 +39,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 🔹 Unified function to extract user data from API response
+  // 🔹 Unified function to extract user data
   const extractUserFromResponse = (responseData: any): User | null => {
-    console.log('Extracting user from:', responseData);
+    if (!responseData) return null;
     
     let userData;
     
     if (responseData.user) {
       userData = responseData.user;
-    } else if (responseData.data) {
-      userData = responseData.data;
     } else if (responseData.id) {
       userData = responseData;
     } else {
-      console.log('No user data found in response');
       return null;
     }
     
@@ -71,29 +70,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
-  // 🔹 Restore user on mount
+  // 🔹 Restore user on mount - SIMPLIFIED
   useEffect(() => {
     const fetchUser = async () => {
       try {
         console.log('🔄 Fetching user on mount...');
-        console.log('📱 Browser is Safari?', isSafari());
         
-        // Use the api instance which handles auth automatically
         const res = await api.get("/user");
-        
-        console.log('📥 User API response:', res.data);
         
         const userData = extractUserFromResponse(res.data);
         
         if (userData) {
-          console.log('✅ Setting user in context:', userData);
+          console.log('✅ User found');
           setUser(userData);
         } else {
-          console.log('❌ No valid user data in response');
+          console.log('❌ No valid user data');
           setUser(null);
         }
-      } catch (err) {
-        console.error("Auth restore failed:", err);
+      } catch (err: any) {
+        console.error("Auth restore failed:", err.message);
+        
+        // Don't automatically redirect - let components handle
         setUser(null);
       } finally {
         setLoading(false);
@@ -101,46 +98,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     fetchUser();
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
   }, []);
 
-  // 🔹 Refresh user data
+  // 🔹 Refresh user data - SIMPLIFIED
   const refreshUser = async (): Promise<void> => {
-    console.log('🔄 refreshUser() called');
-    
     try {
       const response = await api.get(`/user`);
-      
-      console.log('📥 Refresh API response:', response.data);
       
       const newUser = extractUserFromResponse(response.data);
       
       if (!newUser) {
-        console.warn('⚠️ No user data in refresh response');
         setUser(null);
         return;
       }
       
-      const updatedUser: User = {
-        ...newUser,
-        reward_points: { ...newUser.reward_points }
-      };
+      setUser(newUser);
       
-      setUser(updatedUser);
-      console.log('✅ User refreshed successfully');
+    } catch (error: any) {
+      console.error('Failed to refresh user:', error.message);
       
-      // Notify other components
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('userRefreshed', {
-          detail: { 
-            userId: updatedUser.id,
-            timestamp: Date.now()
-          }
-        }));
+      // Only clear user if it's an auth error
+      if (error.response?.status === 401) {
+        setUser(null);
       }
       
-    } catch (error) {
-      console.error('🔴 AuthContext: Failed to refresh user', error);
-      setUser(null);
       throw error;
     }
   };
@@ -148,47 +136,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // 🔹 Update user data
   const updateUser = (updates: Partial<User>) => {
     if (user) {
-      const updatedUser = {
-        ...user,
-        ...updates
-      };
-      console.log('📝 Updating user context:', updatedUser);
-      setUser(updatedUser);
+      setUser({ ...user, ...updates });
     }
   };
 
-  // 🔹 Login
+  // 🔹 Login - SIMPLIFIED
   const login = async (phone: string, username: string) => {
     setLoading(true);
     try {
-      const res = await api.post(
-        "/login",
-        { phone, name: username }
-      );
+      const res = await api.post("/login", { phone, name: username });
 
-      console.log('Login response:', res.data);
-      
       if (res.data.success) {
         const userData = extractUserFromResponse(res.data);
         if (userData) {
           setUser(userData);
-          
-          // For Safari: Save token if returned
-          if (isSafari() && res.data.token) {
-            localStorage.setItem('auth_token', res.data.token);
-            api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
-          }
-          
-          await refreshUser();
           router.push("/");
-        } else {
-          throw new Error("Invalid user data in response");
         }
-      } else {
-        throw new Error(res.data.message || "Login failed");
       }
-    } catch (err) {
-      console.error("Login error:", err);
+    } catch (err: any) {
+      console.error("Login error:", err.message);
       throw err;
     } finally {
       setLoading(false);
@@ -200,13 +166,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await api.post("/logout");
       
-      // Clean up Safari token
       if (isSafari()) {
         localStorage.removeItem('auth_token');
-        delete api.defaults.headers.common['Authorization'];
       }
-    } catch (error) {
-      console.error("Logout error:", error);
+    } catch (error: any) {
+      console.error("Logout error:", error.message);
     }
     
     setUser(null);

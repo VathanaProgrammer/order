@@ -13,29 +13,6 @@ export const isSafari = (): boolean => {
   return isSafari || isIOS;
 };
 
-// Check if we're in iOS Safari Private Browsing
-export const isPrivateBrowsing = async (): Promise<boolean> => {
-  if (typeof window === 'undefined') return false;
-  
-  return new Promise((resolve) => {
-    try {
-      if (!window.indexedDB) {
-        resolve(true);
-        return;
-      }
-      
-      const db = window.indexedDB.open("test");
-      db.onerror = () => resolve(true);
-      db.onsuccess = () => {
-        db.result.close();
-        resolve(false);
-      };
-    } catch (e) {
-      resolve(true);
-    }
-  });
-};
-
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -43,69 +20,66 @@ const api = axios.create({
 
 // Safari token management
 let safariToken: string | null = null;
+let refreshPromise: Promise<string | null> | null = null;
 
-// Initialize token from localStorage
-if (typeof window !== 'undefined') {
+// Initialize token from localStorage ONLY if Safari
+if (typeof window !== 'undefined' && isSafari()) {
   safariToken = localStorage.getItem('auth_token');
   
-  // Set initial Authorization header for Safari
-  if (isSafari() && safariToken) {
+  if (safariToken) {
     api.defaults.headers.common['Authorization'] = `Bearer ${safariToken}`;
-  } else {
-    // Non-Safari: use cookies
-    api.defaults.withCredentials = true;
   }
+} else {
+  // Non-Safari: use cookies
+  api.defaults.withCredentials = true;
 }
 
 // Add request interceptor
-api.interceptors.request.use(async (config) => {
-  const safari = isSafari();
-  
-  if (safari) {
-    // Safari: Add Authorization header
-    if (safariToken) {
+api.interceptors.request.use(
+  (config) => {
+    const safari = isSafari();
+    
+    if (safari && safariToken) {
       config.headers['Authorization'] = `Bearer ${safariToken}`;
     }
     
-    // Add Safari-specific headers
-    config.headers['X-Requested-With'] = 'XMLHttpRequest';
-    
-    // Cache busting for Safari
-    if (config.method === 'get') {
+    // Add cache busting only for GET requests (except auth endpoints)
+    if (config.method === 'get' && 
+        !config.url?.includes('/auth/') && 
+        !config.url?.includes('/login') &&
+        !config.url?.includes('/logout')) {
       config.params = {
         ...config.params,
         _t: Date.now(),
-        _rand: Math.random().toString(36).substring(2, 9)
       };
     }
-  } else {
-    // Non-Safari: Use cookies
-    config.withCredentials = true;
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  
-  // Common cache control headers
-  config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
-  config.headers['Pragma'] = 'no-cache';
-  
-  return config;
-});
+);
 
-// Response interceptor for token refresh
+// Response interceptor - SIMPLIFIED VERSION
 api.interceptors.response.use(
   (response) => {
     const safari = isSafari();
     
-    // Check if response has a new token (for Safari)
+    // For Safari: Update token if returned (only from login/refresh)
     if (safari && response.data?.token) {
-      const newToken = response.data.token;
-      safariToken = newToken;
-      localStorage.setItem('auth_token', newToken);
+      const url = response.config.url || '';
       
-      // Update axios default header
-      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      
-      // Remove token from response data to avoid confusion
-      delete response.data.token;
+      // Only update token from specific endpoints
+      if (url.includes('/login') || url.includes('/auth/refresh')) {
+        const newToken = response.data.token;
+        safariToken = newToken;
+        localStorage.setItem('auth_token', newToken);
+        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+        
+        // Remove token from response to prevent infinite loops
+        delete response.data.token;
+      }
     }
     
     return response;
@@ -113,68 +87,80 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // Handle 401 errors for token refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+    // Only handle 401 errors
+    if (error.response?.status !== 401) {
+      return Promise.reject(error);
+    }
+    
+    // Don't retry if it's a refresh request
+    if (originalRequest.url?.includes('/auth/refresh')) {
+      return Promise.reject(error);
+    }
+    
+    const safari = isSafari();
+    
+    if (safari) {
+      // If we're already refreshing, wait for that promise
+      if (refreshPromise) {
+        try {
+          await refreshPromise;
+          // Retry the original request with new token
+          return api(originalRequest);
+        } catch {
+          return Promise.reject(error);
+        }
+      }
       
-      const safari = isSafari();
-      
-      if (safari) {
-        // Safari: Refresh token
+      // Start a refresh
+      refreshPromise = (async () => {
         try {
           const refreshResponse = await axios.post(
             `${API_BASE_URL}/auth/refresh`,
             {},
             {
-              headers: {
+              headers: safariToken ? {
                 'Authorization': `Bearer ${safariToken}`
-              }
+              } : {}
             }
           );
           
           const newToken = refreshResponse.data.token;
           safariToken = newToken;
           localStorage.setItem('auth_token', newToken);
-          
-          // Update header and retry
-          originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
           api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-          
-          return api(originalRequest);
+          return newToken;
         } catch (refreshError) {
-          // Clear token and redirect to login
+          // Clear auth state on refresh failure
           localStorage.removeItem('auth_token');
           safariToken = null;
           delete api.defaults.headers.common['Authorization'];
-          
-          // Redirect to login
-          if (typeof window !== 'undefined') {
-            window.location.href = '/sign-in?reason=session_expired';
-          }
-          
-          return Promise.reject(refreshError);
+          throw refreshError;
+        } finally {
+          refreshPromise = null;
         }
-      } else {
-        // Non-Safari: Try refresh with cookies
-        try {
-          await axios.post(
-            `${API_BASE_URL}/auth/refresh`,
-            {},
-            { withCredentials: true }
-          );
-          
-          return api(originalRequest);
-        } catch (refreshError) {
-          // Redirect to login
-          if (typeof window !== 'undefined') {
-            window.location.href = '/sign-in?reason=session_expired';
-          }
-          return Promise.reject(refreshError);
-        }
+      })();
+      
+      try {
+        await refreshPromise;
+        // Retry the original request
+        return api(originalRequest);
+      } catch {
+        return Promise.reject(error);
+      }
+      
+    } else {
+      // Non-Safari: Simple retry for cookies
+      try {
+        await axios.post(
+          `${API_BASE_URL}/auth/refresh`,
+          {},
+          { withCredentials: true }
+        );
+        return api(originalRequest);
+      } catch {
+        return Promise.reject(error);
       }
     }
-    
-    return Promise.reject(error);
   }
 );
 
