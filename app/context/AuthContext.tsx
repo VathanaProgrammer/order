@@ -5,6 +5,7 @@ import {
   useEffect,
   useContext,
   ReactNode,
+  useRef,
 } from "react";
 import api, { isSafari } from "@/api/api";
 import { useRouter } from "next/navigation";
@@ -38,19 +39,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-
-  // 🔹 Store phone number in localStorage
-  const storePhone = (phone: string) => {
-    localStorage.setItem('user_phone', phone);
-  };
-
-  const getStoredPhone = (): string | null => {
-    return localStorage.getItem('user_phone');
-  };
-
-  const clearStoredPhone = () => {
-    localStorage.removeItem('user_phone');
-  };
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // 🔹 Unified function to extract user data
   const extractUserFromResponse = (responseData: any): User | null => {
@@ -69,8 +59,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return {
       id: userData.id || 0,
       name: userData.name || '',
-      phone: userData.phone || userData.mobile || null,
-      mobile: userData.mobile || userData.phone || null,
+      phone: userData.phone || null,
+      mobile: userData.mobile || null,
       profile_url: userData.profile_url || null,
       reward_points: userData.reward_points || {
         total: 0,
@@ -81,37 +71,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
-  // 🔹 Restore user on mount using stored phone
+  // 🔹 Restore user on mount - SIMPLIFIED
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const storedPhone = getStoredPhone();
+        console.log('🔄 Fetching user on mount...');
         
-        if (!storedPhone) {
-          console.log('No stored phone number found');
-          setUser(null);
-          setLoading(false);
-          return;
-        }
-        
-        console.log('🔄 Fetching user using stored phone:', storedPhone);
-        
-        // Use the getUserByPhone endpoint with query parameter
-        const res = await api.get(`/user/phone?phone=${encodeURIComponent(storedPhone)}`);
+        const res = await api.get("/user");
         
         const userData = extractUserFromResponse(res.data);
         
         if (userData) {
-          console.log('✅ User restored from stored phone');
+          console.log('✅ User found');
           setUser(userData);
         } else {
           console.log('❌ No valid user data');
-          clearStoredPhone();
           setUser(null);
         }
       } catch (err: any) {
         console.error("Auth restore failed:", err.message);
-        clearStoredPhone();
+        
+        // Don't automatically redirect - let components handle
         setUser(null);
       } finally {
         setLoading(false);
@@ -119,23 +99,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     fetchUser();
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
   }, []);
 
-  // 🔹 Refresh user data
+  // 🔹 Refresh user data - SIMPLIFIED
   const refreshUser = async (): Promise<void> => {
     try {
-      const storedPhone = getStoredPhone();
+      const response = await api.get(`/user`);
       
-      if (!storedPhone) {
-        setUser(null);
-        return;
-      }
-      
-      const response = await api.get(`/user/phone?phone=${encodeURIComponent(storedPhone)}`);
       const newUser = extractUserFromResponse(response.data);
       
       if (!newUser) {
-        clearStoredPhone();
         setUser(null);
         return;
       }
@@ -145,14 +125,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       console.error('Failed to refresh user:', error.message);
       
-      if (error.response?.status === 404 || error.response?.status === 401) {
-        clearStoredPhone();
+      // Only clear user if it's an auth error
+      if (error.response?.status === 401) {
         setUser(null);
       }
       
       throw error;
     }
   };
+
+  
 
   // 🔹 Update user data
   const updateUser = (updates: Partial<User>) => {
@@ -161,77 +143,89 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // 🔹 Enhanced login with phone storage
+  // 🔹 Enhanced login with better error handling
   const login = async (phone: string, username: string) => {
     setLoading(true);
+    setError(null);
     
     try {
       console.log('🔐 Attempting login with:', { phone, username });
       
-      // Clean phone number
-      const cleanPhone = phone.replace(/\D+/g, '');
-      
-      // Use the login endpoint
+      // Use the ACTUAL endpoint from your api.php
       const res = await api.post("/login", { 
-        phone: cleanPhone, 
-        name: username
+        phone, 
+        name: username   // or whatever field the backend expects for username/name
       });
       
       console.log('✅ Login successful');
+      console.log('📥 Login response:', res.data);
       
-      // Store phone number in localStorage
-      storePhone(cleanPhone);
-      
-      // Extract user data from response
-      const userData = extractUserFromResponse(res.data);
-      
-      if (userData) {
-        console.log('✅ User loaded after login:', userData.name);
-        setUser(userData);
-        router.push("/");
-      } else {
-        // Fallback: fetch user by phone
-        try {
-          const userRes = await api.get(`/user/phone?phone=${encodeURIComponent(cleanPhone)}`);
-          const fetchedUser = extractUserFromResponse(userRes.data);
-          
-          if (fetchedUser) {
-            setUser(fetchedUser);
-            router.push("/");
-          } else {
-            throw new Error('Could not fetch user data');
-          }
-        } catch (fetchErr) {
-          console.warn('⚠️ Could not fetch user after login, but phone is stored');
-          router.push("/");
-        }
+      // Handle possible token in response (Safari flow)
+      if (isSafari() && res.data?.token) {
+        console.log('🔑 Token received, saving...');
+        const newToken = res.data.token;
+        localStorage.setItem('auth_token', newToken);
+        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       }
+      
+      // Try to fetch user right after login
+      try {
+        const userResponse = await api.get("/user");
+        console.log('📦 /user after login:', userResponse.data);
+        
+        const userData = extractUserFromResponse(userResponse.data);
+        
+        if (userData) {
+          console.log('✅ User loaded after login:', userData.name);
+          setUser(userData);
+          router.push("/");
+          return;
+        } else {
+          console.warn('⚠️ Login OK but /user did not return valid user object');
+        }
+      } catch (userErr: any) {
+        console.warn('⚠️ Could not fetch /user right after login:', userErr.message);
+        // Still consider login successful if the /login returned 200
+      }
+      
+      // If no immediate user fetch → at least redirect
+      router.push("/");
       
     } catch (err: any) {
       console.error('🔴 Login failed:', {
         message: err.message,
         status: err.response?.status,
         data: err.response?.data,
+        url: err.config?.url
       });
       
-      // Clear stored phone on failed login
-      clearStoredPhone();
+      setError(`Login failed: ${err.response?.data?.message || err.message || 'Unknown error'}`);
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // 🔹 Enhanced Logout
+  // 🔹 Logout
+// 🔹 Enhanced Logout
   const logout = async () => {
     try {
       await api.post("/logout");
+      
+      // Clean up Safari token
+      if (isSafari()) {
+        localStorage.removeItem('auth_token');
+        delete api.defaults.headers.common['Authorization'];
+      }
     } catch (error: any) {
       console.error("Logout error:", error);
+      // Still clean up locally even if API fails
+      if (isSafari()) {
+        localStorage.removeItem('auth_token');
+        delete api.defaults.headers.common['Authorization'];
+      }
     }
     
-    // Always clear stored phone
-    clearStoredPhone();
     setUser(null);
     router.push("/sign-in");
   };
