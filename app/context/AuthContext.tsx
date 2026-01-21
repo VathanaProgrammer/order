@@ -149,71 +149,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('🔐 Attempting login with:', { phone, username });
       
-      // Try different endpoint variations
-      const endpoints = [
-        '/api/login',
-        '/login',
-        '/auth/login',
-        '/api/auth/login'
-      ];
+      // Use the ACTUAL endpoint from your api.php
+      const res = await api.post("/login", { 
+        phone, 
+        name: username   // or whatever field the backend expects for username/name
+      });
       
-      let lastError: any = null;
+      console.log('✅ Login successful');
+      console.log('📥 Login response:', res.data);
       
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`🔄 Trying endpoint: ${endpoint}`);
-          const res = await api.post(endpoint, { 
-            phone, 
-            name: username 
-          });
-          
-          console.log('✅ Login successful via:', endpoint);
-          console.log('📥 Login response:', res.data);
-          
-          if (res.data.success) {
-            // Handle Safari token if present
-            if (res.data.token) {
-              console.log('🔑 Token received, saving...');
-              localStorage.setItem('auth_token', res.data.token);
-            }
-            
-            // Try to get user data
-            try {
-              const userResponse = await api.get("/user");
-              const userData = extractUserFromResponse(userResponse.data);
-              
-              if (userData) {
-                console.log('✅ User data loaded:', userData.name);
-                setUser(userData);
-                router.push("/");
-                return;
-              }
-            } catch (userError) {
-              console.warn('⚠️ Could not fetch user immediately, but login succeeded');
-              // Still proceed if login was successful
-              router.push("/");
-              return;
-            }
-          }
-        } catch (err: any) {
-          lastError = err;
-          console.log(`❌ ${endpoint} failed:`, err.message);
-          continue; // Try next endpoint
-        }
+      // Handle possible token in response (Safari flow)
+      if (isSafari() && res.data?.token) {
+        console.log('🔑 Token received, saving...');
+        const newToken = res.data.token;
+        localStorage.setItem('auth_token', newToken);
+        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       }
       
-      // If all endpoints failed
-      throw lastError || new Error('All login endpoints failed');
+      // Try to fetch user right after login
+      try {
+        const userResponse = await api.get("/user");
+        console.log('📦 /user after login:', userResponse.data);
+        
+        const userData = extractUserFromResponse(userResponse.data);
+        
+        if (userData) {
+          console.log('✅ User loaded after login:', userData.name);
+          setUser(userData);
+          router.push("/");
+          return;
+        } else {
+          console.warn('⚠️ Login OK but /user did not return valid user object');
+        }
+      } catch (userErr: any) {
+        console.warn('⚠️ Could not fetch /user right after login:', userErr.message);
+        // Still consider login successful if the /login returned 200
+      }
+      
+      // If no immediate user fetch → at least redirect
+      router.push("/");
       
     } catch (err: any) {
-      console.error('🔴 Login error details:', {
+      console.error('🔴 Login failed:', {
         message: err.message,
         status: err.response?.status,
         data: err.response?.data,
         url: err.config?.url
       });
       
-      setError(`Login failed: ${err.response?.data?.message || err.message}`);
+      setError(`Login failed: ${err.response?.data?.message || err.message || 'Unknown error'}`);
       throw err;
     } finally {
       setLoading(false);
