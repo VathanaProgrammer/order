@@ -5,9 +5,18 @@ import {
   useEffect,
   useContext,
   ReactNode,
-  useRef,
 } from "react";
-import api, { isSafari } from "@/api/api";
+import api, { 
+  isSafari,
+  saveUserPhone,
+  getSavedPhone,
+  saveUserDataCache,
+  getCachedUserData,
+  clearAuthData,
+  setAuthToken,
+  clearAuthToken,
+  getAuthToken
+} from "@/api/api";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -28,6 +37,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (phone: string, username: string) => Promise<void>;
+  autoLogin: (phone: string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
@@ -39,10 +49,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  // 🔹 Unified function to extract user data
+  // Extract user data
   const extractUserFromResponse = (responseData: any): User | null => {
     if (!responseData) return null;
     
@@ -50,6 +58,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (responseData.user) {
       userData = responseData.user;
+    } else if (responseData.data?.user) {
+      userData = responseData.data.user;
+    } else if (responseData.data) {
+      userData = responseData.data;
     } else if (responseData.id) {
       userData = responseData;
     } else {
@@ -58,9 +70,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     return {
       id: userData.id || 0,
-      name: userData.name || '',
-      phone: userData.phone || null,
-      mobile: userData.mobile || null,
+      name: userData.name || 'Unknown User',
+      phone: userData.phone || userData.mobile || null,
+      mobile: userData.mobile || userData.phone || null,
       profile_url: userData.profile_url || null,
       reward_points: userData.reward_points || {
         total: 0,
@@ -71,161 +83,187 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
-  // 🔹 Restore user on mount - SIMPLIFIED
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        console.log('🔄 Fetching user on mount...');
+  // Auto-login with saved phone
+  const autoLogin = async (phone: string): Promise<boolean> => {
+    try {
+      console.log('🔄 Attempting auto-login with phone:', phone);
+      
+      const response = await api.post('/login', { 
+        phone, 
+        name: 'Auto Login'
+      });
+      
+      if (response.data.success) {
+        console.log('✅ Auto-login successful');
         
-        const res = await api.get("/user");
+        // Save token if provided
+        if (response.data.token) {
+          setAuthToken(response.data.token);
+        }
         
-        const userData = extractUserFromResponse(res.data);
-        
+        // Extract and set user data
+        const userData = extractUserFromResponse(response.data);
         if (userData) {
-          console.log('✅ User found');
           setUser(userData);
-        } else {
-          console.log('❌ No valid user data');
+          saveUserDataCache(userData);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('🔴 Auto-login failed:', error);
+      return false;
+    }
+  };
+
+  // Initial load - Try auto-login
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        console.log('🚀 Initializing auth...');
+        
+        // Check for saved phone
+        const savedPhone = getSavedPhone();
+        
+        if (savedPhone) {
+          console.log('📱 Found saved phone, attempting auto-login...');
+          
+          // Try auto-login
+          const success = await autoLogin(savedPhone);
+          
+          if (success) {
+            console.log('✅ Auto-login successful');
+            setLoading(false);
+            return;
+          } else {
+            console.log('❌ Auto-login failed, clearing saved phone');
+            clearAuthData();
+          }
+        }
+        
+        // If no saved phone or auto-login failed, try normal auth
+        console.log('🔍 Checking existing session...');
+        try {
+          const response = await api.get('/user');
+          const userData = extractUserFromResponse(response.data);
+          
+          if (userData) {
+            console.log('✅ Existing session found');
+            setUser(userData);
+            
+            // Save phone for future auto-login
+            if (userData.mobile || userData.phone) {
+              saveUserPhone(userData.mobile || userData.phone || '');
+            }
+          } else {
+            console.log('❌ No active session');
+            setUser(null);
+          }
+        } catch (error: any) {
+          console.log('🔴 Session check failed:', error.message);
           setUser(null);
         }
-      } catch (err: any) {
-        console.error("Auth restore failed:", err.message);
-        
-        // Don't automatically redirect - let components handle
+      } catch (error) {
+        console.log('🔴 Auth initialization failed:', error);
         setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUser();
-    
-    // Cleanup timeout on unmount
-    return () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-    };
+    initializeAuth();
   }, []);
 
-  // 🔹 Refresh user data - SIMPLIFIED
-  const refreshUser = async (): Promise<void> => {
+  // Normal login
+// In your AuthContext.tsx
+const login = async (phone: string, username: string) => {
+  setLoading(true);
+  try {
+    console.log('🔐 Logging in...');
+    
+    // Send only phone to backend (ignore username)
+    const response = await api.post('/login', { phone });
+    
+    if (response.data.success) {
+      console.log('✅ Login successful');
+      
+      // Save token if provided
+      if (response.data.token) {
+        setAuthToken(response.data.token);
+      }
+      
+      // Extract user data
+      const userData = extractUserFromResponse(response.data);
+      
+      if (userData) {
+        // Save phone to localStorage for future auto-login
+        saveUserPhone(phone);
+        
+        // Cache user data
+        saveUserDataCache(userData);
+        
+        // Set user in state
+        setUser(userData);
+        
+        router.push("/");
+      } else {
+        throw new Error("Could not get user data");
+      }
+    } else {
+      throw new Error(response.data.message || "Login failed");
+    }
+  } catch (error: any) {
+    console.error('🔴 Login failed:', error);
+    
+    // Clear any saved data on login failure
+    clearAuthData();
+    
+    throw error;
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // Logout
+  const logout = async () => {
     try {
-      const response = await api.get(`/user`);
+      await api.post('/logout', {});
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    
+    // Clear all local data
+    clearAuthData();
+    clearAuthToken();
+    setUser(null);
+    router.push("/sign-in");
+  };
+
+  // Refresh user
+  const refreshUser = async () => {
+    try {
+      const response = await api.get('/user');
+      const userData = extractUserFromResponse(response.data);
       
-      const newUser = extractUserFromResponse(response.data);
-      
-      if (!newUser) {
+      if (userData) {
+        setUser(userData);
+        saveUserDataCache(userData);
+      } else {
         setUser(null);
-        return;
       }
-      
-      setUser(newUser);
-      
-    } catch (error: any) {
-      console.error('Failed to refresh user:', error.message);
-      
-      // Only clear user if it's an auth error
-      if (error.response?.status === 401) {
-        setUser(null);
-      }
-      
+    } catch (error) {
+      console.error('Refresh failed:', error);
       throw error;
     }
   };
 
-  // 🔹 Update user data
+  // Update user
   const updateUser = (updates: Partial<User>) => {
     if (user) {
-      setUser({ ...user, ...updates });
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      saveUserDataCache(updatedUser);
     }
-  };
-
-  // 🔹 Enhanced login with better error handling
-  const login = async (phone: string, username: string) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      console.log('🔐 Attempting login with:', { phone, username });
-      
-      // Use the ACTUAL endpoint from your api.php
-      const res = await api.post("/login", { 
-        phone, 
-        name: username   // or whatever field the backend expects for username/name
-      });
-      
-      console.log('✅ Login successful');
-      console.log('📥 Login response:', res.data);
-      
-      // Handle possible token in response (Safari flow)
-      if (isSafari() && res.data?.token) {
-        console.log('🔑 Token received, saving...');
-        const newToken = res.data.token;
-        localStorage.setItem('auth_token', newToken);
-        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      }
-      
-      // Try to fetch user right after login
-      try {
-        const userResponse = await api.get("/user");
-        console.log('📦 /user after login:', userResponse.data);
-        
-        const userData = extractUserFromResponse(userResponse.data);
-        
-        if (userData) {
-          console.log('✅ User loaded after login:', userData.name);
-          setUser(userData);
-          router.push("/");
-          return;
-        } else {
-          console.warn('⚠️ Login OK but /user did not return valid user object');
-        }
-      } catch (userErr: any) {
-        console.warn('⚠️ Could not fetch /user right after login:', userErr.message);
-        // Still consider login successful if the /login returned 200
-      }
-      
-      // If no immediate user fetch → at least redirect
-      router.push("/");
-      
-    } catch (err: any) {
-      console.error('🔴 Login failed:', {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data,
-        url: err.config?.url
-      });
-      
-      setError(`Login failed: ${err.response?.data?.message || err.message || 'Unknown error'}`);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 🔹 Logout
-// 🔹 Enhanced Logout
-  const logout = async () => {
-    try {
-      await api.post("/logout");
-      
-      // Clean up Safari token
-      if (isSafari()) {
-        localStorage.removeItem('auth_token');
-        delete api.defaults.headers.common['Authorization'];
-      }
-    } catch (error: any) {
-      console.error("Logout error:", error);
-      // Still clean up locally even if API fails
-      if (isSafari()) {
-        localStorage.removeItem('auth_token');
-        delete api.defaults.headers.common['Authorization'];
-      }
-    }
-    
-    setUser(null);
-    router.push("/sign-in");
   };
 
   return (
@@ -233,6 +271,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user, 
       loading, 
       login, 
+      autoLogin, 
       logout, 
       refreshUser, 
       updateUser 

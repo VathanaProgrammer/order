@@ -1,95 +1,126 @@
 import axios from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://syspro.asia/api';
 console.log('🌐 API Base URL:', API_BASE_URL);
 
+// Safari detection
 export const isSafari = (): boolean => {
   if (typeof window === 'undefined') return false;
+  
   const ua = navigator.userAgent;
-  return /^((?!chrome|android).)*safari/i.test(ua) || /iPad|iPhone|iPod/.test(ua);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  
+  return isSafari || isIOS;
 };
 
-console.log('🦁 Is Safari?', isSafari());
+// PHONE-BASED AUTH STORAGE KEYS
+const STORAGE_KEYS = {
+  PHONE: 'user_phone',
+  USER_DATA: 'user_data_cache',
+  LAST_LOGIN: 'last_login_timestamp'
+};
+
+// Save phone number
+export const saveUserPhone = (phone: string) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEYS.PHONE, phone);
+  localStorage.setItem(STORAGE_KEYS.LAST_LOGIN, Date.now().toString());
+  console.log('📱 Phone saved to localStorage:', phone);
+};
+
+// Get saved phone
+export const getSavedPhone = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(STORAGE_KEYS.PHONE);
+};
+
+// Save user data cache
+export const saveUserDataCache = (userData: any) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
+  console.log('💾 User data cached');
+};
+
+// Get cached user data
+export const getCachedUserData = (): any => {
+  if (typeof window === 'undefined') return null;
+  const data = localStorage.getItem(STORAGE_KEYS.USER_DATA);
+  return data ? JSON.parse(data) : null;
+};
+
+// Clear all auth data
+export const clearAuthData = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(STORAGE_KEYS.PHONE);
+  localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+  localStorage.removeItem(STORAGE_KEYS.LAST_LOGIN);
+  localStorage.removeItem('auth_token');
+  console.log('🗑️ All auth data cleared');
+};
+
+// Token management
+let authToken: string | null = null;
+if (typeof window !== 'undefined') {
+  authToken = localStorage.getItem('auth_token');
+}
+
+export const getAuthToken = () => authToken;
+export const setAuthToken = (token: string) => {
+  authToken = token;
+  localStorage.setItem('auth_token', token);
+  console.log('🔑 Token saved');
+};
+
+export const clearAuthToken = () => {
+  authToken = null;
+  localStorage.removeItem('auth_token');
+  console.log('🔑 Token cleared');
+};
 
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
-  withCredentials: true, // Safe to always enable (non-Safari uses cookies, Safari ignores)
+  timeout: 15000,
+  headers: {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  }
 });
-
-// Remove any default Authorization (we set it dynamically)
-delete api.defaults.headers.common['Authorization'];
-
-// Unified token management
-let currentToken: string | null = null;
-
-const updateToken = (token: string | null) => {
-  currentToken = token;
-  if (token) {
-    localStorage.setItem('auth_token', token);
-  } else {
-    localStorage.removeItem('auth_token');
-  }
-};
-
-// Load token on module load (Safari only)
-if (typeof window !== 'undefined') {
-  console.log('🔄 Initializing auth...');
-  const stored = localStorage.getItem('auth_token');
-  if (stored && isSafari()) {
-    console.log('🔑 Loaded existing token from localStorage');
-    updateToken(stored);
-  } else if (!isSafari()) {
-    console.log('🍪 Non-Safari: relying on cookies');
-  }
-}
 
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
     const safari = isSafari();
-    const token = currentToken || localStorage.getItem('auth_token');
-
-    console.log(`📤 [${config.method?.toUpperCase()}] ${config.baseURL}${config.url || ''}`);
-
-    if (token) {
-      if (safari && config.method?.toLowerCase() === 'get') {
-        // Safari/iOS GET workaround for Axios header-dropping bug
-        config.params = { ...config.params, token };
-        console.log('🦁 Safari GET workaround: added ?token=...');
-      } else {
-        // Use .set() because config.headers is AxiosHeaders
-        config.headers.set('Authorization', `Bearer ${token}`);
-        console.log('→ Using Bearer header');
+    
+    console.log(`📤 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    console.log(`🌐 Browser: ${safari ? 'Safari' : 'Non-Safari'}`);
+    
+    if (safari) {
+      // Safari: Use Authorization header if token exists
+      if (authToken) {
+        config.headers['Authorization'] = `Bearer ${authToken}`;
+        console.log('🦁 Added Authorization header');
       }
+      config.withCredentials = false;
     } else {
-      console.log('⚠️ No auth token found for this request');
+      // Non-Safari: Use cookies
+      config.withCredentials = true;
+      console.log('🌍 Using cookies');
     }
-
-    // Debug
-    console.log('🔧 Request details:', {
-      isSafari: safari,
-      hasToken: !!token,
-      method: config.method,
-      usingQueryToken: !!config.params?.token,
-      authHeaderSent: config.headers.get('Authorization'),
-      params: config.params,
-      withCredentials: config.withCredentials,
-    });
-
-    // POST/PUT content type
-    if (config.method === 'post' || config.method === 'put') {
-      if (!config.headers.get('Content-Type')) {
-        config.headers.set('Content-Type', 'application/json');
-      }
+    
+    // Add cache busting for GET requests
+    if (config.method?.toLowerCase() === 'get') {
+      config.params = {
+        ...config.params,
+        _t: Date.now()
+      };
     }
-
+    
     return config;
   },
   (error) => {
-    console.error('📤 Request interceptor error:', error);
+    console.error('📤 Request error:', error);
     return Promise.reject(error);
   }
 );
@@ -97,36 +128,31 @@ api.interceptors.request.use(
 // Response interceptor
 api.interceptors.response.use(
   (response) => {
-    const url = response.config.url || '';
-
-    // Save new token from login/refresh responses (Safari)
-    if (isSafari() && response.data?.token) {
-      if (url.includes('login') || url.includes('refresh')) {
-        console.log('🔑 New token received → saving');
-        updateToken(response.data.token);
-      }
+    console.log(`✅ ${response.status} ${response.config.url}`);
+    
+    // Save token from login response
+    if (response.config.url?.includes('login') && response.data?.token) {
+      setAuthToken(response.data.token);
     }
-
-    console.log(`✅ [${response.status}] ${url}`);
+    
     return response;
   },
   (error) => {
-    console.error('🔴 Response error:', {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      data: error.response?.data,
+    console.error(`❌ ${error.response?.status || 'Error'}: ${error.config?.url}`, {
+      message: error.response?.data?.message || error.message
     });
-
-    // Optional: handle 401 globally
-    if (error.response?.status === 401 && !error.config?.url?.includes('login')) {
-      console.warn('401 → clearing token');
-      updateToken(null);
-      // Add redirect here if you want: router.push('/sign-in')
-    }
-
     return Promise.reject(error);
   }
 );
 
+// Create convenience methods
+const apiRequest = {
+  get: (url: string, config?: any) => api.get(url, config),
+  post: (url: string, data?: any, config?: any) => api.post(url, data, config),
+  put: (url: string, data?: any, config?: any) => api.put(url, data, config),
+  delete: (url: string, config?: any) => api.delete(url, config),
+};
+
+// Export everything
 export default api;
+export { apiRequest };
