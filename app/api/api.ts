@@ -15,9 +15,7 @@ export const isSafari = (): boolean => {
   return isSafari || isIOS;
 };
 
-console.log('🦁 Is Safari?', isSafari());
-
-// SIMPLE axios instance - NO interceptors
+// Create axios instance - NO INTERCEPTORS
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
@@ -26,93 +24,84 @@ const api = axios.create({
 // Token management
 let authToken: string | null = null;
 
-// Initialize on client side only
+// Initialize token
 if (typeof window !== 'undefined') {
   authToken = localStorage.getItem('auth_token');
-  console.log('🔑 Initial auth token:', authToken ? 'Found' : 'None');
+  console.log('🔑 Initial token:', authToken ? 'Yes' : 'No');
+  
+  if (authToken && isSafari()) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+  }
 }
 
 // Helper functions
-export const getAuthToken = () => authToken;
-
 export const setAuthToken = (token: string) => {
   authToken = token;
   localStorage.setItem('auth_token', token);
-  console.log('🔑 Token saved');
+  
+  if (isSafari()) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  }
+  
+  console.log('✅ Token saved');
 };
 
 export const clearAuthToken = () => {
   authToken = null;
   localStorage.removeItem('auth_token');
-  console.log('🔑 Token cleared');
+  
+  if (isSafari()) {
+    delete api.defaults.headers.common['Authorization'];
+  }
+  
+  console.log('✅ Token cleared');
 };
 
-// Create a request with proper auth headers
-export const createRequest = (config: any) => {
-  const isSafariBrowser = isSafari();
-  const finalConfig = { ...config };
+export const getAuthToken = () => authToken;
+
+// Simple request functions
+const makeRequest = async (method: string, url: string, data?: any) => {
+  const config: any = {
+    method,
+    url,
+  };
   
-  if (isSafariBrowser) {
-    // Safari: Use Authorization header
+  if (data) {
+    config.data = data;
+  }
+  
+  // For Safari, use token; for others, use cookies
+  if (isSafari()) {
     if (authToken) {
-      finalConfig.headers = {
-        ...finalConfig.headers,
+      config.headers = {
         'Authorization': `Bearer ${authToken}`
       };
     }
-    finalConfig.withCredentials = false;
   } else {
-    // Non-Safari: Use cookies
-    finalConfig.withCredentials = true;
+    config.withCredentials = true;
   }
   
   // Add cache busting for GET requests
-  if (finalConfig.method?.toLowerCase() === 'get' && finalConfig.params) {
-    finalConfig.params._t = Date.now();
+  if (method.toLowerCase() === 'get') {
+    config.params = {
+      _t: Date.now()
+    };
   }
   
-  return api(finalConfig);
-};
-
-// Individual request methods with proper auth
-export const apiGet = (url: string, config = {}) => 
-  createRequest({ method: 'get', url, ...config });
-
-export const apiPost = (url: string, data = {}, config = {}) => 
-  createRequest({ method: 'post', url, data, ...config });
-
-export const apiPut = (url: string, data = {}, config = {}) => 
-  createRequest({ method: 'put', url, data, ...config });
-
-export const apiDelete = (url: string, config = {}) => 
-  createRequest({ method: 'delete', url, ...config });
-
-// Manual token refresh function (call this explicitly, don't auto-refresh)
-export const refreshToken = async () => {
-  const isSafariBrowser = isSafari();
+  console.log(`📤 ${method.toUpperCase()} ${url}`);
   
-  if (isSafariBrowser) {
-    // Safari: Refresh using Authorization header
-    const response = await api.post(`${API_BASE_URL}/auth/refresh`, {}, {
-      headers: authToken ? {
-        'Authorization': `Bearer ${authToken}`
-      } : {}
-    });
-    
-    if (response.data.token) {
-      setAuthToken(response.data.token);
-      return response.data.token;
-    }
-  } else {
-    // Non-Safari: Refresh using cookies
-    await api.post(`${API_BASE_URL}/auth/refresh`, {}, {
-      withCredentials: true
-    });
-    return null;
+  try {
+    const response = await api(config);
+    console.log(`✅ ${method.toUpperCase()} ${url} succeeded`);
+    return response;
+  } catch (error: any) {
+    console.error(`❌ ${method.toUpperCase()} ${url} failed:`, error.message);
+    throw error;
   }
-  
-  throw new Error('Token refresh failed');
 };
 
-// Export the base api for compatibility
+// Export simple methods
+export const apiGet = (url: string) => makeRequest('get', url);
+export const apiPost = (url: string, data?: any) => makeRequest('post', url, data);
+
 export default api;
