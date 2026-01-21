@@ -4,15 +4,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 console.log('🌐 API Base URL:', API_BASE_URL);
 
-// Safari detection utility
 export const isSafari = (): boolean => {
   if (typeof window === 'undefined') return false;
-  
   const ua = navigator.userAgent;
-  const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  
-  return isSafari || isIOS;
+  return /^((?!chrome|android).)*safari/i.test(ua) || /iPad|iPhone|iPod/.test(ua);
 };
 
 console.log('🦁 Is Safari?', isSafari());
@@ -21,77 +16,73 @@ console.log('🦁 Is Safari?', isSafari());
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  withCredentials: true, // Safe to always enable (non-Safari uses cookies, Safari ignores)
 });
 
-// Safari token management
-let safariToken: string | null = null;
+// Remove any default Authorization (we set it dynamically)
+delete api.defaults.headers.common['Authorization'];
 
-// Initialize auth based on browser
-const initializeAuth = () => {
-  if (typeof window === 'undefined') return;
-  
-  console.log('🔄 Initializing auth...');
-  
-  if (isSafari()) {
-    console.log('🦁 Safari detected - using token-based auth');
-    safariToken = localStorage.getItem('auth_token');
-    
-    if (safariToken) {
-      console.log('🔑 Token found in localStorage');
-      api.defaults.headers.common['Authorization'] = `Bearer ${safariToken}`;
-    } else {
-      console.log('🔑 No token in localStorage');
-    }
+// Unified token management
+let currentToken: string | null = null;
+
+const updateToken = (token: string | null) => {
+  currentToken = token;
+  if (token) {
+    localStorage.setItem('auth_token', token);
   } else {
-    console.log('🌍 Non-Safari browser detected - using cookie-based auth');
-    // Non-Safari: use cookies
-    api.defaults.withCredentials = true;
+    localStorage.removeItem('auth_token');
   }
 };
 
-// Initialize on module load
-initializeAuth();
+// Load token on module load (Safari only)
+if (typeof window !== 'undefined') {
+  console.log('🔄 Initializing auth...');
+  const stored = localStorage.getItem('auth_token');
+  if (stored && isSafari()) {
+    console.log('🔑 Loaded existing token from localStorage');
+    updateToken(stored);
+  } else if (!isSafari()) {
+    console.log('🍪 Non-Safari: relying on cookies');
+  }
+}
 
-// Add request interceptor with detailed logging + Safari GET workaround
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
     const safari = isSafari();
-    const token = safariToken || localStorage.getItem('auth_token'); // fallback to localStorage
+    const token = currentToken || localStorage.getItem('auth_token');
 
-    console.log(`📤 [${config.method?.toUpperCase()}] ${config.baseURL}${config.url}`);
+    console.log(`📤 [${config.method?.toUpperCase()}] ${config.baseURL}${config.url || ''}`);
 
     if (token) {
       if (safari && config.method?.toLowerCase() === 'get') {
-        // Critical workaround: Safari/iOS often drops Authorization header on GET
-        // Send token as query param instead → JWTAuth supports this natively
-        config.params = config.params || {};
-        config.params.token = token;
-        console.log('🦁 Safari GET workaround: added ?token=... (header skipped)');
+        // Safari/iOS GET workaround for Axios header-dropping bug
+        config.params = { ...config.params, token };
+        console.log('🦁 Safari GET workaround: added ?token=...');
       } else {
-        // For non-Safari or non-GET requests → use standard Bearer header
-        config.headers = config.headers || {};
-        config.headers['Authorization'] = `Bearer ${token}`;
-        console.log('Using Authorization: Bearer header');
+        // Use .set() because config.headers is AxiosHeaders
+        config.headers.set('Authorization', `Bearer ${token}`);
+        console.log('→ Using Bearer header');
       }
     } else {
       console.log('⚠️ No auth token found for this request');
     }
 
-    // Detailed debug
+    // Debug
     console.log('🔧 Request details:', {
       isSafari: safari,
       hasToken: !!token,
       method: config.method,
       usingQueryToken: !!config.params?.token,
-      authHeaderSent: config.headers?.['Authorization'],
+      authHeaderSent: config.headers.get('Authorization'),
       params: config.params,
       withCredentials: config.withCredentials,
     });
 
-    // Content-Type fix for POST/PUT
+    // POST/PUT content type
     if (config.method === 'post' || config.method === 'put') {
-      if (!config.headers['Content-Type']) {
-        config.headers['Content-Type'] = 'application/json';
+      if (!config.headers.get('Content-Type')) {
+        config.headers.set('Content-Type', 'application/json');
       }
     }
 
@@ -102,4 +93,40 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+// Response interceptor
+api.interceptors.response.use(
+  (response) => {
+    const url = response.config.url || '';
+
+    // Save new token from login/refresh responses (Safari)
+    if (isSafari() && response.data?.token) {
+      if (url.includes('login') || url.includes('refresh')) {
+        console.log('🔑 New token received → saving');
+        updateToken(response.data.token);
+      }
+    }
+
+    console.log(`✅ [${response.status}] ${url}`);
+    return response;
+  },
+  (error) => {
+    console.error('🔴 Response error:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
+
+    // Optional: handle 401 globally
+    if (error.response?.status === 401 && !error.config?.url?.includes('login')) {
+      console.warn('401 → clearing token');
+      updateToken(null);
+      // Add redirect here if you want: router.push('/sign-in')
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 export default api;
