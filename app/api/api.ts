@@ -52,44 +52,43 @@ const initializeAuth = () => {
 // Initialize on module load
 initializeAuth();
 
+// Add request interceptor with detailed logging + Safari GET workaround
 api.interceptors.request.use(
   (config) => {
     const safari = isSafari();
-    const token = safariToken || localStorage.getItem('auth_token');
+    const token = safariToken || localStorage.getItem('auth_token'); // fallback to localStorage
 
     console.log(`📤 [${config.method?.toUpperCase()}] ${config.baseURL}${config.url}`);
 
     if (token) {
-      if (safari) {
-        if (config.method === 'get') {
-          // Workaround for Axios + Safari/iOS bug: Authorization header often dropped on GET
-          config.params = config.params || {};
-          config.params.token = token;
-          console.log('Safari GET workaround → using ?token=... instead of header');
-        } else {
-          // POST/PUT/DELETE → still use Bearer header
-          config.headers = config.headers || {};
-          config.headers['Authorization'] = `Bearer ${token}`;
-          console.log('Safari non-GET → using Authorization: Bearer');
-        }
+      if (safari && config.method?.toLowerCase() === 'get') {
+        // Critical workaround: Safari/iOS often drops Authorization header on GET
+        // Send token as query param instead → JWTAuth supports this natively
+        config.params = config.params || {};
+        config.params.token = token;
+        console.log('🦁 Safari GET workaround: added ?token=... (header skipped)');
       } else {
-        // Non-Safari → always use Bearer header
+        // For non-Safari or non-GET requests → use standard Bearer header
         config.headers = config.headers || {};
         config.headers['Authorization'] = `Bearer ${token}`;
+        console.log('Using Authorization: Bearer header');
       }
     } else {
-      console.log('No token available for this request');
+      console.log('⚠️ No auth token found for this request');
     }
 
-    console.log('🔧 Final request config:', {
+    // Detailed debug
+    console.log('🔧 Request details:', {
       isSafari: safari,
+      hasToken: !!token,
       method: config.method,
       usingQueryToken: !!config.params?.token,
-      authHeader: config.headers?.['Authorization'],
+      authHeaderSent: config.headers?.['Authorization'],
+      params: config.params,
       withCredentials: config.withCredentials,
     });
 
-    // Content-Type for POST/PUT
+    // Content-Type fix for POST/PUT
     if (config.method === 'post' || config.method === 'put') {
       if (!config.headers['Content-Type']) {
         config.headers['Content-Type'] = 'application/json';
