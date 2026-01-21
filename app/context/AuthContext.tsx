@@ -6,13 +6,7 @@ import {
   useContext,
   ReactNode,
 } from "react";
-import { 
-  apiGet, 
-  apiPost, 
-  setAuthToken, 
-  clearAuthToken,
-  isSafari 
-} from "@/api/api";
+import api, { setAuthToken, clearAuthToken, getAuthToken } from "@/api/api";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -45,7 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Extract user data
+  // 🔹 Extract user data from API response
   const extractUserFromResponse = (responseData: any): User | null => {
     if (!responseData) return null;
     
@@ -55,7 +49,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       userData = responseData.user;
     } else if (responseData.data?.user) {
       userData = responseData.data.user;
-    } else if (responseData.data) {
+    } else if (responseData.data?.id) {
       userData = responseData.data;
     } else if (responseData.id) {
       userData = responseData;
@@ -78,144 +72,128 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
-  // Fetch user data
-  const fetchUserData = async (): Promise<User | null> => {
-    try {
-      console.log('🔄 Fetching user data...');
-      
-      const response = await apiGet("/user");
-      
-      console.log('📥 User response:', response.data);
-      
-      const userData = extractUserFromResponse(response.data);
-      
-      if (userData) {
-        console.log('✅ User data loaded:', userData.name);
-        return userData;
-      }
-      
-      return null;
-    } catch (error: any) {
-      console.error('🔴 Failed to fetch user:', error.message);
-      
-      // If 401, clear token and return null
-      if (error.response?.status === 401) {
-        console.log('🔴 Unauthorized, clearing token');
-        if (isSafari()) {
-          clearAuthToken();
-        }
-      }
-      
-      return null;
-    }
-  };
-
-  // Initial load
+  // 🔹 Restore user on mount
   useEffect(() => {
-    const loadUser = async () => {
+    const fetchUser = async () => {
       try {
-        const userData = await fetchUserData();
-        setUser(userData);
-      } catch (error) {
-        console.error('🔴 Initial load failed:', error);
+        console.log('🔄 Fetching user on mount...');
+        console.log('🔑 Current token:', getAuthToken() ? 'Exists' : 'None');
+        
+        const res = await api.get("/user");
+        
+        console.log('📥 User API response:', res.data);
+        
+        const userData = extractUserFromResponse(res.data);
+        
+        if (userData) {
+          console.log('✅ User found:', userData.name);
+          setUser(userData);
+        } else {
+          console.log('❌ No user data in response');
+          setUser(null);
+        }
+      } catch (err: any) {
+        console.error("🔴 Auth restore failed:", err.message);
+        console.error("🔴 Error status:", err.response?.status);
         setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
-    loadUser();
+    fetchUser();
   }, []);
 
-  // Login - SIMPLE AND EFFECTIVE
+  // 🔹 Refresh user data
+  const refreshUser = async (): Promise<void> => {
+    try {
+      const response = await api.get("/user");
+      const newUser = extractUserFromResponse(response.data);
+      
+      if (newUser) {
+        setUser(newUser);
+      } else {
+        setUser(null);
+      }
+    } catch (error: any) {
+      console.error('🔴 Failed to refresh user:', error.message);
+      setUser(null);
+      throw error;
+    }
+  };
+
+  // 🔹 Update user data
+  const updateUser = (updates: Partial<User>) => {
+    if (user) {
+      setUser({ ...user, ...updates });
+    }
+  };
+
+  // 🔹 Login - CRITICAL FIX FOR SAFARI
   const login = async (phone: string, username: string) => {
     setLoading(true);
-    
     try {
-      console.log('🔐 Logging in...');
+      console.log('🔐 Attempting login...');
       
-      // Step 1: Call login endpoint
-      const loginResponse = await apiPost("/login", { 
-        phone, 
-        name: username 
-      });
+      const res = await api.post("/login", { phone, name: username });
+
+      console.log('✅ Login response:', res.data);
       
-      console.log('✅ Login response:', loginResponse.data);
-      
-      if (!loginResponse.data.success) {
-        throw new Error(loginResponse.data.message || "Login failed");
-      }
-      
-      // Step 2: Save token if provided (for Safari)
-      if (loginResponse.data.token) {
-        setAuthToken(loginResponse.data.token);
-        console.log('🔑 Token saved');
-      }
-      
-      // Step 3: Try to get user data
-      let userData;
-      
-      if (loginResponse.data.user) {
-        // If user data is in login response, use it
-        userData = extractUserFromResponse(loginResponse.data);
-        console.log('✅ User data from login response');
+      if (res.data.success) {
+        // SAFARI: Save token if returned
+        if (res.data.token) {
+          setAuthToken(res.data.token);
+        }
+        
+        // Try to get user data immediately
+        try {
+          const userResponse = await api.get("/user");
+          const userData = extractUserFromResponse(userResponse.data);
+          
+          if (userData) {
+            console.log('✅ User data loaded:', userData.name);
+            setUser(userData);
+            router.push("/");
+          } else {
+            throw new Error("Could not load user data");
+          }
+        } catch (userError: any) {
+          console.warn('⚠️ Could not fetch user immediately:', userError.message);
+          // Still proceed with login
+          if (res.data.user) {
+            const userData = extractUserFromResponse(res.data);
+            setUser(userData);
+          }
+          router.push("/");
+        }
       } else {
-        // Otherwise fetch from /user endpoint
-        userData = await fetchUserData();
-        console.log('✅ User data from /user endpoint');
+        throw new Error(res.data.message || "Login failed");
       }
+    } catch (err: any) {
+      console.error("🔴 Login error:", err.message);
+      console.error("🔴 Error details:", err.response?.data);
       
-      if (userData) {
-        setUser(userData);
-        router.push("/");
-      } else {
-        throw new Error("Could not get user data");
-      }
+      // Clear any stored token on login failure
+      clearAuthToken();
       
-    } catch (error: any) {
-      console.error('🔴 Login failed:', error.message);
-      
-      // Clean up on failure
-      if (isSafari()) {
-        clearAuthToken();
-      }
-      
-      throw error;
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // Logout
+  // 🔹 Logout
   const logout = async () => {
     try {
-      await apiPost("/logout", {});
-    } catch (error) {
-      console.error('Logout error:', error);
+      await api.post("/logout");
+    } catch (error: any) {
+      console.error("Logout error:", error.message);
     }
     
-    // Always clear local state
+    // Always clear local auth state
     clearAuthToken();
     setUser(null);
     router.push("/sign-in");
-  };
-
-  // Refresh user
-  const refreshUser = async () => {
-    try {
-      const userData = await fetchUserData();
-      setUser(userData);
-    } catch (error) {
-      console.error('Refresh failed:', error);
-      throw error;
-    }
-  };
-
-  // Update user
-  const updateUser = (updates: Partial<User>) => {
-    if (user) {
-      setUser({ ...user, ...updates });
-    }
   };
 
   return (

@@ -1,20 +1,10 @@
 import axios from "axios";
 
-// SAFARI FIX: Use absolute URLs since frontend/backend are different domains
-const getAPIBaseURL = () => {
-  // Try to get from env first
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  
-  // Default to your likely backend
-  return 'https://syspro.asia';
-};
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://your-api-domain.com';
 
-const API_BASE_URL = getAPIBaseURL();
 console.log('🌐 API Base URL:', API_BASE_URL);
 
-// Safari detection
+// Safari detection utility
 export const isSafari = (): boolean => {
   if (typeof window === 'undefined') return false;
   
@@ -25,54 +15,61 @@ export const isSafari = (): boolean => {
   return isSafari || isIOS;
 };
 
-console.log('🦁 Is Safari?', isSafari());
+console.log('🦁 Browser is Safari/iOS:', isSafari());
 
-// Create axios instance with absolute URL
+// Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 10000,
 });
 
-// Token management
+// Token management for Safari
 let authToken: string | null = null;
 
-// Initialize
+// Initialize token from localStorage
 if (typeof window !== 'undefined') {
   authToken = localStorage.getItem('auth_token');
-  console.log('🔑 Initial token:', authToken ? 'Found' : 'None');
+  console.log('🔑 Initial token from localStorage:', authToken ? 'Found' : 'Not found');
+  
+  if (authToken) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+    console.log('✅ Authorization header set');
+  }
 }
 
-export const getAuthToken = () => authToken;
-
+// Store token function (call this after login)
 export const setAuthToken = (token: string) => {
   authToken = token;
   localStorage.setItem('auth_token', token);
-  console.log('✅ Token saved');
+  api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  console.log('🔑 Token saved and header updated');
 };
 
+// Clear token function (call this after logout)
 export const clearAuthToken = () => {
   authToken = null;
   localStorage.removeItem('auth_token');
-  console.log('✅ Token cleared');
+  delete api.defaults.headers.common['Authorization'];
+  console.log('🔑 Token cleared');
 };
 
-// Request interceptor
+// Get current token
+export const getAuthToken = () => authToken;
+
+// Add request interceptor
 api.interceptors.request.use(
   (config) => {
-    const safari = isSafari();
+    console.log(`📤 Request: ${config.method?.toUpperCase()} ${config.url}`);
     
-    console.log(`📤 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
-    
-    // CRITICAL: For Safari, use Authorization header
-    if (safari && authToken) {
+    // Always add the current token if we have one
+    if (authToken) {
       config.headers['Authorization'] = `Bearer ${authToken}`;
-      console.log('🔑 Added Authorization header for Safari');
+      console.log('🔑 Adding Authorization header to request');
     }
     
-    // CRITICAL: For non-Safari, use cookies (withCredentials)
-    if (!safari) {
-      config.withCredentials = true;
-      console.log('🍪 Using cookies (withCredentials) for non-Safari');
+    // Don't add cache busting to avoid infinite loops
+    if (config.method === 'get' && config.params) {
+      config.params._t = Date.now();
     }
     
     return config;
@@ -83,24 +80,80 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor - SIMPLE
+// Response interceptor - SIMPLIFIED
 api.interceptors.response.use(
   (response) => {
-    console.log(`✅ ${response.status} ${response.config.url}`);
+    console.log(`✅ Response [${response.status}]: ${response.config.url}`);
     
-    // Save token from login response
+    // Check for new token in login response
     if (response.config.url?.includes('login') && response.data?.token) {
+      setAuthToken(response.data.token);
+    }
+    
+    // Check for new token in refresh response  
+    if (response.config.url?.includes('refresh') && response.data?.token) {
+      setAuthToken(response.data.token);
+    }
+    
+    // Check for new token in user response (if backend returns it)
+    if (response.config.url?.includes('user') && response.data?.token) {
       setAuthToken(response.data.token);
     }
     
     return response;
   },
-  (error) => {
-    console.error(`❌ ${error.response?.status || 'Network'} Error:`, {
+  async (error) => {
+    const originalRequest = error.config;
+    
+    console.error('🔴 Response error:', {
       url: error.config?.url,
-      method: error.config?.method,
-      message: error.response?.data?.message || error.message
+      status: error.response?.status,
+      message: error.response?.data?.message
     });
+    
+    // Handle 401 Unauthorized errors
+    if (error.response?.status === 401) {
+      console.log('🔄 Handling 401 error');
+      
+      // If it's a login request, don't try to refresh
+      if (originalRequest.url?.includes('login') || 
+          originalRequest.url?.includes('logout')) {
+        return Promise.reject(error);
+      }
+      
+      // Try to refresh the token
+      try {
+        console.log('🔄 Attempting token refresh...');
+        
+        const refreshResponse = await axios.post(
+          `${API_BASE_URL}/auth/refresh`,
+          {},
+          {
+            headers: authToken ? {
+              'Authorization': `Bearer ${authToken}`
+            } : {}
+          }
+        );
+        
+        if (refreshResponse.data.token) {
+          setAuthToken(refreshResponse.data.token);
+          console.log('✅ Token refreshed successfully');
+          
+          // Retry the original request with new token
+          originalRequest.headers['Authorization'] = `Bearer ${authToken}`;
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        console.error('🔴 Token refresh failed:', refreshError);
+        clearAuthToken();
+        
+        // Redirect to login page
+        if (typeof window !== 'undefined') {
+          window.location.href = '/sign-in?reason=session_expired';
+        }
+      }
+    }
+    
     return Promise.reject(error);
   }
 );
