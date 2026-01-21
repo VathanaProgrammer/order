@@ -141,20 +141,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // 🔹 Login - SIMPLIFIED
+  // 🔹 Login with unified flow
   const login = async (phone: string, username: string) => {
     setLoading(true);
     try {
+      console.log('🔐 Attempting login...');
+      
       const res = await api.post("/login", { phone, name: username });
 
+      console.log('✅ Login response:', res.data);
+      
       if (res.data.success) {
-        const userData = extractUserFromResponse(res.data);
+        // Handle Safari token if present
+        if (isSafari() && res.data.token) {
+          console.log('🦁 Safari: Token received, saving to localStorage');
+          localStorage.setItem('auth_token', res.data.token);
+          // Update axios default header
+          api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+        }
+        
+        // ALWAYS fetch user data immediately after login
+        console.log('🔄 Immediately fetching user data after login...');
+        const userResponse = await api.get("/user");
+        
+        console.log('📥 User data after login:', userResponse.data);
+        
+        const userData = extractUserFromResponse(userResponse.data);
+        
         if (userData) {
+          console.log('✅ Login successful, user set:', userData.name);
           setUser(userData);
           router.push("/");
+        } else {
+          throw new Error("Could not fetch user data after login");
         }
+      } else {
+        throw new Error(res.data.message || "Login failed");
       }
     } catch (err: any) {
-      console.error("Login error:", err.message);
+      console.error("🔴 Login error:", err);
+      // Clean up on error
+      if (isSafari()) {
+        localStorage.removeItem('auth_token');
+        delete api.defaults.headers.common['Authorization'];
+      }
       throw err;
     } finally {
       setLoading(false);
@@ -162,15 +192,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // 🔹 Logout
+// 🔹 Enhanced Logout
   const logout = async () => {
     try {
       await api.post("/logout");
       
+      // Clean up Safari token
       if (isSafari()) {
         localStorage.removeItem('auth_token');
+        delete api.defaults.headers.common['Authorization'];
       }
     } catch (error: any) {
-      console.error("Logout error:", error.message);
+      console.error("Logout error:", error);
+      // Still clean up locally even if API fails
+      if (isSafari()) {
+        localStorage.removeItem('auth_token');
+        delete api.defaults.headers.common['Authorization'];
+      }
     }
     
     setUser(null);
