@@ -140,51 +140,79 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // 🔹 Login - SIMPLIFIED
-  // 🔹 Login with unified flow
+  // 🔹 Enhanced login with better error handling
   const login = async (phone: string, username: string) => {
     setLoading(true);
+    setError(null);
+    
     try {
-      console.log('🔐 Attempting login...');
+      console.log('🔐 Attempting login with:', { phone, username });
       
-      const res = await api.post("/login", { phone, name: username });
-
-      console.log('✅ Login response:', res.data);
+      // Try different endpoint variations
+      const endpoints = [
+        '/api/login',
+        '/login',
+        '/auth/login',
+        '/api/auth/login'
+      ];
       
-      if (res.data.success) {
-        // Handle Safari token if present
-        if (isSafari() && res.data.token) {
-          console.log('🦁 Safari: Token received, saving to localStorage');
-          localStorage.setItem('auth_token', res.data.token);
-          // Update axios default header
-          api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+      let lastError: any = null;
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`🔄 Trying endpoint: ${endpoint}`);
+          const res = await api.post(endpoint, { 
+            phone, 
+            name: username 
+          });
+          
+          console.log('✅ Login successful via:', endpoint);
+          console.log('📥 Login response:', res.data);
+          
+          if (res.data.success) {
+            // Handle Safari token if present
+            if (res.data.token) {
+              console.log('🔑 Token received, saving...');
+              localStorage.setItem('auth_token', res.data.token);
+            }
+            
+            // Try to get user data
+            try {
+              const userResponse = await api.get("/user");
+              const userData = extractUserFromResponse(userResponse.data);
+              
+              if (userData) {
+                console.log('✅ User data loaded:', userData.name);
+                setUser(userData);
+                router.push("/");
+                return;
+              }
+            } catch (userError) {
+              console.warn('⚠️ Could not fetch user immediately, but login succeeded');
+              // Still proceed if login was successful
+              router.push("/");
+              return;
+            }
+          }
+        } catch (err: any) {
+          lastError = err;
+          console.log(`❌ ${endpoint} failed:`, err.message);
+          continue; // Try next endpoint
         }
-        
-        // ALWAYS fetch user data immediately after login
-        console.log('🔄 Immediately fetching user data after login...');
-        const userResponse = await api.get("/user");
-        
-        console.log('📥 User data after login:', userResponse.data);
-        
-        const userData = extractUserFromResponse(userResponse.data);
-        
-        if (userData) {
-          console.log('✅ Login successful, user set:', userData.name);
-          setUser(userData);
-          router.push("/");
-        } else {
-          throw new Error("Could not fetch user data after login");
-        }
-      } else {
-        throw new Error(res.data.message || "Login failed");
       }
+      
+      // If all endpoints failed
+      throw lastError || new Error('All login endpoints failed');
+      
     } catch (err: any) {
-      console.error("🔴 Login error:", err);
-      // Clean up on error
-      if (isSafari()) {
-        localStorage.removeItem('auth_token');
-        delete api.defaults.headers.common['Authorization'];
-      }
+      console.error('🔴 Login error details:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        url: err.config?.url
+      });
+      
+      setError(`Login failed: ${err.response?.data?.message || err.message}`);
       throw err;
     } finally {
       setLoading(false);
