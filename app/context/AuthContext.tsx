@@ -5,9 +5,8 @@ import {
   useEffect,
   useContext,
   ReactNode,
-  useRef,
 } from "react";
-import api, { isSafari } from "@/api/api";
+import api, { setAuthToken, clearAuthToken, getAuthToken } from "@/api/api";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -39,10 +38,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  // 🔹 Unified function to extract user data
+  // 🔹 Extract user data from API response
   const extractUserFromResponse = (responseData: any): User | null => {
     if (!responseData) return null;
     
@@ -50,6 +47,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (responseData.user) {
       userData = responseData.user;
+    } else if (responseData.data?.user) {
+      userData = responseData.data.user;
+    } else if (responseData.data?.id) {
+      userData = responseData.data;
     } else if (responseData.id) {
       userData = responseData;
     } else {
@@ -58,9 +59,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     return {
       id: userData.id || 0,
-      name: userData.name || '',
-      phone: userData.phone || null,
-      mobile: userData.mobile || null,
+      name: userData.name || 'Unknown User',
+      phone: userData.phone || userData.mobile || null,
+      mobile: userData.mobile || userData.phone || null,
       profile_url: userData.profile_url || null,
       reward_points: userData.reward_points || {
         total: 0,
@@ -71,27 +72,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
-  // 🔹 Restore user on mount - SIMPLIFIED
+  // 🔹 Restore user on mount
   useEffect(() => {
     const fetchUser = async () => {
       try {
         console.log('🔄 Fetching user on mount...');
+        console.log('🔑 Current token:', getAuthToken() ? 'Exists' : 'None');
         
         const res = await api.get("/user");
+        
+        console.log('📥 User API response:', res.data);
         
         const userData = extractUserFromResponse(res.data);
         
         if (userData) {
-          console.log('✅ User found');
+          console.log('✅ User found:', userData.name);
           setUser(userData);
         } else {
-          console.log('❌ No valid user data');
+          console.log('❌ No user data in response');
           setUser(null);
         }
       } catch (err: any) {
-        console.error("Auth restore failed:", err.message);
-        
-        // Don't automatically redirect - let components handle
+        console.error("🔴 Auth restore failed:", err.message);
+        console.error("🔴 Error status:", err.response?.status);
         setUser(null);
       } finally {
         setLoading(false);
@@ -99,37 +102,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     fetchUser();
-    
-    // Cleanup timeout on unmount
-    return () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-    };
   }, []);
 
-  // 🔹 Refresh user data - SIMPLIFIED
+  // 🔹 Refresh user data
   const refreshUser = async (): Promise<void> => {
     try {
-      const response = await api.get(`/user`);
-      
+      const response = await api.get("/user");
       const newUser = extractUserFromResponse(response.data);
       
-      if (!newUser) {
+      if (newUser) {
+        setUser(newUser);
+      } else {
         setUser(null);
-        return;
       }
-      
-      setUser(newUser);
-      
     } catch (error: any) {
-      console.error('Failed to refresh user:', error.message);
-      
-      // Only clear user if it's an auth error
-      if (error.response?.status === 401) {
-        setUser(null);
-      }
-      
+      console.error('🔴 Failed to refresh user:', error.message);
+      setUser(null);
       throw error;
     }
   };
@@ -141,79 +129,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // 🔹 Enhanced login with better error handling
+  // 🔹 Login - CRITICAL FIX FOR SAFARI
   const login = async (phone: string, username: string) => {
     setLoading(true);
-    setError(null);
-    
     try {
-      console.log('🔐 Attempting login with:', { phone, username });
+      console.log('🔐 Attempting login...');
       
-      // Try different endpoint variations
-      const endpoints = [
-        '/api/login',
-        '/login',
-        '/auth/login',
-        '/api/auth/login'
-      ];
+      const res = await api.post("/login", { phone, name: username });
+
+      console.log('✅ Login response:', res.data);
       
-      let lastError: any = null;
-      
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`🔄 Trying endpoint: ${endpoint}`);
-          const res = await api.post(endpoint, { 
-            phone, 
-            name: username 
-          });
-          
-          console.log('✅ Login successful via:', endpoint);
-          console.log('📥 Login response:', res.data);
-          
-          if (res.data.success) {
-            // Handle Safari token if present
-            if (res.data.token) {
-              console.log('🔑 Token received, saving...');
-              localStorage.setItem('auth_token', res.data.token);
-            }
-            
-            // Try to get user data
-            try {
-              const userResponse = await api.get("/user");
-              const userData = extractUserFromResponse(userResponse.data);
-              
-              if (userData) {
-                console.log('✅ User data loaded:', userData.name);
-                setUser(userData);
-                router.push("/");
-                return;
-              }
-            } catch (userError) {
-              console.warn('⚠️ Could not fetch user immediately, but login succeeded');
-              // Still proceed if login was successful
-              router.push("/");
-              return;
-            }
-          }
-        } catch (err: any) {
-          lastError = err;
-          console.log(`❌ ${endpoint} failed:`, err.message);
-          continue; // Try next endpoint
+      if (res.data.success) {
+        // SAFARI: Save token if returned
+        if (res.data.token) {
+          setAuthToken(res.data.token);
         }
+        
+        // Try to get user data immediately
+        try {
+          const userResponse = await api.get("/user");
+          const userData = extractUserFromResponse(userResponse.data);
+          
+          if (userData) {
+            console.log('✅ User data loaded:', userData.name);
+            setUser(userData);
+            router.push("/");
+          } else {
+            throw new Error("Could not load user data");
+          }
+        } catch (userError: any) {
+          console.warn('⚠️ Could not fetch user immediately:', userError.message);
+          // Still proceed with login
+          if (res.data.user) {
+            const userData = extractUserFromResponse(res.data);
+            setUser(userData);
+          }
+          router.push("/");
+        }
+      } else {
+        throw new Error(res.data.message || "Login failed");
       }
-      
-      // If all endpoints failed
-      throw lastError || new Error('All login endpoints failed');
-      
     } catch (err: any) {
-      console.error('🔴 Login error details:', {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data,
-        url: err.config?.url
-      });
+      console.error("🔴 Login error:", err.message);
+      console.error("🔴 Error details:", err.response?.data);
       
-      setError(`Login failed: ${err.response?.data?.message || err.message}`);
+      // Clear any stored token on login failure
+      clearAuthToken();
+      
       throw err;
     } finally {
       setLoading(false);
@@ -221,25 +183,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // 🔹 Logout
-// 🔹 Enhanced Logout
   const logout = async () => {
     try {
       await api.post("/logout");
-      
-      // Clean up Safari token
-      if (isSafari()) {
-        localStorage.removeItem('auth_token');
-        delete api.defaults.headers.common['Authorization'];
-      }
     } catch (error: any) {
-      console.error("Logout error:", error);
-      // Still clean up locally even if API fails
-      if (isSafari()) {
-        localStorage.removeItem('auth_token');
-        delete api.defaults.headers.common['Authorization'];
-      }
+      console.error("Logout error:", error.message);
     }
     
+    // Always clear local auth state
+    clearAuthToken();
     setUser(null);
     router.push("/sign-in");
   };

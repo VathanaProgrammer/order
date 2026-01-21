@@ -15,7 +15,7 @@ export const isSafari = (): boolean => {
   return isSafari || isIOS;
 };
 
-console.log('🦁 Is Safari?', isSafari());
+console.log('🦁 Browser is Safari/iOS:', isSafari());
 
 // Create axios instance
 const api = axios.create({
@@ -23,57 +23,53 @@ const api = axios.create({
   timeout: 10000,
 });
 
-// Safari token management
-let safariToken: string | null = null;
+// Token management for Safari
+let authToken: string | null = null;
 
-// Initialize auth based on browser
-const initializeAuth = () => {
-  if (typeof window === 'undefined') return;
+// Initialize token from localStorage
+if (typeof window !== 'undefined') {
+  authToken = localStorage.getItem('auth_token');
+  console.log('🔑 Initial token from localStorage:', authToken ? 'Found' : 'Not found');
   
-  console.log('🔄 Initializing auth...');
-  
-  if (isSafari()) {
-    console.log('🦁 Safari detected - using token-based auth');
-    safariToken = localStorage.getItem('auth_token');
-    
-    if (safariToken) {
-      console.log('🔑 Token found in localStorage');
-      api.defaults.headers.common['Authorization'] = `Bearer ${safariToken}`;
-    } else {
-      console.log('🔑 No token in localStorage');
-    }
-  } else {
-    console.log('🌍 Non-Safari browser detected - using cookie-based auth');
-    // Non-Safari: use cookies
-    api.defaults.withCredentials = true;
+  if (authToken) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+    console.log('✅ Authorization header set');
   }
+}
+
+// Store token function (call this after login)
+export const setAuthToken = (token: string) => {
+  authToken = token;
+  localStorage.setItem('auth_token', token);
+  api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  console.log('🔑 Token saved and header updated');
 };
 
-// Initialize on module load
-initializeAuth();
+// Clear token function (call this after logout)
+export const clearAuthToken = () => {
+  authToken = null;
+  localStorage.removeItem('auth_token');
+  delete api.defaults.headers.common['Authorization'];
+  console.log('🔑 Token cleared');
+};
 
-// Add request interceptor with detailed logging
+// Get current token
+export const getAuthToken = () => authToken;
+
+// Add request interceptor
 api.interceptors.request.use(
   (config) => {
-    const safari = isSafari();
+    console.log(`📤 Request: ${config.method?.toUpperCase()} ${config.url}`);
     
-    console.log(`📤 [${config.method?.toUpperCase()}] ${config.baseURL}${config.url}`);
-    console.log('🔧 Request config:', {
-      isSafari: safari,
-      hasToken: !!safariToken,
-      withCredentials: config.withCredentials,
-      headers: config.headers
-    });
-    
-    if (safari && safariToken) {
-      config.headers['Authorization'] = `Bearer ${safariToken}`;
+    // Always add the current token if we have one
+    if (authToken) {
+      config.headers['Authorization'] = `Bearer ${authToken}`;
+      console.log('🔑 Adding Authorization header to request');
     }
     
-    // Ensure proper content type for POST requests
-    if (config.method === 'post' || config.method === 'put') {
-      if (!config.headers['Content-Type']) {
-        config.headers['Content-Type'] = 'application/json';
-      }
+    // Don't add cache busting to avoid infinite loops
+    if (config.method === 'get' && config.params) {
+      config.params._t = Date.now();
     }
     
     return config;
@@ -84,34 +80,79 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor
+// Response interceptor - SIMPLIFIED
 api.interceptors.response.use(
   (response) => {
-    console.log(`✅ [${response.status}] ${response.config.url}`);
-    console.log('📥 Response data:', response.data);
+    console.log(`✅ Response [${response.status}]: ${response.config.url}`);
     
-    const safari = isSafari();
-    const url = response.config.url || '';
+    // Check for new token in login response
+    if (response.config.url?.includes('login') && response.data?.token) {
+      setAuthToken(response.data.token);
+    }
     
-    // Store new token from login response
-    if (safari && url.includes('login') && response.data?.token) {
-      const newToken = response.data.token;
-      safariToken = newToken;
-      localStorage.setItem('auth_token', newToken);
-      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      console.log('🔑 New token saved from login');
+    // Check for new token in refresh response  
+    if (response.config.url?.includes('refresh') && response.data?.token) {
+      setAuthToken(response.data.token);
+    }
+    
+    // Check for new token in user response (if backend returns it)
+    if (response.config.url?.includes('user') && response.data?.token) {
+      setAuthToken(response.data.token);
     }
     
     return response;
   },
   async (error) => {
+    const originalRequest = error.config;
+    
     console.error('🔴 Response error:', {
       url: error.config?.url,
-      method: error.config?.method,
       status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data
+      message: error.response?.data?.message
     });
+    
+    // Handle 401 Unauthorized errors
+    if (error.response?.status === 401) {
+      console.log('🔄 Handling 401 error');
+      
+      // If it's a login request, don't try to refresh
+      if (originalRequest.url?.includes('login') || 
+          originalRequest.url?.includes('logout')) {
+        return Promise.reject(error);
+      }
+      
+      // Try to refresh the token
+      try {
+        console.log('🔄 Attempting token refresh...');
+        
+        const refreshResponse = await axios.post(
+          `${API_BASE_URL}/auth/refresh`,
+          {},
+          {
+            headers: authToken ? {
+              'Authorization': `Bearer ${authToken}`
+            } : {}
+          }
+        );
+        
+        if (refreshResponse.data.token) {
+          setAuthToken(refreshResponse.data.token);
+          console.log('✅ Token refreshed successfully');
+          
+          // Retry the original request with new token
+          originalRequest.headers['Authorization'] = `Bearer ${authToken}`;
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        console.error('🔴 Token refresh failed:', refreshError);
+        clearAuthToken();
+        
+        // Redirect to login page
+        if (typeof window !== 'undefined') {
+          window.location.href = '/sign-in?reason=session_expired';
+        }
+      }
+    }
     
     return Promise.reject(error);
   }
