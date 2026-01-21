@@ -79,36 +79,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Fetch user data
-  // const fetchUserData = async (): Promise<User | null> => {
-  //   try {
-  //     console.log('🔄 Fetching user data...');
+  const fetchUserData = async (): Promise<User | null> => {
+    try {
+      console.log('🔄 Fetching user data...');
       
-  //     const response = await apiGet("/user");
+      const response = await apiGet("/user");
       
-  //     console.log('📥 User response:', response.data);
+      console.log('📥 User response:', response.data);
       
-  //     const userData = extractUserFromResponse(response.data);
+      const userData = extractUserFromResponse(response.data);
       
-  //     if (userData) {
-  //       console.log('✅ User data loaded:', userData.name);
-  //       return userData;
-  //     }
+      if (userData) {
+        console.log('✅ User data loaded:', userData.name);
+        return userData;
+      }
       
-  //     return null;
-  //   } catch (error: any) {
-  //     console.error('🔴 Failed to fetch user:', error.message);
+      return null;
+    } catch (error: any) {
+      console.error('🔴 Failed to fetch user:', error.message);
       
-  //     // If 401, clear token and return null
-  //     if (error.response?.status === 401) {
-  //       console.log('🔴 Unauthorized, clearing token');
-  //       if (isSafari()) {
-  //         clearAuthToken();
-  //       }
-  //     }
+      // If 401, clear token and return null
+      if (error.response?.status === 401) {
+        console.log('🔴 Unauthorized, clearing token');
+        if (isSafari()) {
+          clearAuthToken();
+        }
+      }
       
-  //     return null;
-  //   }
-  // };
+      return null;
+    }
+  };
 
   // Initial load
   useEffect(() => {
