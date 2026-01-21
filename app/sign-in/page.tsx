@@ -13,7 +13,7 @@ const Page = () => {
   const [error, setError] = useState("");
   
   // Get language context
-  const { language, toggleLanguage, t } = useLanguage();
+  const { t } = useLanguage();
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -188,23 +188,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (phone: string, username: string) => {
     setLoading(true);
     try {
-      const res = await api.post(
-        "/login",
-        { phone, name: username },
-        { withCredentials: true }
-      );
-
-      console.log('Login response:', res.data);
-      
-      if (res.data.success && res.data.user) {
-        const userData = extractUserFromResponse(res.data);
-        if (userData) {
-          setUser(userData);
-          await refreshUser(); // Force a refresh after login
-          router.push("/");
-        } else {
-          throw new Error("Invalid user data in response");
-        }
+      const res = await api.post("/login", {
+        phone,
+        name: username,
+      });
+  
+      console.log("Login response:", res.data);
+  
+      if (res.data.success && res.data.token) {
+        // ✅ Store JWT
+        localStorage.setItem("token", res.data.token);
+  
+        // ✅ Set default Authorization header
+        api.defaults.headers.common.Authorization =
+          `Bearer ${res.data.token}`;
+  
+        // ✅ Now refresh user using JWT
+        await refreshUser();
+  
+        router.push("/");
       } else {
         throw new Error(res.data.message || "Login failed");
       }
@@ -214,7 +216,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  };  
 
   // 🔹 Logout
   const logout = async () => {

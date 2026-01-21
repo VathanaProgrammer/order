@@ -24,7 +24,7 @@ export default function Signup() {
         success: boolean;
         otp: string;
         message?: string;
-      }>("/register", { phone, name: username }, { withCredentials: true });
+      }>("/register", { phone, name: username });
 
       if (res.data.success) {
         const otp = res.data.otp; // fake OTP
