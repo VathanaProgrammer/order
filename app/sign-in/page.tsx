@@ -1,52 +1,32 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import axios, { AxiosError } from "axios";
-import { useLanguage } from "@/context/LanguageContext";
-import { getSavedPhone } from "@/api/api";
+import { useLanguage } from "@/context/LanguageContext"; // Import the hook
 
 const Page = () => {
   const router = useRouter();
   const { login, loading } = useAuth();
-  const [phone, setPhone] = useState("");
+  const [phone, setPh] = useState("");
+  const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   
   // Get language context
   const { t } = useLanguage();
 
-  // Pre-fill phone if saved
-  useEffect(() => {
-    const savedPhone = getSavedPhone();
-    if (savedPhone) {
-      setPhone(savedPhone);
-    }
-  }, []);
-
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    // Validate input
-    if (!phone.trim()) {
-      setError(t.phoneRequired || "Phone number is required");
-      return;
-    }
-
     try {
-      // Pass empty string or phone as username (backend doesn't use it)
-      await login(phone, phone); // Using phone as username since backend doesn't need it
+      await login(phone, username);
     } catch (err: AxiosError | unknown) {
-      if (axios.isAxiosError(err)) {
-        if (err.response?.status === 401) {
-          setError(t.invalidCredentials || "Invalid phone number");
-        } else if (err.response?.status === 404) {
-          setError(t.endpointError || "Server error. Please try again.");
-        } else {
-          setError(err.response?.data?.message || t.error || "An error occurred");
-        }
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        setError(t.invalidCredentials);
+        console.log(err);
       } else {
-        setError(t.error || "An unexpected error occurred");
+        setError(t.error);
         console.error(err);
       }
     }
@@ -62,60 +42,48 @@ const Page = () => {
           className="mb-4 text-gray-600 hover:text-gray-800 flex items-center gap-2"
         >
           <span className="text-xl">←</span>
-          <span>{t.back || "Back"}</span>
+          <span>{t.back}</span>
         </button>
         
-        <form onSubmit={handleSignIn} className="mt-8 w-full">
-          <h1 className="text-2xl font-bold text-center text-gray-800">
-            {t.title || "Welcome Back"}
+        <form onSubmit={handleSignIn} className="mt-18 w-full">
+          <h1 onClick={() => router.push('/')} className="text-2xl font-bold text-center text-gray-800">
+            {t.title}
           </h1>
           <h2 className="text-lg font-medium text-center text-gray-600 mb-6">
-            {t.subtitle || "Sign in with your phone number"}
+            {t.subtitle}
           </h2>
 
-          {/* Phone Input Only */}
-          <div className="w-full mt-4">
-            <label className="text-[16px] font-medium text-gray-700">
-              {t.phoneLabel || "Phone Number"}
+          <div className="w-full mt-6">
+            <label className="text-[20px] font-medium text-gray-700">
+              {t.phoneLabel}
             </label>
             <input
-              type="tel"
+              type="text"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder={t.phonePlaceholder || "Enter your phone number"}
-              className="w-full px-4 min-h-[45px] py-2 border focus:outline-0 rounded-[5px] focus:border-blue-600 mt-1"
-              required
-              autoFocus
+              onChange={(e) => setPh(e.target.value)}
+              placeholder={t.phonePlaceholder}
+              className="w-full px-4 min-h-[45px] py-2 border focus:outline-0 rounded-[5px] focus:border-blue-600 mt-2"
             />
-            {getSavedPhone() === phone && (
-              <p className="text-sm text-green-600 mt-1">
-                ✓ Using saved phone number
-              </p>
-            )}
           </div>
 
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-lg">
-              {error}
-            </div>
-          )}
+          {error && <p className="text-red-500 mt-2">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-6 bg-gray-700 text-white py-3 rounded-lg font-semibold hover:bg-gray-800 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full mt-8 bg-gray-700 text-white py-3 rounded-lg font-semibold hover:bg-gray-700 active:scale-95 transition"
           >
-            {loading ? (t.signingIn || "Signing In...") : (t.signIn || "Sign In")}
+            {loading ? t.signingIn : t.signIn}
           </button>
 
-          <div className="mt-4 w-full">
-            <p className="text-center text-[14px] font-medium">
-              {t.newUser || "New user?"}{" "}
+          <div className="mt-2 w-full">
+            <p className="text-center text-[16px] font-medium">
+              {t.newUser}{" "}
               <span
                 onClick={() => router.push("/sign-up")}
-                className="text-blue-600 cursor-pointer hover:underline"
+                className="text-blue-600 cursor-pointer"
               >
-                {t.createAccount || "Create an account"}
+                {t.createAccount}
               </span>
             </p>
           </div>
