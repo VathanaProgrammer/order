@@ -6,7 +6,7 @@ import {
   useContext,
   ReactNode,
 } from "react";
-import api from "@/api/api";
+import api, { isSafari } from "@/api/api";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -28,7 +28,7 @@ interface AuthContextType {
   loading: boolean;
   login: (phone: string, username: string) => Promise<void>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>; // Keep as Promise<void>
+  refreshUser: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
 }
 
@@ -45,24 +45,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     let userData;
     
-    // Check different possible structures
     if (responseData.user) {
       userData = responseData.user;
-      console.log('Found user in responseData.user');
     } else if (responseData.data) {
       userData = responseData.data;
-      console.log('Found user in responseData.data');
     } else if (responseData.id) {
       userData = responseData;
-      console.log('Found user directly in responseData');
     } else {
       console.log('No user data found in response');
       return null;
     }
     
-    console.log('Raw user data:', userData);
-    
-    // Format the user object
     return {
       id: userData.id || 0,
       name: userData.name || '',
@@ -78,12 +71,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
-  // 🔹 Restore user from cookie on mount
+  // 🔹 Restore user on mount
   useEffect(() => {
     const fetchUser = async () => {
       try {
         console.log('🔄 Fetching user on mount...');
-        const res = await api.get("/user", { withCredentials: true });
+        console.log('📱 Browser is Safari?', isSafari());
+        
+        // Use the api instance which handles auth automatically
+        const res = await api.get("/user");
         
         console.log('📥 User API response:', res.data);
         
@@ -91,7 +87,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (userData) {
           console.log('✅ Setting user in context:', userData);
-          console.log('Points available:', userData.reward_points.available);
           setUser(userData);
         } else {
           console.log('❌ No valid user data in response');
@@ -108,19 +103,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     fetchUser();
   }, []);
 
-  // 🔹 Refresh user data - Returns Promise<void>
+  // 🔹 Refresh user data
   const refreshUser = async (): Promise<void> => {
-    console.log('🔄 refreshUser() called at', new Date().toISOString());
+    console.log('🔄 refreshUser() called');
     
     try {
-      // Force fresh request with cache busting
-      const timestamp = Date.now();
-      const response = await api.get(`/user?_t=${timestamp}`, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
-      });
+      const response = await api.get(`/user`);
       
       console.log('📥 Refresh API response:', response.data);
       
@@ -129,37 +117,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!newUser) {
         console.warn('⚠️ No user data in refresh response');
         setUser(null);
-        return; // Return void
+        return;
       }
       
-      console.log('🔄 New user data:', newUser);
-      console.log('🔄 Old user points:', user?.reward_points?.available);
-      console.log('🔄 New user points:', newUser.reward_points.available);
-      
-      // Force update by creating completely new object
       const updatedUser: User = {
         ...newUser,
         reward_points: { ...newUser.reward_points }
       };
       
-      // Use functional update to ensure React detects change
-      setUser(prevUser => {
-        // Check if data actually changed
-        if (prevUser && prevUser.id === updatedUser.id) {
-          const pointsChanged = prevUser.reward_points.available !== updatedUser.reward_points.available;
-          console.log('📊 Points changed?', pointsChanged);
-        }
-        return updatedUser;
-      });
-      
+      setUser(updatedUser);
       console.log('✅ User refreshed successfully');
       
-      // Dispatch global event to notify other components
+      // Notify other components
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('userRefreshed', {
           detail: { 
             userId: updatedUser.id,
-            points: updatedUser.reward_points.available,
             timestamp: Date.now()
           }
         }));
@@ -184,23 +157,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // 🔹 Login and set cookie
+  // 🔹 Login
   const login = async (phone: string, username: string) => {
     setLoading(true);
     try {
       const res = await api.post(
         "/login",
-        { phone, name: username },
-        { withCredentials: true }
+        { phone, name: username }
       );
 
       console.log('Login response:', res.data);
       
-      if (res.data.success && res.data.user) {
+      if (res.data.success) {
         const userData = extractUserFromResponse(res.data);
         if (userData) {
           setUser(userData);
-          await refreshUser(); // Force a refresh after login
+          
+          // For Safari: Save token if returned
+          if (isSafari() && res.data.token) {
+            localStorage.setItem('auth_token', res.data.token);
+            api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+          }
+          
+          await refreshUser();
           router.push("/");
         } else {
           throw new Error("Invalid user data in response");
@@ -219,10 +198,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // 🔹 Logout
   const logout = async () => {
     try {
-      await api.post("/logout", {}, { withCredentials: true });
+      await api.post("/logout");
+      
+      // Clean up Safari token
+      if (isSafari()) {
+        localStorage.removeItem('auth_token');
+        delete api.defaults.headers.common['Authorization'];
+      }
     } catch (error) {
       console.error("Logout error:", error);
     }
+    
     setUser(null);
     router.push("/sign-in");
   };
