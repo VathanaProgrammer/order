@@ -101,10 +101,8 @@ api.interceptors.response.use(
 
     // Save new token from login/refresh responses (Safari)
     if (isSafari() && response.data?.token) {
-      if (url.includes('login') || url.includes('refresh')) {
-        console.log('🔑 New token received → saving');
-        updateToken(response.data.token);
-      }
+      console.log('🔑 Token detected in response → saving (regardless of URL)');
+      updateToken(response.data.token);
     }
 
     console.log(`✅ [${response.status}] ${url}`);
