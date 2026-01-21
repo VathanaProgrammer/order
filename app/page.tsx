@@ -7,6 +7,7 @@ import RewardSection from "./components/RewardSection";
 import { useState, useEffect, useCallback } from "react";
 import api from "@/api/api";
 import { useLanguage } from "@/context/LanguageContext";
+import DebugInfo from "./components/DebugInfo";
 
 interface ProductData {
   id: number;
@@ -132,6 +133,7 @@ export default function ProductPage() {
 
   return (
     <div className="flex flex-col flex-1 hide-scrollbar">
+      <DebugInfo />
       <RewardSection />
       
       <div className="sticky top-0 z-20 bg-white">
