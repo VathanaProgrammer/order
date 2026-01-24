@@ -4,7 +4,7 @@ import axios from "axios";
 import api from "@/api/api";
 import { useLanguage } from "@/context/LanguageContext";
 
-type CategoriesProps = {
+type CategoriesProps = {            
   selectedCategory: string;
   onSelect: (category: string) => void;
 };
@@ -12,6 +12,7 @@ type CategoriesProps = {
 type CategoryData = {
   id: number;
   name: string;
+  category_pics?: any;
 };
 
 const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) => {
@@ -47,6 +48,7 @@ const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) =
           <span className="">
             {cat.name}
           </span>
+          <img src={cat.category_pics} alt="" />
         </div>
       ))}
     </section>
