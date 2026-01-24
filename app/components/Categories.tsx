@@ -19,11 +19,21 @@ const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) =
   const [categories, setCategories] = useState<CategoryData[]>([]);
   const { t } = useLanguage();
 
+  const baseUrl = "https://syspro.asia";
+
   useEffect(() => {
     async function fetchCategories() {
       try {
         const res = await api.get<{ status: string; data: CategoryData[] }>("/category/all");
-        setCategories(res.data.data);
+                // Transform data to include full URLs
+                const categoriesWithUrls = res.data.data.map(cat => ({
+                  id: cat.id,
+                  name: cat.name,
+                  category_pics: cat.category_pics 
+                    ? `${baseUrl}/storage/category-images/${cat.category_pics}`
+                    : null
+                }));
+        setCategories(categoriesWithUrls);
         console.log(res)
       } catch (error) {
         console.error("Failed to fetch categories", error);
@@ -33,7 +43,7 @@ const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) =
     fetchCategories();
   }, []);
 
-  const allCategories = [{ id: 0, name: t.all }, ...categories];
+  const allCategories = [{ id: 0, name: t.all, category_pics: "" }, ...categories];
 
   return (
     <section className="flex flex-col gap-4 mt-2 mb-1! mr-2">
