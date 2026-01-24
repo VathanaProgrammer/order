@@ -182,13 +182,13 @@ const Page: React.FC = () => {
       action: t.manageAddresses,
       route: '/account/shipping-address'
     },
-    {
-      icon: "lucide:database",
-      title: t.rewards,
-      desc: t.checkAvailableCoupons,
-      action: t.viewRewards,
-      route: '/account/reward'
-    },
+    // {
+    //   icon: "lucide:database",
+    //   title: t.rewards,
+    //   desc: t.checkAvailableCoupons,
+    //   action: t.viewRewards,
+    //   route: '/account/reward'
+    // },
   ];
 
   if (loading) {
