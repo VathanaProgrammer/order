@@ -290,7 +290,7 @@ const translations = {
     tryAgain: "ព្យាយាមម្តងទៀត",
     pleaseSelectAShippingAddress: "សូមជ្រើសរើសអាសយដ្ឋានដឹកជញ្ជូនរបស់អ្នក!",
     pleaseSelectAPaymentMethod: "សូមជ្រើសរើសមធ្យោបាយទូទាត់របស់អ្នក!",
-    addToCart: "បន្ថែមទៅកន្ត្រក",
+    addToCart: "យកមួយ",
     betterLuckNextTime: "សូមសំណាងល្អនៅពេលក្រោយ!",
     pointsDeducted: "ពិន្ទុបានដកចេញ",
     congratulationsYouWon: "អបអរសាទរ! អ្នកបានឈ្នះ",

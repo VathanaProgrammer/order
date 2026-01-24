@@ -74,9 +74,9 @@ const TopNav = () => {
         <h1 className="text-[18px] font-bold main-text">SOB</h1>
 
         <div className="flex flex-row gap-2">
-          <button onClick={handleWheelClick} className="p-1 flex items-center rounded-[10px] cursor-pointer transition">
+          {/* <button onClick={handleWheelClick} className="p-1 flex items-center rounded-[10px] cursor-pointer transition">
             <Image src={SpinWheelPic} alt="wheel" width={20} height={20} />
-          </button>
+          </button> */}
 
           <button onClick={toggleLanguage} className="p-1 text-sm flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition">
             {language === "en" ? "ភាសាខ្មែរ" : "English"}
@@ -97,7 +97,7 @@ const TopNav = () => {
         </div>
 
         {/* Points - Now updates instantly every time */}
-        <div
+        {/* <div
           onClick={() => router.push("/account/reward")}
           className="p-1 flex flex-row items-center min-w-[75px] rounded-[10px] bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md cursor-pointer hover:from-yellow-500 hover:to-yellow-600 transition"
         >
@@ -105,7 +105,7 @@ const TopNav = () => {
           <p className="text-[12px] font-medium ml-1">
             {points.toLocaleString()}
           </p>
-        </div>
+        </div> */}
       </div>
 
       {error && <p className="text-red-500 text-[12px]">{error}</p>}
