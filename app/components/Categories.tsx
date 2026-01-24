@@ -51,7 +51,7 @@ const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) =
         <div
           key={cat.id}
           onClick={() => onSelect(cat.name)}
-          className={`px-2 py-2 text-[8px] font-medium rounded-[5px] cursor-pointer flex items-center justify-center min-h-[50px] w-[50px] ${
+          className={`px-2 py-2 text-[8px] font-medium rounded-[5px] cursor-pointer flex flex-col items-center justify-center min-h-[50px] w-[50px] ${
             selectedCategory === cat.name ? "bg-blue-600 text-white" : "bg-gray-500 text-white"
           }`}
         >
