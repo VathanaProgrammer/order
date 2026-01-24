@@ -55,7 +55,7 @@ const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) =
             selectedCategory === cat.name ? "bg-blue-600 text-white" : "bg-gray-500 text-white"
           }`}
         >
-          <span className="">
+          <span className="pb-0.5">
             {cat.name}
           </span>
           <img src={cat.category_pics} alt="" />
