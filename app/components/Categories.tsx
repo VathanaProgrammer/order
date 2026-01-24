@@ -34,7 +34,7 @@ const Categories: React.FC<CategoriesProps> = ({ selectedCategory, onSelect }) =
                     : null
                 }));
         setCategories(categoriesWithUrls);
-        console.log(res)
+        console.log("Categories with URLs:", categoriesWithUrls);
       } catch (error) {
         console.error("Failed to fetch categories", error);
       }
