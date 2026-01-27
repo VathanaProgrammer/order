@@ -61,6 +61,14 @@ const CombinedCheckoutPage = () => {
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const { t } = useLanguage();
 
+  // SEPARATE CUSTOMER INFORMATION STATE
+  const [customerInfo, setCustomerInfo] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    notes: "",
+  });
+
   const paymentMethods = [
     { name: t.QR, image: "/qr.jpg" },
     { name: t.cash, image: "/cash.jpg" },
@@ -98,7 +106,6 @@ const CombinedCheckoutPage = () => {
       setTempAddress((prev) => ({
         ...prev,
         api_user_id: user.id,
-        phone: user?.role === "sale" ? "" : getPhoneFromUser(user) || "",
       }));
     }
   }, [user]);
@@ -116,6 +123,15 @@ const CombinedCheckoutPage = () => {
   };
 
   const userPhone = getPhoneFromUser(user);
+
+  // HANDLE CUSTOMER INFO CHANGES
+  const handleCustomerInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setCustomerInfo(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleDetectCurrentLocation = async () => {
     setIsDetectingLocation(true);
@@ -153,24 +169,13 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Save new address – now supports custom phone for sales role
+  // Save new address – updated for separate customer info
   const handleSaveNewAddress = async () => {
-    // For sale role, we need customer name and phone
-    if (user?.role === "sale") {
-      if (!tempAddress.label?.trim()) {
-        toast.error("Please enter customer name");
-        return;
-      }
-      if (!tempAddress.phone?.trim()) {
-        toast.error("Please enter customer phone number");
-        return;
-      }
-    } else {
-      // For regular users
-      if (!tempAddress.label?.trim()) {
-        toast.error("Please enter a name/label");
-        return;
-      }
+    // For regular users, use their own name for address label
+    if (user?.role !== "sale" && !tempAddress.label?.trim()) {
+      // Use customer name or "My Address" as default
+      const label = customerInfo.name?.trim() || "My Address";
+      setTempAddress(prev => ({ ...prev, label }));
     }
     
     if (!tempAddress.details?.trim()) {
@@ -182,14 +187,11 @@ const CombinedCheckoutPage = () => {
       return;
     }
 
-    const finalPhone = user?.role === "sale" ? tempAddress.phone?.trim() : userPhone?.trim();
+    // For regular users, use their own phone
+    const finalPhone = user?.role === "sale" ? customerInfo.phone?.trim() : userPhone?.trim();
 
     if (!finalPhone) {
-      toast.error(
-        user?.role === "sale"
-          ? "Please enter customer's phone number"
-          : "Please add your phone number in account settings"
-      );
+      toast.error("Please add your phone number");
       return;
     }
 
@@ -202,7 +204,7 @@ const CombinedCheckoutPage = () => {
 
     try {
       const addressData: APIAddress = {
-        label: tempAddress.label.trim(),
+        label: user?.role === "sale" ? tempAddress.label?.trim() || "Customer Address" : customerInfo.name?.trim() || "My Address",
         phone: finalPhone,
         details: tempAddress.details.trim(),
         coordinates: tempAddress.coordinates,
@@ -230,7 +232,7 @@ const CombinedCheckoutPage = () => {
 
       setTempAddress({
         label: "",
-        phone: user?.role === "sale" ? "" : userPhone || "",
+        phone: "",
         details: "",
         coordinates: { lat: 11.567, lng: 104.928 },
         api_user_id: user?.id,
@@ -266,20 +268,31 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Checkout handler
+  // Checkout handler - updated for separate customer info
   const handleCheckout = async () => {
     if (cart.length === 0) return toast.error("Your cart is empty");
     if (!selectedAddress) return toast.error("Please select a shipping address");
     if (!paymentMethod) return toast.error("Please select a payment method");
   
-    // Additional validation for sale role
+    // Validate customer info for sale role
     if (user?.role === "sale") {
-      if (selectedAddress === "current") {
-        // Check if customer info is entered in tempAddress
-        if (!tempAddress.label?.trim() || !tempAddress.phone?.trim()) {
-          toast.error("Please enter customer name and phone number");
-          return;
-        }
+      if (!customerInfo.name.trim()) {
+        toast.error("Please enter customer name");
+        return;
+      }
+      if (!customerInfo.phone.trim()) {
+        toast.error("Please enter customer phone number");
+        return;
+      }
+    } else {
+      // Validate customer info for regular users
+      if (!customerInfo.name.trim()) {
+        toast.error("Please enter your name");
+        return;
+      }
+      if (!customerInfo.phone.trim() && !userPhone) {
+        toast.error("Please enter your phone number");
+        return;
       }
     }
   
@@ -302,27 +315,13 @@ const CombinedCheckoutPage = () => {
         })),
       };
   
-      // Add customer info for sale role
-      if (user?.role === "sale") {
-        let customerName = "";
-        let customerPhone = "";
-        
-        if (selectedAddress === "current") {
-          customerName = tempAddress.label || "";
-          customerPhone = tempAddress.phone || "";
-        } else if (selectedAddress && typeof selectedAddress !== "string") {
-          const savedAddr = selectedAddress as ExtendedAddress;
-          customerName = savedAddr.label || "";
-          customerPhone = savedAddr.phone || "";
-        }
-        
-        if (customerName && customerPhone) {
-          orderData.customer_info = {
-            name: customerName,
-            phone: customerPhone,
-          };
-        }
-      }
+      // Add customer info for all users
+      orderData.customer_info = {
+        name: customerInfo.name.trim(),
+        phone: customerInfo.phone.trim() || userPhone || "",
+        email: customerInfo.email.trim() || "",
+        notes: customerInfo.notes.trim() || "",
+      };
   
       if (selectedAddress === "current") {
         if (!currentAddress?.coordinates) {
@@ -330,26 +329,15 @@ const CombinedCheckoutPage = () => {
           return;
         }
   
-        // For sale role, use customer phone; for regular users, use user phone
-        let phoneForCurrent = "";
-        if (user?.role === "sale") {
-          phoneForCurrent = tempAddress.phone || "";
-          if (!phoneForCurrent) {
-            toast.error("Please enter customer phone number");
-            return;
-          }
-        } else {
-          phoneForCurrent = userPhone || "";
-          if (!phoneForCurrent) {
-            toast.error("Please add your phone in account settings");
-            return;
-          }
+        // Use customer phone for all users
+        const phoneForCurrent = customerInfo.phone.trim() || userPhone || "";
+        if (!phoneForCurrent) {
+          toast.error("Please enter phone number");
+          return;
         }
   
-        // For sale role, label is customer name; for regular users, use "Current Location"
-        const labelForCurrent = user?.role === "sale"
-          ? (tempAddress.label || "Customer")
-          : "Current Location";
+        // For sale role, label is customer name; for regular users, also customer name
+        const labelForCurrent = customerInfo.name.trim() || "Customer";
   
         orderData.address = {
           label: labelForCurrent,
@@ -368,10 +356,8 @@ const CombinedCheckoutPage = () => {
         toast.success("Order placed successfully!");
         const orderId = response.data.order_id;
         
-        // Show customer info for sale role
-        if (user?.role === "sale" && orderData.customer_info) {
-          toast.info(`Customer: ${orderData.customer_info.name}, Phone: ${orderData.customer_info.phone}`);
-        }
+        // Show customer info
+        toast.info(`Customer: ${orderData.customer_info.name}, Phone: ${orderData.customer_info.phone}`);
         
         router.push(orderId ? `/order-confirmation/${orderId}` : "/order-confirmation");
       } else {
@@ -439,7 +425,79 @@ const CombinedCheckoutPage = () => {
         )}
       </section>
 
-      {/* Shipping Address Section */}
+      {/* SEPARATE CUSTOMER INFORMATION SECTION */}
+      <section className="flex flex-col gap-3">
+        <h2 className="text-2xl font-semibold text-gray-800">
+          {user?.role === "sale" ? "Customer Information" : "Your Information"}
+        </h2>
+        
+        <div className="bg-white p-4 rounded-xl border border-gray-200">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {user?.role === "sale" ? "Customer Name *" : "Your Name *"}
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={customerInfo.name}
+                onChange={handleCustomerInfoChange}
+                placeholder={user?.role === "sale" ? "Enter customer name" : "Enter your name"}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {user?.role === "sale" ? "Customer Phone *" : "Phone Number *"}
+              </label>
+              <input
+                type="tel"
+                name="phone"
+                value={customerInfo.phone}
+                onChange={handleCustomerInfoChange}
+                placeholder={user?.role === "sale" ? "Enter customer phone" : "Enter your phone"}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+              {user?.role !== "sale" && userPhone && (
+                <p className="text-sm text-gray-500 mt-1">Account phone: {userPhone}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email Address (Optional)
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={customerInfo.email}
+                onChange={handleCustomerInfoChange}
+                placeholder="Enter email address"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes (Optional)
+              </label>
+              <textarea
+                name="notes"
+                value={customerInfo.notes}
+                onChange={handleCustomerInfoChange}
+                placeholder="Special instructions, delivery preferences, etc."
+                rows={3}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SEPARATE SHIPPING ADDRESS SECTION */}
       <section className="flex flex-col gap-3">
         <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
 
@@ -499,40 +557,18 @@ const CombinedCheckoutPage = () => {
         {/* Add New Address Button / Form */}
         {isAdding ? (
           <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
-            {/* Name / Label */}
+            {/* Address Label */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {user?.role === "sale" ? "Customer Name *" : "Label *"}
+                Address Label *
               </label>
               <input
                 type="text"
-                placeholder={
-                  user?.role === "sale" ? "Enter customer name" : "Home, Work, etc."
-                }
+                placeholder="Home, Work, etc."
                 value={tempAddress.label || ""}
                 onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.phone} *
-              </label>
-              {user?.role === "sale" ? (
-                <input
-                  type="tel"
-                  placeholder="Customer phone number"
-                  value={tempAddress.phone || ""}
-                  onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              ) : (
-                <div className="w-full p-3 border rounded-lg bg-gray-50 text-gray-700">
-                  {userPhone ? `${userPhone} (from account)` : "No phone in profile"}
-                </div>
-              )}
             </div>
 
             {/* Address Details */}
@@ -579,9 +615,7 @@ const CombinedCheckoutPage = () => {
                 disabled={
                   !tempAddress.details?.trim() ||
                   !tempAddress.coordinates ||
-                  (user?.role === "sale" 
-                    ? (!tempAddress.label?.trim() || !tempAddress.phone?.trim())
-                    : (!tempAddress.label?.trim() || !userPhone?.trim()))
+                  !tempAddress.label?.trim()
                 }
               >
                 {t.saveAddress}
@@ -591,7 +625,7 @@ const CombinedCheckoutPage = () => {
                   setIsAdding(false);
                   setTempAddress({
                     label: "",
-                    phone: user?.role === "sale" ? "" : userPhone || "",
+                    phone: "",
                     details: "",
                     coordinates: { lat: 11.567, lng: 104.928 },
                     api_user_id: user?.id,
@@ -609,7 +643,7 @@ const CombinedCheckoutPage = () => {
             className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
           >
             <span className="text-xl">+</span>
-            {user?.role === "sale" ? "Add Customer Information" : t.addNewAddress}
+            {t.addNewAddress}
           </button>
         )}
       </section>
@@ -755,6 +789,30 @@ const CombinedCheckoutPage = () => {
           </div>
         </div>
       )}
+
+      {/* Checkout Button */}
+      <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+        <button
+          onClick={handleCheckout}
+          disabled={isSubmittingOrder || cart.length === 0 || !selectedAddress || !paymentMethod || 
+                   (user?.role === "sale" ? (!customerInfo.name || !customerInfo.phone) : !customerInfo.name)}
+          className={`w-full py-4 rounded-xl font-semibold text-lg ${
+            isSubmittingOrder || cart.length === 0 || !selectedAddress || !paymentMethod || 
+            (user?.role === "sale" ? (!customerInfo.name || !customerInfo.phone) : !customerInfo.name)
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : "bg-green-600 text-white hover:bg-green-700"
+          }`}
+        >
+          {isSubmittingOrder ? (
+            <div className="flex items-center justify-center gap-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              Processing Order...
+            </div>
+          ) : (
+            `Place Order - $${total.toFixed(2)}`
+          )}
+        </button>
+      </div>
     </div>
   );
 };
