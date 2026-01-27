@@ -317,35 +317,33 @@ const placeOrder= async () => {
     return;
   }
 
-  // Prepare the payload - Using existing /store-order structure
-  const payload = {
-    api_user_id: user?.id,
-    saved_address_id: selectedAddress !== "current" ? addressToSend.id : undefined,
-    address: selectedAddress === "current" ? addressToSend : undefined,
-    address_type: selectedAddress === "current" ? "current" : "saved",
-    paymentMethod,
-    total_qty: cart.reduce((sum, i) => sum + i.qty, 0),
-    total,
-    items: cart.map(i => ({
-      product_id: i.id,
-      qty: i.qty,
-      price_at_order: i.price,
-      total_line: Number((i.price * i.qty).toFixed(2)),
-      image_url: (i.image ?? "").split("/").pop(),
-    })),
-    // ADD customer info to the existing payload structure
-    customer_info: {
-      name: customerInfo.name.trim(),
-      phone: customerInfo.phone.trim() || user?.phone || user?.mobile || "",
-      email: customerInfo.email?.trim() || "",
-      notes: customerInfo.notes?.trim() || "",
-      latitude: customerInfo.coordinates.lat,
-      longitude: customerInfo.coordinates.lng,
-    },
-  };
-
   try {
-    console.log("Sending order with customer info payload:", payload);
+    const payload = {
+      api_user_id: user?.id,
+      user_role: user?.role,
+      
+      // ✅ Send customer info at ROOT LEVEL (not nested)
+      customer_name: customerInfo.name.trim(),
+      customer_phone: customerInfo.phone.trim(),
+      customer_email: customerInfo.email?.trim() || "",
+      customer_notes: customerInfo.notes?.trim() || "",
+      latitude: customerInfo.coordinates?.lat || 0,
+      longitude: customerInfo.coordinates?.lng || 0,
+      
+      // Order Information
+      paymentMethod: paymentMethod,
+      total_qty: cart.reduce((sum, item) => sum + item.qty, 0),
+      total: total,
+      items: cart.map((item) => ({
+        product_id: item.id,
+        qty: item.qty,
+        price_at_order: item.price,
+        total_line: item.price * item.qty,
+        image_url: item.image || null,
+      })),
+    };
+
+    console.log("Sending order with customer info (ROOT LEVEL):", payload);
     const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}//sales-order/save-customer-info`, payload, {
       withCredentials: true,
       headers: { Accept: "application/json" },
