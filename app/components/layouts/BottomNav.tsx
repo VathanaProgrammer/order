@@ -72,7 +72,7 @@ const BottomNav: React.FC = () => {
       if (isPaymentMissing) {
         errors.push(t.pleaseSelectAPaymentMethod);
       }
-      if (isAddressMissing) {
+      if (user?.role !== "sale" && isAddressMissing) {
         errors.push(t.pleaseSelectAShippingAddress);
       }
       
