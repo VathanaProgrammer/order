@@ -1,4 +1,5 @@
 "use client";
+
 import { createContext, useContext, ReactNode, useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "./AuthContext";
@@ -31,6 +32,15 @@ export type Address = {
   short_address?: string;
 };
 
+// NEW: Customer Information Type
+export type CustomerInfo = {
+  name: string;
+  phone: string;
+  email?: string;
+  notes?: string;
+  coordinates?: { lat: number; lng: number }; // Separated from address
+};
+
 type CheckoutContextType = {
   cart: CartItem[];
   total: number;
@@ -50,11 +60,17 @@ type CheckoutContextType = {
   setCurrentAddress: (addr: Address) => void;
   detectCurrentLocation: () => Promise<Address>;
 
+  // NEW: Customer Information State
+  customerInfo: CustomerInfo;
+  setCustomerInfo: (info: CustomerInfo | ((prev: CustomerInfo) => CustomerInfo)) => void;
+  updateCustomerInfo: (field: keyof CustomerInfo, value: any) => void;
+
   paymentMethod: string;
   setPaymentMethod: (method: string) => void;
 
-  placeOrder: () => void;
-  placeRewardOrder: () => void;
+  placeOrder: () => Promise<void>;
+  placeOrderWithCustomerInfo: () => Promise<void>; // NEW: For orders with customer info
+  placeRewardOrder: () => Promise<void>;
 };
 
 const CheckoutContext = createContext<CheckoutContextType | undefined>(undefined);
@@ -73,25 +89,54 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   const [currentAddress, setCurrentAddress] = useState<Address>({
     label: "Current Location",
     details: "",
-    phone: user?.phone || user?.mobile || "", // Initialize with user's phone
+    phone: user?.phone || user?.mobile || "",
+    coordinates: { lat: 0, lng: 0 },
+  });
+
+  // NEW: Customer Information State
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
+    name: "",
+    phone: "",
+    email: "",
+    notes: "",
     coordinates: { lat: 0, lng: 0 },
   });
 
   const [paymentMethod, setPaymentMethod] = useState("QR");
   const userPoints = user?.reward_points?.available || 0;
 
-  // Update currentAddress phone when user changes
+  // Update currentAddress phone and customer info when user changes
   useEffect(() => {
     if (user) {
       const userPhone = user.phone || user.mobile;
+      const userName = user.name || "";
+      
+      // Update current address phone
       if (userPhone && userPhone !== currentAddress.phone) {
         setCurrentAddress(prev => ({
           ...prev,
           phone: userPhone
         }));
       }
+
+      // Auto-fill customer info for regular users
+      if (user?.role !== "sale") {
+        setCustomerInfo(prev => ({
+          ...prev,
+          name: userName || prev.name,
+          phone: userPhone || prev.phone
+        }));
+      }
     }
   }, [user]);
+
+  // NEW: Helper to update specific customer info field
+  const updateCustomerInfo = (field: keyof CustomerInfo, value: any) => {
+    setCustomerInfo(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   const recalcTotal = (items: CartItem[]) => items.reduce((sum, i) => sum + i.price * i.qty, 0);
   const recalcTotalPoints = (items: RewardItem[]) => items.reduce((sum, i) => sum + i.points_at_reward * i.qty, 0);
@@ -158,7 +203,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       }, 0) + (idx === -1 ? deltaQty * reward.points_at_reward : 0);
 
       if (newTotalPoints > userPoints) {
-        // ⚠️ block increment, toast after
         setTimeout(() => {
           toast.error("You don't have enough reward points!", { autoClose: 2000 });
         }, 0);
@@ -197,7 +241,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  // --- PLACE ORDER ---
+  // --- PLACE ORDER (ORIGINAL) ---
   const placeOrder = async () => {
     let addressToSend: Address | null = null;
     if (selectedAddress === "current") {
@@ -206,7 +250,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
-      // Get user's phone number
       const userPhone = user?.phone || user?.mobile;
       if (!userPhone) {
         toast.error("Please add your phone number in your account settings");
@@ -217,7 +260,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       addressToSend = { 
         ...currentAddress, 
         short_address,
-        phone: userPhone // Use user's phone from account
+        phone: userPhone
       };
     } else {
       addressToSend = selectedAddress as Address;
@@ -259,6 +302,116 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err: any) {
       console.error("Order error:", err.response?.data || err);
+      toast.error(err.response?.data?.message || "Order failed. Please try again.");
+    }
+  };
+
+  // NEW: Place Order with Customer Information
+  const placeOrderWithCustomerInfo = async () => {
+    // Validate customer information
+    if (user?.role === "sale") {
+      // For sale role, validate customer info
+      if (!customerInfo.name.trim()) {
+        toast.error("Please enter customer name");
+        return;
+      }
+      if (!customerInfo.phone.trim()) {
+        toast.error("Please enter customer phone number");
+        return;
+      }
+    } else {
+      // For regular users, validate their info
+      if (!customerInfo.name.trim()) {
+        toast.error("Please enter your name");
+        return;
+      }
+      if (!customerInfo.phone.trim() && !(user?.phone || user?.mobile)) {
+        toast.error("Please enter your phone number");
+        return;
+      }
+    }
+
+    // Validate coordinates
+    if (!customerInfo.coordinates) {
+      toast.error("Please select a location on the map");
+      return;
+    }
+
+    if (cart.length === 0) {
+      toast.error("Your cart is empty");
+      return;
+    }
+
+    if (!paymentMethod) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
+    // Prepare the payload with customer information
+    const payload = {
+      api_user_id: user?.id,
+      user_role: user?.role, // Send user role to backend
+      
+      // Customer Information
+      customer_info: {
+        name: customerInfo.name.trim(),
+        phone: customerInfo.phone.trim() || user?.phone || user?.mobile || "",
+        email: customerInfo.email?.trim() || "",
+        notes: customerInfo.notes?.trim() || "",
+        latitude: customerInfo.coordinates.lat,
+        longitude: customerInfo.coordinates.lng,
+      },
+      
+      // Order Information
+      paymentMethod,
+      total_qty: cart.reduce((sum, item) => sum + item.qty, 0),
+      total,
+      items: cart.map((item) => ({
+        product_id: item.id,
+        qty: item.qty,
+        price_at_order: item.price,
+        total_line: item.price * item.qty,
+        image_url: item.image || null,
+      })),
+    };
+
+    try {
+      console.log("Sending order with customer info:", payload);
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/sales-order/complete-order`, payload, {
+        withCredentials: true,
+        headers: { 
+          Accept: "application/json",
+          'Content-Type': 'application/json'
+        },
+      });
+      
+      if (res.data?.success) {
+        toast.success("Order placed successfully!");
+        
+        // Show customer info for sale role
+        if (user?.role === "sale") {
+          toast.info(`Customer: ${customerInfo.name}, Phone: ${customerInfo.phone}`);
+        }
+        
+        // Clear cart and customer info
+        setCart([]);
+        setTotal(0);
+        setCustomerInfo({
+          name: "",
+          phone: "",
+          email: "",
+          notes: "",
+          coordinates: { lat: 0, lng: 0 },
+        });
+        
+        // Redirect to confirmation page
+        const orderId = res.data.order_id;
+        router.push(orderId ? `/order-confirmation/${orderId}` : "/order-confirmation");
+      } else {
+        toast.error(res.data?.message || "Failed to place order");
+      }
+    } catch (err: any) {
+      console.error("Order with customer info error:", err.response?.data || err);
       toast.error(err.response?.data?.message || "Order failed. Please try again.");
     }
   };
@@ -308,25 +461,31 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           const { latitude, longitude } = position.coords;
           const coordinates = { lat: latitude, lng: longitude };
 
-          // Get user's phone number
           const userPhone = user?.phone || user?.mobile;
   
           try {
-            // Get human-readable short address using your existing utility
             const short_address = await getShortAddress(latitude, longitude);
   
             const currentAddr: Address = {
               label: "Current Location",
               details: short_address || "Your current position",
-              phone: userPhone || "", // Set user's phone from account
+              phone: userPhone || "",
               coordinates,
               short_address,
             };
   
             setCurrentAddress(currentAddr);
+            
+            // Also update customer coordinates if they haven't selected one yet
+            if (!customerInfo.coordinates) {
+              setCustomerInfo(prev => ({
+                ...prev,
+                coordinates: { lat: latitude, lng: longitude }
+              }));
+            }
+            
             resolve(currentAddr);
           } catch (err) {
-            // Fallback if reverse geocoding fails
             const fallbackAddr: Address = {
               label: "Current Location",
               details: "Detected location",
@@ -375,9 +534,13 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         currentAddress,
         setCurrentAddress,
         detectCurrentLocation,
+        customerInfo, // NEW
+        setCustomerInfo, // NEW
+        updateCustomerInfo, // NEW
         paymentMethod,
         setPaymentMethod,
         placeOrder,
+        placeOrderWithCustomerInfo, // NEW
         placeRewardOrder,
       }}
     >

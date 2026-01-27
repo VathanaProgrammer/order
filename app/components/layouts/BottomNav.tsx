@@ -15,11 +15,13 @@ const BottomNav: React.FC = () => {
   const {
     total,
     placeOrder,
+    placeOrderWithCustomerInfo, // NEW: Get the new function
     placeRewardOrder,
     cart,
     rewards,
     paymentMethod,
     selectedAddress,
+    customerInfo, // NEW: Get customer info for validation
   } = useCheckout();
   const [activePage, setActivePage] = useState<"home" | "chat">("home");
   const { t } = useLanguage();
@@ -31,31 +33,82 @@ const BottomNav: React.FC = () => {
   const isCartEmpty = cart.length === 0 && rewards.length === 0;
   const isPaymentMissing = !paymentMethod;
   const isAddressMissing = !selectedAddress;
+  
+  // NEW: Check if customer info is complete
+  const isCustomerInfoIncomplete = () => {
+    if (user?.role === "sale") {
+      // For sale users: customer name, phone, and coordinates are required
+      return !customerInfo?.name?.trim() || 
+             !customerInfo?.phone?.trim() || 
+             !customerInfo?.coordinates;
+    } else {
+      // For regular users: name and coordinates are required, phone is optional if in account
+      const hasPhone = customerInfo?.phone?.trim() || user?.phone || user?.mobile;
+      return !customerInfo?.name?.trim() || 
+             !customerInfo?.coordinates ||
+             !hasPhone;
+    }
+  };
 
   const formatPrice = (value: number) =>
     typeof value !== "number" || isNaN(value) ? "$0.00" : `$${value.toFixed(2)}`;
 
-  const handleClickCheckout = () => {
-    if (!user) return router.push("/sign-in");
+  const handleClickCheckout = async () => {
+    if (!user) {
+      router.push("/sign-in");
+      return;
+    }
 
     if (isCheckoutPage) {
       const errors: string[] = [];
+      
+      // Basic validation
       if (cart.length > 0 && rewards.length > 0) {
         errors.push("Cannot mix products and rewards!");
       }
-      if (cart.length === 0 && rewards.length === 0) errors.push(t.yourCartIsEmpty);
-      if (isPaymentMissing) errors.push(t.pleaseSelectAPaymentMethod);
-      if (isAddressMissing) errors.push(t.pleaseSelectAShippingAddress);
+      if (cart.length === 0 && rewards.length === 0) {
+        errors.push(t.yourCartIsEmpty);
+      }
+      if (isPaymentMissing) {
+        errors.push(t.pleaseSelectAPaymentMethod);
+      }
+      if (isAddressMissing) {
+        errors.push(t.pleaseSelectAShippingAddress);
+      }
+      
+      // NEW: Customer info validation
+      if (isCustomerInfoIncomplete()) {
+        if (user?.role === "sale") {
+          if (!customerInfo?.name?.trim()) errors.push("Please enter customer name");
+          if (!customerInfo?.phone?.trim()) errors.push("Please enter customer phone");
+        } else {
+          if (!customerInfo?.name?.trim()) errors.push("Please enter your name");
+          if (!customerInfo?.phone?.trim() && !(user?.phone || user?.mobile)) {
+            errors.push("Please enter your phone number");
+          }
+        }
+        if (!customerInfo?.coordinates) {
+          errors.push("Please select a location on the map");
+        }
+      }
 
       if (errors.length > 0) {
         errors.forEach((err) => toast.error(err));
         return;
       }
 
-      if (rewards.length > 0) {
-        placeRewardOrder?.();
-      } else {
-        placeOrder?.();
+      try {
+        // For reward orders, use the original function
+        if (rewards.length > 0) {
+          await placeRewardOrder?.();
+        } 
+        // For regular orders with customer info, use the new function
+        else if (cart.length > 0) {
+          await placeOrderWithCustomerInfo?.();
+        }
+      } catch (error) {
+        console.error("Checkout error:", error);
+        toast.error("Failed to place order. Please try again.");
       }
     } else {
       router.push("/checkout");
@@ -90,6 +143,9 @@ const BottomNav: React.FC = () => {
     };
     return pageTranslations[page] || page.charAt(0).toUpperCase() + page.slice(1);
   };
+
+  // Show warning if customer info is incomplete
+  const showCustomerInfoWarning = isCheckoutPage && isCustomerInfoIncomplete();
 
   return (
     <section className="flex items-center justify-between my-2">
@@ -132,11 +188,23 @@ const BottomNav: React.FC = () => {
       <div className="flex flex-col items-center justify-center">
         <p className="text-[17px] font-semibold leading-none">{formatPrice(total)}</p>
         <p className="text-[13px] leading-none pt-1 text-gray-500">{t.total}</p>
+        
+        {/* NEW: Show warning if customer info is incomplete */}
+        {showCustomerInfoWarning && (
+          <p className="text-xs text-red-500 mt-1 text-center max-w-[120px]">
+            Complete customer info
+          </p>
+        )}
       </div>
 
       <button
         onClick={handleClickCheckout}
-        className="border rounded-[8px] px-6 py-3 font-semibold shadow-sm bg-[#1E40AF] text-white hover:opacity-80 active:scale-95 transition"
+        disabled={isCartEmpty}
+        className={`border rounded-[8px] px-6 py-3 font-semibold shadow-sm transition ${
+          isCartEmpty 
+            ? "bg-gray-400 text-gray-200 cursor-not-allowed" 
+            : "bg-[#1E40AF] text-white hover:opacity-80 active:scale-95"
+        }`}
       >
         {t.checkout}
       </button>

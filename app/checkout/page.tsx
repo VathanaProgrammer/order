@@ -42,6 +42,7 @@ const CombinedCheckoutPage = () => {
     detectCurrentLocation,
     paymentMethod,
     setPaymentMethod,
+    placeOrderWithCustomerInfo,
   } = useCheckout();
 
   const { setLoading } = useLoading();
@@ -127,9 +128,9 @@ const CombinedCheckoutPage = () => {
   // HANDLE CUSTOMER INFO CHANGES
   const handleCustomerInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setCustomerInfo(prev => ({
+    setCustomerInfo((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -151,6 +152,36 @@ const CombinedCheckoutPage = () => {
     setIsAdding(false);
   };
 
+// Handle map click for customer coordinates
+const handleCustomerMapClick = (e: google.maps.MapMouseEvent) => {
+  const latLng = e.latLng?.lat() && e.latLng?.lng() ? {
+    lat: e.latLng.lat(),
+    lng: e.latLng.lng()
+  } : null;
+  
+  if (latLng) {
+    setCustomerInfo(prev => ({
+      ...prev,
+      coordinates: latLng
+    }));
+  }
+};
+
+// Handle marker drag end for customer coordinates
+const handleCustomerMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
+  const latLng = e.latLng?.lat() && e.latLng?.lng() ? {
+    lat: e.latLng.lat(),
+    lng: e.latLng.lng()
+  } : null;
+  
+  if (latLng) {
+    setCustomerInfo(prev => ({
+      ...prev,
+      coordinates: latLng
+    }));
+  }
+};
+
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
       setTempAddress({
@@ -158,7 +189,7 @@ const CombinedCheckoutPage = () => {
         coordinates: { lat: e.latLng.lat(), lng: e.latLng.lng() },
       });
     }
-  };
+  };  
 
   const handleMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
@@ -269,107 +300,107 @@ const CombinedCheckoutPage = () => {
   };
 
   // Checkout handler - updated for separate customer info
-  const handleCheckout = async () => {
-    if (cart.length === 0) return toast.error("Your cart is empty");
-    if (!selectedAddress) return toast.error("Please select a shipping address");
-    if (!paymentMethod) return toast.error("Please select a payment method");
+  // const handleCheckout = async () => {
+  //   if (cart.length === 0) return toast.error("Your cart is empty");
+  //   if (!selectedAddress) return toast.error("Please select a shipping address");
+  //   if (!paymentMethod) return toast.error("Please select a payment method");
   
-    // Validate customer info for sale role
-    if (user?.role === "sale") {
-      if (!customerInfo.name.trim()) {
-        toast.error("Please enter customer name");
-        return;
-      }
-      if (!customerInfo.phone.trim()) {
-        toast.error("Please enter customer phone number");
-        return;
-      }
-    } else {
-      // Validate customer info for regular users
-      if (!customerInfo.name.trim()) {
-        toast.error("Please enter your name");
-        return;
-      }
-      if (!customerInfo.phone.trim() && !userPhone) {
-        toast.error("Please enter your phone number");
-        return;
-      }
-    }
+  //   // Validate customer info for sale role
+  //   if (user?.role === "sale") {
+  //     if (!customerInfo.name.trim()) {
+  //       toast.error("Please enter customer name");
+  //       return;
+  //     }
+  //     if (!customerInfo.phone.trim()) {
+  //       toast.error("Please enter customer phone number");
+  //       return;
+  //     }
+  //   } else {
+  //     // Validate customer info for regular users
+  //     if (!customerInfo.name.trim()) {
+  //       toast.error("Please enter your name");
+  //       return;
+  //     }
+  //     if (!customerInfo.phone.trim() && !userPhone) {
+  //       toast.error("Please enter your phone number");
+  //       return;
+  //     }
+  //   }
   
-    setIsSubmittingOrder(true);
-    setLoading(true);
+  //   setIsSubmittingOrder(true);
+  //   setLoading(true);
   
-    try {
-      const orderData: any = {
-        api_user_id: user?.id,
-        address_type: selectedAddress === "current" ? "current" : "saved",
-        paymentMethod,
-        total_qty: cart.reduce((sum, item) => sum + item.qty, 0),
-        total,
-        items: cart.map((item) => ({
-          product_id: item.id,
-          qty: item.qty,
-          price_at_order: item.price,
-          total_line: item.price * item.qty,
-          image_url: item.image || null,
-        })),
-      };
+  //   try {
+  //     const orderData: any = {
+  //       api_user_id: user?.id,
+  //       address_type: selectedAddress === "current" ? "current" : "saved",
+  //       paymentMethod,
+  //       total_qty: cart.reduce((sum, item) => sum + item.qty, 0),
+  //       total,
+  //       items: cart.map((item) => ({
+  //         product_id: item.id,
+  //         qty: item.qty,
+  //         price_at_order: item.price,
+  //         total_line: item.price * item.qty,
+  //         image_url: item.image || null,
+  //       })),
+  //     };
   
-      // Add customer info for all users
-      orderData.customer_info = {
-        name: customerInfo.name.trim(),
-        phone: customerInfo.phone.trim() || userPhone || "",
-        notes: customerInfo.notes.trim() || "",
-      };
+  //     // Add customer info for all users
+  //     orderData.customer_info = {
+  //       name: customerInfo.name.trim(),
+  //       phone: customerInfo.phone.trim() || userPhone || "",
+  //       notes: customerInfo.notes.trim() || "",
+  //     };
   
-      if (selectedAddress === "current") {
-        if (!currentAddress?.coordinates) {
-          toast.error("Please detect your current location first");
-          return;
-        }
+  //     if (selectedAddress === "current") {
+  //       if (!currentAddress?.coordinates) {
+  //         toast.error("Please detect your current location first");
+  //         return;
+  //       }
   
-        // Use customer phone for all users
-        const phoneForCurrent = customerInfo.phone.trim() || userPhone || "";
-        if (!phoneForCurrent) {
-          toast.error("Please enter phone number");
-          return;
-        }
+  //       // Use customer phone for all users
+  //       const phoneForCurrent = customerInfo.phone.trim() || userPhone || "";
+  //       if (!phoneForCurrent) {
+  //         toast.error("Please enter phone number");
+  //         return;
+  //       }
   
-        // For sale role, label is customer name; for regular users, also customer name
-        const labelForCurrent = customerInfo.name.trim() || "Customer";
+  //       // For sale role, label is customer name; for regular users, also customer name
+  //       const labelForCurrent = customerInfo.name.trim() || "Customer";
   
-        orderData.address = {
-          label: labelForCurrent,
-          phone: phoneForCurrent,
-          details: tempAddress.details || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
-          coordinates: currentAddress.coordinates,
-        };
-      } else {
-        orderData.saved_address_id = (selectedAddress as ExtendedAddress).id;
-      }
+  //       orderData.address = {
+  //         label: labelForCurrent,
+  //         phone: phoneForCurrent,
+  //         details: tempAddress.details || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
+  //         coordinates: currentAddress.coordinates,
+  //       };
+  //     } else {
+  //       orderData.saved_address_id = (selectedAddress as ExtendedAddress).id;
+  //     }
   
-      console.log("Order data:", orderData);
-      const response = await api.post("/orders", orderData);
+  //     console.log("Order data:", orderData);
+  //     const response = await api.post("/orders", orderData);
   
-      if (response.data.success) {
-        toast.success("Order placed successfully!");
-        const orderId = response.data.order_id;
+  //     if (response.data.success) {
+  //       toast.success("Order placed successfully!");
+  //       const orderId = response.data.order_id;
         
-        // Show customer info
-        toast.info(`Customer: ${orderData.customer_info.name}, Phone: ${orderData.customer_info.phone}`);
+  //       // Show customer info
+  //       toast.info(`Customer: ${orderData.customer_info.name}, Phone: ${orderData.customer_info.phone}`);
         
-        router.push(orderId ? `/order-confirmation/${orderId}` : "/order-confirmation");
-      } else {
-        toast.error(response.data.message || "Failed to place order");
-      }
-    } catch (error: any) {
-      console.error("Checkout error:", error);
-      toast.error(error.response?.data?.message || "Failed to place order");
-    } finally {
-      setIsSubmittingOrder(false);
-      setLoading(false);
-    }
-  };
+  //       router.push(orderId ? `/order-confirmation/${orderId}` : "/order-confirmation");
+  //     } else {
+  //       toast.error(response.data.message || "Failed to place order");
+  //     }
+  //   } catch (error: any) {
+  //     console.error("Checkout error:", error);
+  //     toast.error(error.response?.data?.message || "Failed to place order");
+  //   } finally {
+  //     setIsSubmittingOrder(false);
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar pb-24">
@@ -531,13 +562,13 @@ const CombinedCheckoutPage = () => {
         mapContainerStyle={containerStyle}
         center={customerInfo.coordinates || { lat: 11.567, lng: 104.928 }}
         zoom={15}
-        onClick={handleMapClick}
+        onClick={handleCustomerMapClick}  // Use the new handler
       >
         {customerInfo.coordinates && (
           <Marker
             position={customerInfo.coordinates}
             draggable
-            onDragEnd={handleMarkerDragEnd}
+            onDragEnd={handleCustomerMarkerDragEnd}  // Use the new handler
           />
         )}
       </GoogleMap>
@@ -865,30 +896,6 @@ const CombinedCheckoutPage = () => {
           </div>
         </div>
       )}
-
-      {/* Checkout Button */}
-      <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
-        <button
-          onClick={handleCheckout}
-          disabled={isSubmittingOrder || cart.length === 0 || !selectedAddress || !paymentMethod || 
-                   (user?.role === "sale" ? (!customerInfo.name || !customerInfo.phone) : !customerInfo.name)}
-          className={`w-full py-4 rounded-xl font-semibold text-lg ${
-            isSubmittingOrder || cart.length === 0 || !selectedAddress || !paymentMethod || 
-            (user?.role === "sale" ? (!customerInfo.name || !customerInfo.phone) : !customerInfo.name)
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-              : "bg-green-600 text-white hover:bg-green-700"
-          }`}
-        >
-          {isSubmittingOrder ? (
-            <div className="flex items-center justify-center gap-2">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              Processing Order...
-            </div>
-          ) : (
-            `Place Order - $${total.toFixed(2)}`
-          )}
-        </button>
-      </div>
     </div>
   );
 };
