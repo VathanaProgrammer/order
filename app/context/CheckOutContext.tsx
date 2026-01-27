@@ -29,10 +29,6 @@ export type Address = {
   phone?: string;
   coordinates?: { lat: number; lng: number };
   short_address?: string;
-
-  customer_name?: string;
-  customer_email?: string;
-  customer_company?: string;
 };
 
 type CheckoutContextType = {
@@ -204,64 +200,35 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   // --- PLACE ORDER ---
   const placeOrder = async () => {
     let addressToSend: Address | null = null;
-    
     if (selectedAddress === "current") {
       if (!currentAddress.coordinates) {
         toast.error("Current address coordinates not set!");
         return;
       }
       
-      // For sale role users
-      if (user?.role === 'sale') {
-        // Try to get customer info from the selected address or current address
-        let customerName = "";
-        let customerPhone = "";
-        
-        if (selectedAddress === "current") {
-          // For current location, check if we have customer info in address details
-          customerName = currentAddress.label || "Customer";
-          customerPhone = currentAddress.phone || user?.phone || user?.mobile || "";
-        } else {
-          // For saved addresses
-          const savedAddr = selectedAddress as Address;
-          customerName = savedAddr.label || "Customer";
-          customerPhone = savedAddr.phone || user?.phone || user?.mobile || "";
-        }
-        
-        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
-        addressToSend = { 
-          ...currentAddress, 
-          short_address,
-          phone: customerPhone,
-          label: customerName, // This will use the address label (which should be customer name for sale role)
-          details: currentAddress.details || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
-        };
-      } else {
-        // Regular user
-        const userPhone = user?.phone || user?.mobile || "";
-        if (!userPhone) {
-          toast.error("Please add your phone number in your account settings");
-          return;
-        }
-        
-        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
-        addressToSend = { 
-          ...currentAddress, 
-          short_address,
-          phone: userPhone,
-          label: "Current Location",
-        };
+      // Get user's phone number
+      const userPhone = user?.phone || user?.mobile;
+      if (!userPhone) {
+        toast.error("Please add your phone number in your account settings");
+        return;
       }
+      
+      const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
+      addressToSend = { 
+        ...currentAddress, 
+        short_address,
+        phone: userPhone // Use user's phone from account
+      };
     } else {
       addressToSend = selectedAddress as Address;
     }
-  
+
     if (!addressToSend || cart.length === 0) {
       toast.error("Cart is empty or no address selected!");
       return;
     }
-  
-    const payload: any = {
+
+    const payload = {
       api_user_id: user?.id,
       saved_address_id: selectedAddress !== "current" ? addressToSend.id : undefined,
       address: selectedAddress === "current" ? addressToSend : undefined,
@@ -277,7 +244,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         image_url: (i.image ?? "").split("/").pop(),
       })),
     };
-  
+
     try {
       console.log("Sending order with payload:", payload);
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
@@ -286,12 +253,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       });
       if (res.data?.success) {
         toast.success("Order placed successfully!");
-        
-        // Show customer info for sale role
-        if (user?.role === 'sale' && payload.customer_info) {
-          toast.info(`Customer: ${payload.customer_info.name}, Phone: ${payload.customer_info.phone}`);
-        }
-        
         setCart([]);
         setTotal(0);
         router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}`);
