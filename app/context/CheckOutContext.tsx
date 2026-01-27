@@ -202,70 +202,63 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // --- PLACE ORDER ---
-  const placeOrder = async () => {
+  const placeOrder = async (customerInfo?: { name: string; phone: string }) => {
     let addressToSend: Address | null = null;
-    let customerInfo = {};
     
-    // Check if user role is 'sale' and prepare customer info
-    if (user?.role === 'sale') {
-      // For sale role, we need to collect customer info
-      // You might want to get this from form state or separate customer info state
-      const customerName = currentAddress?.label || "Customer";
-      const customerPhone = currentAddress?.phone || "";
-      
-      if (!customerPhone) {
-        toast.error("Please enter customer phone number");
-        return;
-      }
-      
-      customerInfo = {
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        // Add other customer fields if available
-      };
-    }
-  
     if (selectedAddress === "current") {
       if (!currentAddress.coordinates) {
         toast.error("Current address coordinates not set!");
         return;
       }
       
-      // For sale role, use customer phone; for regular users, use user phone
-      let phoneToUse = "";
+      // For sale role users
       if (user?.role === 'sale') {
-        phoneToUse = currentAddress.phone || "";
-        if (!phoneToUse) {
-          toast.error("Please enter customer phone number");
-          return;
+        // Determine customer name and phone
+        let customerName = "";
+        let customerPhone = "";
+        
+        // Priority 1: Use provided customerInfo
+        if (customerInfo?.name && customerInfo?.phone) {
+          customerName = customerInfo.name;
+          customerPhone = customerInfo.phone;
         }
+        // Priority 2: Use from currentAddress (if set elsewhere)
+        else if (currentAddress.label && currentAddress.label !== "Current Location") {
+          customerName = currentAddress.label;
+          customerPhone = currentAddress.phone || "";
+        }
+        // Priority 3: Use from user's account
+        else {
+          customerName = "Customer";
+          customerPhone = user?.phone || user?.mobile || "";
+        }
+        
+        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
+        addressToSend = { 
+          ...currentAddress, 
+          short_address,
+          phone: customerPhone,
+          label: customerName, // This is the FIX - use customer name, not "Current Location"
+          details: currentAddress.details || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
+        };
       } else {
-        phoneToUse = user?.phone || user?.mobile || "";
-        if (!phoneToUse) {
+        // Regular user - keep as is
+        const userPhone = user?.phone || user?.mobile || "";
+        if (!userPhone) {
           toast.error("Please add your phone number in your account settings");
           return;
         }
+        
+        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
+        addressToSend = { 
+          ...currentAddress, 
+          short_address,
+          phone: userPhone,
+          label: "Current Location", // Keep generic for regular users
+        };
       }
-      
-      const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
-      addressToSend = { 
-        ...currentAddress, 
-        short_address,
-        phone: phoneToUse,
-        // Add customer info to address for sale role
-        ...(user?.role === 'sale' ? customerInfo : {})
-      };
     } else {
       addressToSend = selectedAddress as Address;
-      
-      // For sale role with saved address, ensure we have customer info
-      if (user?.role === 'sale' && addressToSend) {
-        // Check if saved address has customer info
-        if (!addressToSend.phone) {
-          toast.error("Saved address missing phone number. Please update address with customer phone.");
-          return;
-        }
-      }
     }
   
     if (!addressToSend || cart.length === 0) {
@@ -290,21 +283,12 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       })),
     };
   
-    // Add customer_info for sale role users
-    if (user?.role === 'sale') {
-      // Use address info for customer data
+    // Add customer_info for sale role when using current location
+    if (user?.role === 'sale' && selectedAddress === "current") {
       payload.customer_info = {
         name: addressToSend.label || "Customer",
         phone: addressToSend.phone || "",
-
-        // Add other fields from address if available
-        company: addressToSend.customer_company || "",
       };
-      
-      // For current address, also add coordinates to customer info
-      if (selectedAddress === "current" && addressToSend.coordinates) {
-        payload.customer_info.coordinates = addressToSend.coordinates;
-      }
     }
   
     try {
