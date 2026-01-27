@@ -437,7 +437,7 @@ const placeOrder= async () => {
         // Order Information
         payment_method: paymentMethod,
         total_qty: cart.reduce((sum, item) => sum + item.qty, 0),
-        total: total,
+        total_amount: total, 
         cart_items: cart.map((item) => ({
           product_id: item.id,
           qty: item.qty,
