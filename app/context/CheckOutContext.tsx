@@ -24,7 +24,7 @@ export type RewardItem = {
 
 export type Address = {
   id?: number;
-  label: string;
+  label: string | any;
   details?: string;
   phone?: string;
   coordinates?: { lat: number; lng: number };
@@ -203,16 +203,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
 
   // --- PLACE ORDER ---
   const placeOrder = async () => {
-    // Add this to get customer info from parent component
-    const getCustomerInfo = () => {
-      // This should be passed from the checkout page component
-      return {
-        customerName: "", // Get from checkout page state
-        customerPhone: "", // Get from checkout page state
-        customerAddress: "", // Get from checkout page state
-      };
-    };
-  
     let addressToSend: Address | null = null;
     
     if (selectedAddress === "current") {
@@ -221,11 +211,16 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
-      // For sale role, get customer info
+      // For sale role, check if we have customer info in the checkout page state
+      // This requires passing customer info through props or context
       if (user?.role === 'sale') {
-        const customerInfo = getCustomerInfo(); // You need to implement this
+        // IMPORTANT: You need to get customer info from somewhere
+        // This could be from a parent component, local storage, or separate state
+        const customerName = ""; // Get from parent component
+        const customerPhone = ""; // Get from parent component
+        const customerAddressDetails = ""; // Get from parent component
         
-        if (!customerInfo.customerName || !customerInfo.customerPhone) {
+        if (!customerName || !customerPhone) {
           toast.error("Please enter customer name and phone number");
           return;
         }
@@ -234,9 +229,9 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         addressToSend = { 
           ...currentAddress, 
           short_address,
-          phone: customerInfo.customerPhone,
-          label: customerInfo.customerName,
-          details: customerInfo.customerAddress || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
+          phone: customerPhone,
+          label: customerName, // Use customer name, NOT "Current Location"
+          details: customerAddressDetails || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
         };
       } else {
         // Regular user
@@ -251,6 +246,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           ...currentAddress, 
           short_address,
           phone: userPhone,
+          label: user?.name,
         };
       }
     } else {
@@ -279,8 +275,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       })),
     };
   
-    // Add customer_info for sale role users
-    if (user?.role === 'sale' && addressToSend) {
+    // Add customer_info for sale role users when using current location
+    if (user?.role === 'sale' && selectedAddress === "current" && addressToSend) {
       payload.customer_info = {
         name: addressToSend.label || "Customer",
         phone: addressToSend.phone || "",
