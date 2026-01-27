@@ -573,12 +573,9 @@ const CombinedCheckoutPage = () => {
 
             {/* Action Buttons */}
             {/* Action Buttons - Different for sale vs regular users */}
-// Remove the entire handleSaveNewAddress function - you don't need it
-
-// Update the action buttons to just validate and close:
 <div className="flex gap-3 pt-2">
   {user?.role === "sale" ? (
-    // For sale role: Just validate and close, no saving
+    // For sale role: No address saving, just validate and continue
     <>
       <button
         onClick={() => {
@@ -591,16 +588,22 @@ const CombinedCheckoutPage = () => {
             return;
           }
           
-          // Just close the form - customer info stays in tempAddress
+          // Close the form, keep customer info in tempAddress
           setIsAdding(false);
           // Automatically select current address for checkout
           setSelectedAddress("current");
           
-          toast.success("Customer information ready for checkout!");
+          toast.success("Customer information saved. Ready to checkout!");
         }}
-        className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+        className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
+        disabled={
+          !tempAddress.label?.trim() || // Customer name
+          !tempAddress.phone?.trim() || // Customer phone
+          !tempAddress.details?.trim() || // Address details
+          !tempAddress.coordinates // Location
+        }
       >
-        Done
+        Save Customer Info
       </button>
       <button
         onClick={() => {
@@ -619,7 +622,7 @@ const CombinedCheckoutPage = () => {
       </button>
     </>
   ) : (
-    // For regular users: Keep address saving
+    // For regular users: Normal address saving
     <>
       <button
         onClick={handleSaveNewAddress}
