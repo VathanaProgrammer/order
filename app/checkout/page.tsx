@@ -443,13 +443,20 @@ const CombinedCheckoutPage = () => {
               </label>
               <input
                 type="text"
-                placeholder={
-                  user?.role === "sale" ? "Enter customer name" : "Home, Work, etc."
-                }
+                placeholder="Home, Work, etc."
                 value={tempAddress.label || ""}
-                onChange={(e) => {if (user?.role === "sale"){ setUser({ ...user, name: e.target.value })} else {setTempAddress({ ...tempAddress, label: e.target.value })}}}
+                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
+              {user?.role === "sale" && (
+                <input
+                type="text"
+                placeholder="Enter customer name"
+                //value={tempAddress.label || ""}
+                onChange={(e) => setUser({ ...user, name: e.target.value })}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              )}
             </div>
 
             {/* Phone */}
