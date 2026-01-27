@@ -435,7 +435,7 @@ const placeOrder= async () => {
         longitude: customerInfo.coordinates?.lng || 0,
         
         // Order Information
-        paymentMethod: paymentMethod,
+        payment_method: paymentMethod,
         total_qty: cart.reduce((sum, item) => sum + item.qty, 0),
         total: total,
         items: cart.map((item) => ({
