@@ -202,7 +202,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // --- PLACE ORDER ---
-  const placeOrder = async (customerInfo?: { name: string; phone: string }) => {
+  const placeOrder = async () => {
     let addressToSend: Address | null = null;
     
     if (selectedAddress === "current") {
@@ -213,24 +213,19 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       
       // For sale role users
       if (user?.role === 'sale') {
-        // Determine customer name and phone
+        // Try to get customer info from the selected address or current address
         let customerName = "";
         let customerPhone = "";
         
-        // Priority 1: Use provided customerInfo
-        if (customerInfo?.name && customerInfo?.phone) {
-          customerName = customerInfo.name;
-          customerPhone = customerInfo.phone;
-        }
-        // Priority 2: Use from currentAddress (if set elsewhere)
-        else if (currentAddress.label && currentAddress.label !== "Current Location") {
-          customerName = currentAddress.label;
-          customerPhone = currentAddress.phone || "";
-        }
-        // Priority 3: Use from user's account
-        else {
-          customerName = "Customer";
-          customerPhone = user?.phone || user?.mobile || "";
+        if (selectedAddress === "current") {
+          // For current location, check if we have customer info in address details
+          customerName = currentAddress.label || "Customer";
+          customerPhone = currentAddress.phone || user?.phone || user?.mobile || "";
+        } else {
+          // For saved addresses
+          const savedAddr = selectedAddress as Address;
+          customerName = savedAddr.label || "Customer";
+          customerPhone = savedAddr.phone || user?.phone || user?.mobile || "";
         }
         
         const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
@@ -238,11 +233,11 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           ...currentAddress, 
           short_address,
           phone: customerPhone,
-          label: customerName, // This is the FIX - use customer name, not "Current Location"
+          label: customerName, // This will use the address label (which should be customer name for sale role)
           details: currentAddress.details || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
         };
       } else {
-        // Regular user - keep as is
+        // Regular user
         const userPhone = user?.phone || user?.mobile || "";
         if (!userPhone) {
           toast.error("Please add your phone number in your account settings");
@@ -254,7 +249,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           ...currentAddress, 
           short_address,
           phone: userPhone,
-          label: "Current Location", // Keep generic for regular users
+          label: "Current Location",
         };
       }
     } else {
@@ -282,14 +277,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         image_url: (i.image ?? "").split("/").pop(),
       })),
     };
-  
-    // Add customer_info for sale role when using current location
-    if (user?.role === 'sale' && selectedAddress === "current") {
-      payload.customer_info = {
-        name: addressToSend.label || "Customer",
-        phone: addressToSend.phone || "",
-      };
-    }
   
     try {
       console.log("Sending order with payload:", payload);
