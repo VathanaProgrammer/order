@@ -155,10 +155,24 @@ const CombinedCheckoutPage = () => {
 
   // Save new address – now supports custom phone for sales role
   const handleSaveNewAddress = async () => {
-    if (!tempAddress.label?.trim()) {
-      toast.error("Please enter a name/label");
-      return;
+    // For sale role, we need customer name and phone
+    if (user?.role === "sale") {
+      if (!tempAddress.label?.trim()) {
+        toast.error("Please enter customer name");
+        return;
+      }
+      if (!tempAddress.phone?.trim()) {
+        toast.error("Please enter customer phone number");
+        return;
+      }
+    } else {
+      // For regular users
+      if (!tempAddress.label?.trim()) {
+        toast.error("Please enter a name/label");
+        return;
+      }
     }
+    
     if (!tempAddress.details?.trim()) {
       toast.error("Please enter address details");
       return;
@@ -252,15 +266,26 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Checkout handler (you might want to adjust phone for current location too when role=sale)
+  // Checkout handler
   const handleCheckout = async () => {
     if (cart.length === 0) return toast.error("Your cart is empty");
     if (!selectedAddress) return toast.error("Please select a shipping address");
     if (!paymentMethod) return toast.error("Please select a payment method");
-
+  
+    // Additional validation for sale role
+    if (user?.role === "sale") {
+      if (selectedAddress === "current") {
+        // Check if customer info is entered in tempAddress
+        if (!tempAddress.label?.trim() || !tempAddress.phone?.trim()) {
+          toast.error("Please enter customer name and phone number");
+          return;
+        }
+      }
+    }
+  
     setIsSubmittingOrder(true);
     setLoading(true);
-
+  
     try {
       const orderData: any = {
         api_user_id: user?.id,
@@ -276,42 +301,78 @@ const CombinedCheckoutPage = () => {
           image_url: item.image || null,
         })),
       };
-
+  
+      // Add customer info for sale role
+      if (user?.role === "sale") {
+        let customerName = "";
+        let customerPhone = "";
+        
+        if (selectedAddress === "current") {
+          customerName = tempAddress.label || "";
+          customerPhone = tempAddress.phone || "";
+        } else if (selectedAddress && typeof selectedAddress !== "string") {
+          const savedAddr = selectedAddress as ExtendedAddress;
+          customerName = savedAddr.label || "";
+          customerPhone = savedAddr.phone || "";
+        }
+        
+        if (customerName && customerPhone) {
+          orderData.customer_info = {
+            name: customerName,
+            phone: customerPhone,
+          };
+        }
+      }
+  
       if (selectedAddress === "current") {
         if (!currentAddress?.coordinates) {
           toast.error("Please detect your current location first");
           return;
         }
-
-        const phoneForCurrent =
-          user?.role === "sale" && tempAddress.phone?.trim()
-            ? tempAddress.phone.trim()
-            : userPhone;
-
-        if (!phoneForCurrent) {
-          toast.error(
-            user?.role === "sale"
-              ? "Please enter customer's phone number"
-              : "Please add your phone in account settings"
-          );
-          return;
+  
+        // For sale role, use customer phone; for regular users, use user phone
+        let phoneForCurrent = "";
+        if (user?.role === "sale") {
+          phoneForCurrent = tempAddress.phone || "";
+          if (!phoneForCurrent) {
+            toast.error("Please enter customer phone number");
+            return;
+          }
+        } else {
+          phoneForCurrent = userPhone || "";
+          if (!phoneForCurrent) {
+            toast.error("Please add your phone in account settings");
+            return;
+          }
         }
-
+  
+        // For sale role, label is customer name; for regular users, use "Current Location"
+        const labelForCurrent = user?.role === "sale"
+          ? (tempAddress.label || "Customer")
+          : "Current Location";
+  
         orderData.address = {
-          label: "Current Location",
+          label: labelForCurrent,
           phone: phoneForCurrent,
-          details: `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
+          details: tempAddress.details || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
           coordinates: currentAddress.coordinates,
         };
       } else {
         orderData.saved_address_id = (selectedAddress as ExtendedAddress).id;
       }
-
+  
+      console.log("Order data:", orderData);
       const response = await api.post("/orders", orderData);
-
+  
       if (response.data.success) {
         toast.success("Order placed successfully!");
         const orderId = response.data.order_id;
+        
+        // Show customer info for sale role
+        if (user?.role === "sale" && orderData.customer_info) {
+          toast.info(`Customer: ${orderData.customer_info.name}, Phone: ${orderData.customer_info.phone}`);
+        }
+        
         router.push(orderId ? `/order-confirmation/${orderId}` : "/order-confirmation");
       } else {
         toast.error(response.data.message || "Failed to place order");
@@ -383,29 +444,31 @@ const CombinedCheckoutPage = () => {
         <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
 
         {/* Current Location */}
-{ user?.role !== "sale" &&  <div
-          onClick={handleDetectCurrentLocation}
-          className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${
-            selectedAddress === "current" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
-          } ${isDetectingLocation ? "opacity-70" : ""}`}
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-blue-500 text-xl">📍</span>
-            <div>
-              <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
-              <p className="text-sm text-gray-500">
-                {isDetectingLocation
-                  ? t.detectingYourCurrentLocation
-                  : currentAddress
-                  ? t.clickToUseYourCurrentLocation
-                  : t.clickToDetectYourCurrentLocation}
-              </p>
+        {user?.role !== "sale" && (
+          <div
+            onClick={handleDetectCurrentLocation}
+            className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${
+              selectedAddress === "current" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
+            } ${isDetectingLocation ? "opacity-70" : ""}`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-blue-500 text-xl">📍</span>
+              <div>
+                <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
+                <p className="text-sm text-gray-500">
+                  {isDetectingLocation
+                    ? t.detectingYourCurrentLocation
+                    : currentAddress
+                    ? t.clickToUseYourCurrentLocation
+                    : t.clickToDetectYourCurrentLocation}
+                </p>
+              </div>
             </div>
+            {isDetectingLocation && (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+            )}
           </div>
-          {isDetectingLocation && (
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-          )}
-        </div>}
+        )}
 
         {/* Saved Addresses */}
         {savedAddresses.map((addr) => (
@@ -433,29 +496,23 @@ const CombinedCheckoutPage = () => {
           </div>
         ))}
 
-        {/* Add New Address Button / Form */}z
+        {/* Add New Address Button / Form */}
         {isAdding ? (
           <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
             {/* Name / Label */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {user?.role === "sale" ? "Customer Name" : "Label"} *
+                {user?.role === "sale" ? "Customer Name *" : "Label *"}
               </label>
-              {user?.role === "sale" ? (
-                <input
+              <input
                 type="text"
-                placeholder="Enter customer name"
-                //value={tempAddress.label || ""}
-                onChange={(e) => setUser({ ...user, name: e.target.value })}
+                placeholder={
+                  user?.role === "sale" ? "Enter customer name" : "Home, Work, etc."
+                }
+                value={tempAddress.label || ""}
+                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
-              ): <input
-              type="text"
-              placeholder="Home, Work, etc."
-              value={tempAddress.label || ""}
-              onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />}
             </div>
 
             {/* Phone */}
@@ -520,10 +577,11 @@ const CombinedCheckoutPage = () => {
                 onClick={handleSaveNewAddress}
                 className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
                 disabled={
-                  !tempAddress.label?.trim() ||
                   !tempAddress.details?.trim() ||
                   !tempAddress.coordinates ||
-                  (user?.role === "sale" ? !tempAddress.phone?.trim() : !userPhone?.trim())
+                  (user?.role === "sale" 
+                    ? (!tempAddress.label?.trim() || !tempAddress.phone?.trim())
+                    : (!tempAddress.label?.trim() || !userPhone?.trim()))
                 }
               >
                 {t.saveAddress}
