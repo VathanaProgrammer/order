@@ -346,7 +346,7 @@ const placeOrder= async () => {
 
   try {
     console.log("Sending order with customer info payload:", payload);
-    const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
+    const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}//sales-order/save-customer-info`, payload, {
       withCredentials: true,
       headers: { Accept: "application/json" },
     });
