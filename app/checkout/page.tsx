@@ -21,6 +21,11 @@ type APIAddress = {
   coordinates?: { lat: number; lng: number };
 };
 
+type Coordinates = {
+  lat: number;
+  lng: number;
+} | null;
+
 // Extended type that includes both context and API properties
 type ExtendedAddress = ContextAddress & {
   api_user_id?: number;
@@ -63,11 +68,17 @@ const CombinedCheckoutPage = () => {
   const { t } = useLanguage();
 
   // SEPARATE CUSTOMER INFORMATION STATE
-  const [customerInfo, setCustomerInfo] = useState({
+  const [customerInfo, setCustomerInfo] = useState<{
+    name: string;
+    phone: string;
+    email?: string;
+    notes?: string;
+    coordinates: Coordinates;
+  }>({
     name: "",
     phone: "",
     notes: "",
-    coordinates: { lat: 11.567, lng: 104.928 },
+    coordinates: null,
   });
 
   const paymentMethods = [
@@ -154,32 +165,12 @@ const CombinedCheckoutPage = () => {
 
 // Handle map click for customer coordinates
 const handleCustomerMapClick = (e: google.maps.MapMouseEvent) => {
-  const latLng = e.latLng?.lat() && e.latLng?.lng() ? {
-    lat: e.latLng.lat(),
-    lng: e.latLng.lng()
-  } : null;
-  
-  if (latLng) {
-    setCustomerInfo(prev => ({
-      ...prev,
-      coordinates: latLng
-    }));
-  }
+
 };
 
 // Handle marker drag end for customer coordinates
 const handleCustomerMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
-  const latLng = e.latLng?.lat() && e.latLng?.lng() ? {
-    lat: e.latLng.lat(),
-    lng: e.latLng.lng()
-  } : null;
-  
-  if (latLng) {
-    setCustomerInfo(prev => ({
-      ...prev,
-      coordinates: latLng
-    }));
-  }
+
 };
 
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
@@ -507,7 +498,7 @@ const handleCustomerMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
                   readOnly
                   value={
                     customerInfo.coordinates
-                      ? `Lat: ${customerInfo.coordinates.lat.toFixed(6)}, Lng: ${customerInfo.coordinates.lng.toFixed(6)}`
+                      ? `Lat: ${customerInfo.coordinates.lat?.toFixed(6) || "0.000000"}, Lng: ${customerInfo.coordinates.lng?.toFixed(6) || "0.000000"}`
                       : ""
                   }
                   onClick={() => setShowMap(true)}
@@ -560,7 +551,7 @@ const handleCustomerMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
 
       <GoogleMap
         mapContainerStyle={containerStyle}
-        center={customerInfo.coordinates || { lat: 11.567, lng: 104.928 }}
+        center={customerInfo.coordinates ? customerInfo.coordinates : { lat: 11.567, lng: 104.928 }}
         zoom={15}
         onClick={handleCustomerMapClick}  // Use the new handler
       >
