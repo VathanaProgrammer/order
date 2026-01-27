@@ -16,6 +16,7 @@ interface User {
   phone?: string | null;
   mobile?: string | null;
   profile_url?: string | null;
+  role?: string;
   reward_points: {
     total: number;
     used: number;

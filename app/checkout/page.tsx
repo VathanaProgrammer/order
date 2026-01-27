@@ -11,7 +11,7 @@ import { toast } from "react-toastify";
 import { useLanguage } from "@/context/LanguageContext";
 import { useRouter } from "next/navigation";
 
-// Define the API Address type based on your ShippingAddressPage
+// Define the API Address type
 type APIAddress = {
   id?: number;
   api_user_id: number | undefined;
@@ -67,10 +67,8 @@ const CombinedCheckoutPage = () => {
   ];
 
   const IMAGE_URL = process.env.NEXT_PUBLIC_IMAGE_URL!;
-  
-  const currentSelectedAddress = selectedAddress === "current" 
-    ? currentAddress 
-    : selectedAddress;
+
+  const currentSelectedAddress = selectedAddress === "current" ? currentAddress : selectedAddress;
 
   // Fetch saved addresses
   useEffect(() => {
@@ -78,10 +76,8 @@ const CombinedCheckoutPage = () => {
       setLoading(true);
       try {
         const res = await api.get("/addresses/all");
-        // Map API response to ExtendedAddress type
         const addresses: ExtendedAddress[] = res.data?.data.map((addr: any) => ({
           ...addr,
-          // Add any missing properties needed by ContextAddress
         })) || [];
         setSavedAddresses(addresses);
       } catch (err) {
@@ -96,46 +92,30 @@ const CombinedCheckoutPage = () => {
     }
   }, [setLoading, user]);
 
+  // Update tempAddress when user changes
   useEffect(() => {
-    // Update tempAddress with user ID when user is available
     if (user && !tempAddress.api_user_id) {
-      setTempAddress(prev => ({
+      setTempAddress((prev) => ({
         ...prev,
         api_user_id: user.id,
-        phone: getPhoneFromUser(user) || ""
+        phone: user?.role === "sale" ? "" : getPhoneFromUser(user) || "",
       }));
     }
   }, [user]);
 
-  // Helper function to get phone from user
+  // Helper to extract phone from user object
   const getPhoneFromUser = (userData: any): string | null => {
-    console.log("User object for phone extraction:", userData);
-    
-    // Try different possible phone fields
-    if (userData.phone && userData.phone.trim() !== "") {
-      console.log("Found phone in user.phone:", userData.phone);
-      return userData.phone;
-    }
-    
-    if (userData.mobile && userData.mobile.trim() !== "") {
-      console.log("Found phone in user.mobile:", userData.mobile);
-      return userData.mobile;
-    }
-    
-    // Check if contact object exists
-    if (userData.contact?.mobile && userData.contact.mobile.trim() !== "") {
-      console.log("Found phone in user.contact.mobile:", userData.contact.mobile);
-      return userData.contact.mobile;
-    }
-    
-    if (userData.contact?.phone && userData.contact.phone.trim() !== "") {
-      console.log("Found phone in user.contact.phone:", userData.contact.phone);
-      return userData.contact.phone;
-    }
-    
-    console.log("No phone found in user object");
+    if (!userData) return null;
+
+    if (userData.phone && userData.phone.trim()) return userData.phone.trim();
+    if (userData.mobile && userData.mobile.trim()) return userData.mobile.trim();
+    if (userData.contact?.mobile && userData.contact.mobile.trim()) return userData.contact.mobile.trim();
+    if (userData.contact?.phone && userData.contact.phone.trim()) return userData.contact.phone.trim();
+
     return null;
   };
+
+  const userPhone = getPhoneFromUser(user);
 
   const handleDetectCurrentLocation = async () => {
     setIsDetectingLocation(true);
@@ -155,7 +135,6 @@ const CombinedCheckoutPage = () => {
     setIsAdding(false);
   };
 
-  // Handle map click to select coordinates
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
       setTempAddress({
@@ -165,7 +144,6 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Handle marker drag
   const handleMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
       setTempAddress({
@@ -175,15 +153,29 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Save new address to backend
+  // Save new address – now supports custom phone for sales role
   const handleSaveNewAddress = async () => {
-    if (!tempAddress.label?.trim() || !tempAddress.details?.trim()) {
-      toast.error("Please fill all required fields");
+    if (!tempAddress.label?.trim()) {
+      toast.error("Please enter a name/label");
+      return;
+    }
+    if (!tempAddress.details?.trim()) {
+      toast.error("Please enter address details");
+      return;
+    }
+    if (!tempAddress.coordinates) {
+      toast.error("Please select a location on the map");
       return;
     }
 
-    if (!tempAddress.coordinates) {
-      toast.error("Please select a location on the map");
+    const finalPhone = user?.role === "sale" ? tempAddress.phone?.trim() : userPhone?.trim();
+
+    if (!finalPhone) {
+      toast.error(
+        user?.role === "sale"
+          ? "Please enter customer's phone number"
+          : "Please add your phone number in account settings"
+      );
       return;
     }
 
@@ -192,31 +184,22 @@ const CombinedCheckoutPage = () => {
       return;
     }
 
-    // Get user's phone number
-    const userPhone = getPhoneFromUser(user);
-    if (!userPhone) {
-      toast.error("Please add your phone number in your account settings");
-      return;
-    }
-
     setLoading(true);
+
     try {
-      // Prepare the address data - use user's phone from account
       const addressData: APIAddress = {
-        label: tempAddress.label,
-        phone: userPhone,
-        details: tempAddress.details,
+        label: tempAddress.label.trim(),
+        phone: finalPhone,
+        details: tempAddress.details.trim(),
         coordinates: tempAddress.coordinates,
         api_user_id: tempAddress.api_user_id,
       };
 
-      console.log("Saving address with data:", addressData);
+      console.log("Saving address:", addressData);
 
-      // Save address to backend
       const res = await api.post("/addresses", addressData);
-      
-      // Convert API response to ExtendedAddress
       const apiResponse = res.data?.data;
+
       const newAddress: ExtendedAddress = {
         ...apiResponse,
         id: apiResponse.id,
@@ -226,22 +209,20 @@ const CombinedCheckoutPage = () => {
         coordinates: apiResponse.coordinates,
         api_user_id: apiResponse.api_user_id,
       };
-      
-      // Update saved addresses list
-      setSavedAddresses(prev => [...prev, newAddress]);
-      
-      // Select the newly saved address
+
+      setSavedAddresses((prev) => [...prev, newAddress]);
       setSelectedAddress(newAddress);
       setIsAdding(false);
-      
-      // Reset temp address
+
       setTempAddress({
         label: "",
-        phone: userPhone,
+        phone: user?.role === "sale" ? "" : userPhone || "",
         details: "",
         coordinates: { lat: 11.567, lng: 104.928 },
         api_user_id: user?.id,
       });
+
+      toast.success("Address saved successfully");
     } catch (err: any) {
       console.error("Save address error:", err);
       toast.error(err.response?.data?.message || "Failed to save address");
@@ -259,51 +240,35 @@ const CombinedCheckoutPage = () => {
 
   const handleDownloadQR = () => {
     try {
-      const qrImageUrl = "/qr.jpg";
       const link = document.createElement("a");
       link.download = "payment-qr-code.png";
-      link.href = qrImageUrl;
+      link.href = "/qr.jpg";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("QR code downloaded successfully!");
+      toast.success("QR code downloaded");
     } catch (error) {
-      console.error("Download failed:", error);
       toast.error("Failed to download QR code");
     }
   };
 
-  // Handle checkout button click - Direct API call
+  // Checkout handler (you might want to adjust phone for current location too when role=sale)
   const handleCheckout = async () => {
-    if (cart.length === 0) {
-      toast.error("Your cart is empty");
-      return;
-    }
-
-    if (!selectedAddress) {
-      toast.error("Please select a shipping address");
-      return;
-    }
-
-    if (!paymentMethod) {
-      toast.error("Please select a payment method");
-      return;
-    }
+    if (cart.length === 0) return toast.error("Your cart is empty");
+    if (!selectedAddress) return toast.error("Please select a shipping address");
+    if (!paymentMethod) return toast.error("Please select a payment method");
 
     setIsSubmittingOrder(true);
     setLoading(true);
+
     try {
-      // Get user's phone number
-      const userPhone = getPhoneFromUser(user);
-      
-      // Prepare order data based on backend requirements
       const orderData: any = {
         api_user_id: user?.id,
         address_type: selectedAddress === "current" ? "current" : "saved",
-        paymentMethod: paymentMethod,
+        paymentMethod,
         total_qty: cart.reduce((sum, item) => sum + item.qty, 0),
-        total: total,
-        items: cart.map(item => ({
+        total,
+        items: cart.map((item) => ({
           product_id: item.id,
           qty: item.qty,
           price_at_order: item.price,
@@ -312,55 +277,42 @@ const CombinedCheckoutPage = () => {
         })),
       };
 
-      // Handle address data based on selection
       if (selectedAddress === "current") {
-        // For current address, send address data directly
         if (!currentAddress?.coordinates) {
           toast.error("Please detect your current location first");
-          setIsSubmittingOrder(false);
-          setLoading(false);
           return;
         }
 
-        if (!userPhone) {
-          toast.error("Please add your phone number in your account settings");
-          setIsSubmittingOrder(false);
-          setLoading(false);
+        const phoneForCurrent =
+          user?.role === "sale" && tempAddress.phone?.trim()
+            ? tempAddress.phone.trim()
+            : userPhone;
+
+        if (!phoneForCurrent) {
+          toast.error(
+            user?.role === "sale"
+              ? "Please enter customer's phone number"
+              : "Please add your phone in account settings"
+          );
           return;
         }
 
         orderData.address = {
           label: "Current Location",
-          phone: userPhone, // Make sure this is NOT null
+          phone: phoneForCurrent,
           details: `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
           coordinates: currentAddress.coordinates,
         };
-
-        console.log("Order data with current address:", {
-          ...orderData,
-          address: {
-            ...orderData.address,
-            phone: userPhone // Log phone to verify
-          }
-        });
       } else {
-        // For saved address, send the saved address ID
         orderData.saved_address_id = (selectedAddress as ExtendedAddress).id;
       }
 
-      console.log("Submitting order with data:", orderData);
-
-      // Direct API call to place order
       const response = await api.post("/orders", orderData);
-      
+
       if (response.data.success) {
         toast.success("Order placed successfully!");
-        // Redirect to order confirmation page
-        if (response.data.order_id) {
-          router.push(`/order-confirmation/${response.data.order_id}`);
-        } else {
-          router.push("/order-confirmation");
-        }
+        const orderId = response.data.order_id;
+        router.push(orderId ? `/order-confirmation/${orderId}` : "/order-confirmation");
       } else {
         toast.error(response.data.message || "Failed to place order");
       }
@@ -373,31 +325,29 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Get user's phone for display
-  const userPhone = getPhoneFromUser(user);
-
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar pb-24">
       <Header title={t.checkout} />
 
-      {/* ===== Order Summary ===== */}
+      {/* Order Summary */}
       <section className="flex flex-col gap-3">
         <h2 className="text-2xl font-semibold text-gray-800">{t.orderSummary}</h2>
         {cart.length === 0 && <p>{t.yourCartIsEmpty}</p>}
+
         {cart.map((item) => (
           <div
             key={item.id}
             className="flex items-center justify-between border-b border-gray-300 p-3 gap-3"
           >
             <img
-              src={item.image && item.image.trim() !== "" ? IMAGE_URL + item.image : "https://syspro.asia/img/default.png"}
+              src={item.image && item.image.trim() ? IMAGE_URL + item.image : "https://syspro.asia/img/default.png"}
               alt={item.title}
               className="w-16 h-16 object-cover rounded"
             />
             <div className="flex-1">
               <p className="font-medium">{item.title}</p>
               <p className="text-gray-600">
-                ${item.price.toFixed(2)} x {item.qty} = ${(item.price * item.qty).toFixed(2)}
+                ${item.price.toFixed(2)} × {item.qty} = ${(item.price * item.qty).toFixed(2)}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -417,8 +367,7 @@ const CombinedCheckoutPage = () => {
             </div>
           </div>
         ))}
-        
-        {/* Total Section */}
+
         {cart.length > 0 && (
           <div className="pt-4 border-t border-gray-300">
             <div className="flex justify-between items-center">
@@ -429,38 +378,33 @@ const CombinedCheckoutPage = () => {
         )}
       </section>
 
-      {/* Shipping Address */}
+      {/* Shipping Address Section */}
       <section className="flex flex-col gap-3">
         <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
 
-        {/* Current Location Option */}
-        <div className="flex flex-col gap-3">
-          {/* Current Location Button */}
-          <div
-            onClick={handleDetectCurrentLocation}
-            className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${
-              selectedAddress === "current"
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-200 hover:bg-gray-50"
-            } ${isDetectingLocation ? "opacity-70" : ""}`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-blue-500 text-xl">📍</span>
-              <div>
-                <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
-                <p className="text-sm text-gray-500">
-                  {isDetectingLocation 
-                    ? t.detectingYourCurrentLocation
-                    : currentAddress 
-                    ? t.clickToUseYourCurrentLocation
-                    : t.clickToDetectYourCurrentLocation}
-                </p>
-              </div>
+        {/* Current Location */}
+        <div
+          onClick={handleDetectCurrentLocation}
+          className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${
+            selectedAddress === "current" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
+          } ${isDetectingLocation ? "opacity-70" : ""}`}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-blue-500 text-xl">📍</span>
+            <div>
+              <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
+              <p className="text-sm text-gray-500">
+                {isDetectingLocation
+                  ? t.detectingYourCurrentLocation
+                  : currentAddress
+                  ? t.clickToUseYourCurrentLocation
+                  : t.clickToDetectYourCurrentLocation}
+              </p>
             </div>
-            {isDetectingLocation && (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-            )}
           </div>
+          {isDetectingLocation && (
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+          )}
         </div>
 
         {/* Saved Addresses */}
@@ -479,7 +423,9 @@ const CombinedCheckoutPage = () => {
                 <p className="font-semibold">{addr.label}</p>
                 <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
                 {addr.phone && (
-                  <p className="text-sm text-gray-600 mt-1">{t.phone}: {addr.phone}</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {t.phone}: {addr.phone}
+                  </p>
                 )}
               </div>
               <span className="text-blue-500 text-lg">📍</span>
@@ -487,52 +433,60 @@ const CombinedCheckoutPage = () => {
           </div>
         ))}
 
-        {/* Add New Address Form */}
+        {/* Add New Address Button / Form */}
         {isAdding ? (
           <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
+            {/* Name / Label */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.label} *
+                {user?.role === "sale" ? "Customer Name" : "Label"} *
               </label>
               <input
                 type="text"
-                placeholder={t.labelHomeWork}
+                placeholder={
+                  user?.role === "sale" ? "Enter customer name" : "Home, Work, etc."
+                }
                 value={tempAddress.label || ""}
                 onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-            
-            {userPhone ? (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t.phone}
-                </label>
-                <div className="w-full p-3 border rounded-lg bg-gray-50">
-                  {userPhone} (from your account)
+
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t.phone} *
+              </label>
+              {user?.role === "sale" ? (
+                <input
+                  type="tel"
+                  placeholder="Customer phone number"
+                  value={tempAddress.phone || ""}
+                  onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              ) : (
+                <div className="w-full p-3 border rounded-lg bg-gray-50 text-gray-700">
+                  {userPhone ? `${userPhone} (from account)` : "No phone in profile"}
                 </div>
-              </div>
-            ) : (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-yellow-700 text-sm">
-                  ⚠️ Please add your phone number in your account settings
-                </p>
-              </div>
-            )}
-            
+              )}
+            </div>
+
+            {/* Address Details */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {t.details || "Address Details"} *
               </label>
               <textarea
-                placeholder={t.details}
+                placeholder="Street, building, floor, notes..."
                 value={tempAddress.details || ""}
                 onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 rows={3}
               />
             </div>
-            
+
+            {/* Location Picker */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {t.clickToSelectLocation} *
@@ -550,17 +504,21 @@ const CombinedCheckoutPage = () => {
                 placeholder={t.clickToSelectLocation}
               />
               {!tempAddress.coordinates && (
-                <p className="text-sm text-red-500 mt-1">
-                  {t.pleaseSelectALocationOnTheMap}
-                </p>
+                <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
               )}
             </div>
-            
+
+            {/* Action Buttons */}
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleSaveNewAddress}
                 className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={!tempAddress.label?.trim() || !tempAddress.details?.trim() || !tempAddress.coordinates || !userPhone}
+                disabled={
+                  !tempAddress.label?.trim() ||
+                  !tempAddress.details?.trim() ||
+                  !tempAddress.coordinates ||
+                  (user?.role === "sale" ? !tempAddress.phone?.trim() : !userPhone?.trim())
+                }
               >
                 {t.saveAddress}
               </button>
@@ -569,7 +527,7 @@ const CombinedCheckoutPage = () => {
                   setIsAdding(false);
                   setTempAddress({
                     label: "",
-                    phone: userPhone || "",
+                    phone: user?.role === "sale" ? "" : userPhone || "",
                     details: "",
                     coordinates: { lat: 11.567, lng: 104.928 },
                     api_user_id: user?.id,
@@ -587,7 +545,7 @@ const CombinedCheckoutPage = () => {
             className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
           >
             <span className="text-xl">+</span>
-            {t.addNewAddress}
+            {user?.role === "sale" ? "Add New Customer Address" : t.addNewAddress}
           </button>
         )}
       </section>
@@ -597,9 +555,7 @@ const CombinedCheckoutPage = () => {
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg max-h-[90vh] overflow-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">
-                {t.selectLocation}
-              </h3>
+              <h3 className="text-lg font-semibold">{t.selectLocation}</h3>
               <button
                 onClick={() => setShowMap(false)}
                 className="text-gray-500 hover:text-gray-700 text-xl p-1"
@@ -607,7 +563,7 @@ const CombinedCheckoutPage = () => {
                 ✕
               </button>
             </div>
-            
+
             <GoogleMap
               mapContainerStyle={containerStyle}
               center={tempAddress.coordinates || { lat: 11.567, lng: 104.928 }}
@@ -624,30 +580,21 @@ const CombinedCheckoutPage = () => {
             </GoogleMap>
 
             <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700">
-                {t.selectedCoordinates}:
-              </p>
+              <p className="text-sm font-medium text-gray-700">{t.selectedCoordinates}:</p>
               {tempAddress.coordinates ? (
                 <p className="text-sm text-gray-600 mt-1">
-                  {t.latitude}: {tempAddress.coordinates.lat.toFixed(6)}
+                  Lat: {tempAddress.coordinates.lat.toFixed(6)}
                   <br />
-                  {t.longtitude}: {tempAddress.coordinates.lng.toFixed(6)}
+                  Lng: {tempAddress.coordinates.lng.toFixed(6)}
                 </p>
               ) : (
-                <p className="text-sm text-gray-500 mt-1">
-                  {t.clickToSelectLocation}
-                </p>
+                <p className="text-sm text-gray-500 mt-1">{t.clickToSelectLocation}</p>
               )}
             </div>
 
             <div className="flex justify-end gap-2 mt-4">
               <button
-                onClick={() => {
-                  setTempAddress({
-                    ...tempAddress,
-                    coordinates: undefined,
-                  });
-                }}
+                onClick={() => setTempAddress({ ...tempAddress, coordinates: undefined })}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
               >
                 {t.clear}
@@ -670,87 +617,75 @@ const CombinedCheckoutPage = () => {
           <div
             key={method.name}
             onClick={() => handlePaymentMethodSelect(method.name)}
-            className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow duration-200 ${
-              paymentMethod === method.name 
-                ? "border-blue-500 bg-blue-50 shadow-lg" 
+            className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow ${
+              paymentMethod === method.name
+                ? "border-blue-500 bg-blue-50 shadow-lg"
                 : "border-gray-200 hover:shadow-md"
             }`}
           >
             <div className="flex items-center gap-4">
-              <img 
-                src={method.image} 
-                alt={method.name} 
+              <img
+                src={method.image}
+                alt={method.name}
                 className="w-12 h-12 object-contain"
-                onError={(e) => {
-                  e.currentTarget.src = "https://syspro.asia/img/default.png";
-                }}
+                onError={(e) => (e.currentTarget.src = "https://syspro.asia/img/default.png")}
               />
               <p className="font-semibold text-gray-700">{method.name}</p>
             </div>
             {paymentMethod === method.name && method.name !== "QR" && (
               <p className="text-sm text-gray-500 mt-2">
-                {t.YouWillPayWithCashUponDelivery || "You will pay with cash upon delivery"}
+                You will pay with cash upon delivery
               </p>
             )}
           </div>
         ))}
       </section>
 
-      {/* QR Popup Modal */}
+      {/* QR Popup */}
       {showQRPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-xl font-semibold text-gray-800">
-                  {t.scanQRCode || "Scan QR Code"}
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {t.scanWithYourBankApp || "Scan with your bank app to pay"}
-                </p>
+                <h3 className="text-xl font-semibold text-gray-800">Scan QR Code</h3>
+                <p className="text-sm text-gray-500">Scan with your bank app to pay</p>
               </div>
-              <button 
+              <button
                 onClick={() => setShowQRPopup(false)}
                 className="text-gray-400 hover:text-gray-600 text-2xl p-1"
               >
-                &times;
+                ×
               </button>
             </div>
-            
+
             <div className="text-center mb-6">
               <div className="mb-4 p-4 border rounded-lg bg-white inline-block">
-                <img 
+                <img
                   src="/qr.jpg"
                   alt="Payment QR Code"
                   className="w-64 h-64 mx-auto"
-                  onError={(e) => {
-                    e.currentTarget.src = "https://syspro.asia/img/default.png";
-                  }}
+                  onError={(e) => (e.currentTarget.src = "https://syspro.asia/img/default.png")}
                 />
-                <p className="text-xs text-gray-500 mt-2">
-                  {t.amount || "Amount"}: ${total.toFixed(2)}
-                </p>
+                <p className="text-xs text-gray-500 mt-2">Amount: ${total.toFixed(2)}</p>
               </div>
-              
-              <div className="flex flex-col space-y-3">
-                <button
-                  onClick={handleDownloadQR}
-                  className="py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 flex items-center justify-center"
-                >
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  {t.downloadQR || "Download QR"}
-                </button>
-              </div>
+
+              <button
+                onClick={handleDownloadQR}
+                className="py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 w-full flex items-center justify-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download QR
+              </button>
             </div>
-            
+
             <div className="text-center">
               <button
                 onClick={() => setShowQRPopup(false)}
                 className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
-                {t.close || "Close"}
+                Close
               </button>
             </div>
           </div>
