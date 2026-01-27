@@ -572,36 +572,88 @@ const CombinedCheckoutPage = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleSaveNewAddress}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={
-                  !tempAddress.details?.trim() ||
-                  !tempAddress.coordinates ||
-                  (user?.role === "sale" 
-                    ? (!tempAddress.label?.trim() || !tempAddress.phone?.trim())
-                    : (!tempAddress.label?.trim() || !userPhone?.trim()))
-                }
-              >
-                {t.saveAddress}
-              </button>
-              <button
-                onClick={() => {
-                  setIsAdding(false);
-                  setTempAddress({
-                    label: "",
-                    phone: user?.role === "sale" ? "" : userPhone || "",
-                    details: "",
-                    coordinates: { lat: 11.567, lng: 104.928 },
-                    api_user_id: user?.id,
-                  });
-                }}
-                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-              >
-                {t.cancel}
-              </button>
-            </div>
+            {/* Action Buttons - Different for sale vs regular users */}
+<div className="flex gap-3 pt-2">
+  {user?.role === "sale" ? (
+    // For sale role: No address saving, just validate and continue
+    <>
+      <button
+        onClick={() => {
+          // Validate customer info
+          if (!tempAddress.label?.trim() || 
+              !tempAddress.phone?.trim() || 
+              !tempAddress.details?.trim() || 
+              !tempAddress.coordinates) {
+            toast.error("Please fill all required fields");
+            return;
+          }
+          
+          // Close the form, keep customer info in tempAddress
+          setIsAdding(false);
+          // Automatically select current address for checkout
+          setSelectedAddress("current");
+          
+          toast.success("Customer information saved. Ready to checkout!");
+        }}
+        className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
+        disabled={
+          !tempAddress.label?.trim() || // Customer name
+          !tempAddress.phone?.trim() || // Customer phone
+          !tempAddress.details?.trim() || // Address details
+          !tempAddress.coordinates // Location
+        }
+      >
+        Save Customer Info
+      </button>
+      <button
+        onClick={() => {
+          setIsAdding(false);
+          setTempAddress({
+            label: "",
+            phone: "",
+            details: "",
+            coordinates: { lat: 11.567, lng: 104.928 },
+            api_user_id: user?.id,
+          });
+        }}
+        className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+      >
+        Cancel
+      </button>
+    </>
+  ) : (
+    // For regular users: Normal address saving
+    <>
+      <button
+        onClick={handleSaveNewAddress}
+        className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
+        disabled={
+          !tempAddress.label?.trim() ||
+          !tempAddress.details?.trim() ||
+          !tempAddress.coordinates ||
+          !userPhone?.trim()
+        }
+      >
+        {t.saveAddress}
+      </button>
+      <button
+        onClick={() => {
+          setIsAdding(false);
+          setTempAddress({
+            label: "",
+            phone: userPhone || "",
+            details: "",
+            coordinates: { lat: 11.567, lng: 104.928 },
+            api_user_id: user?.id,
+          });
+        }}
+        className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+      >
+        {t.cancel}
+      </button>
+    </>
+  )}
+</div>
           </div>
         ) : (
           <button
