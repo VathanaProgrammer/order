@@ -35,7 +35,16 @@ export type Address = {
   customer_company?: string;
 };
 
+export type CustomerInfo = {
+  name: string;
+  phone: string;
+  address?: string;
+};
+
 type CheckoutContextType = {
+  customerInfo: CustomerInfo | null;
+  setCustomerInfo: (info: CustomerInfo | null) => void;
+  clearCustomerInfo: () => void;
   cart: CartItem[];
   total: number;
   addToCart: (product: Omit<CartItem, "qty">, deltaQty: number) => void;
@@ -66,6 +75,12 @@ const CheckoutContext = createContext<CheckoutContextType | undefined>(undefined
 export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const router = useRouter();
+
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
+  
+  const clearCustomerInfo = () => {
+    setCustomerInfo(null);
+  };
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -308,6 +323,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     } catch (err: any) {
       console.error("Order error:", err.response?.data || err);
       toast.error(err.response?.data?.message || "Order failed. Please try again.");
+    } finally {
+      clearCustomerInfo();
     }
   };
 
@@ -408,6 +425,9 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   return (
     <CheckoutContext.Provider
       value={{
+        customerInfo,
+        setCustomerInfo,
+        clearCustomerInfo,
         cart,
         total,
         addToCart,
