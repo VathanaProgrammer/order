@@ -35,16 +35,7 @@ export type Address = {
   customer_company?: string;
 };
 
-export type CustomerInfo = {
-  name: string;
-  phone: string;
-  address?: string;
-};
-
 type CheckoutContextType = {
-  customerInfo: CustomerInfo | null;
-  setCustomerInfo: (info: CustomerInfo | null) => void;
-  clearCustomerInfo: () => void;
   cart: CartItem[];
   total: number;
   addToCart: (product: Omit<CartItem, "qty">, deltaQty: number) => void;
@@ -75,12 +66,6 @@ const CheckoutContext = createContext<CheckoutContextType | undefined>(undefined
 export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const router = useRouter();
-
-  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
-  
-  const clearCustomerInfo = () => {
-    setCustomerInfo(null);
-  };
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -219,53 +204,75 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   // --- PLACE ORDER ---
   const placeOrder = async () => {
     let addressToSend: Address | null = null;
+    let customerInfo = {};
     
+    // Check if user role is 'sale' and prepare customer info
+    if (user?.role === 'sale') {
+      // For sale role, we need to collect customer info
+      // You might want to get this from form state or separate customer info state
+      const customerName = currentAddress?.label || "Customer";
+      const customerPhone = currentAddress?.phone || "";
+      
+      if (!customerPhone) {
+        toast.error("Please enter customer phone number");
+        return;
+      }
+      
+      customerInfo = {
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        // Add other customer fields if available
+      };
+    }
+  
     if (selectedAddress === "current") {
       if (!currentAddress.coordinates) {
         toast.error("Current address coordinates not set!");
         return;
       }
       
-      // For sale role, use customerInfo from context
+      // For sale role, use customer phone; for regular users, use user phone
+      let phoneToUse = "";
       if (user?.role === 'sale') {
-        // Use the customerInfo from context state
-        if (!customerInfo?.name || !customerInfo?.phone) {
-          toast.error("Please enter customer name and phone number");
+        phoneToUse = currentAddress.phone || "";
+        if (!phoneToUse) {
+          toast.error("Please enter customer phone number");
           return;
         }
-        
-        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
-        addressToSend = { 
-          ...currentAddress, 
-          short_address,
-          phone: customerInfo.phone,
-          label: customerInfo.name,
-          details: customerInfo.address || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
-        };
       } else {
-        // Regular user
-        const userPhone = user?.phone || user?.mobile || "";
-        if (!userPhone) {
+        phoneToUse = user?.phone || user?.mobile || "";
+        if (!phoneToUse) {
           toast.error("Please add your phone number in your account settings");
           return;
         }
-        
-        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
-        addressToSend = { 
-          ...currentAddress, 
-          short_address,
-          phone: userPhone,
-        };
       }
+      
+      const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
+      addressToSend = { 
+        ...currentAddress, 
+        short_address,
+        phone: phoneToUse,
+        // Add customer info to address for sale role
+        ...(user?.role === 'sale' ? customerInfo : {})
+      };
     } else {
       addressToSend = selectedAddress as Address;
+      
+      // For sale role with saved address, ensure we have customer info
+      if (user?.role === 'sale' && addressToSend) {
+        // Check if saved address has customer info
+        if (!addressToSend.phone) {
+          toast.error("Saved address missing phone number. Please update address with customer phone.");
+          return;
+        }
+      }
     }
-
+  
     if (!addressToSend || cart.length === 0) {
       toast.error("Cart is empty or no address selected!");
       return;
     }
-
+  
     const payload: any = {
       api_user_id: user?.id,
       saved_address_id: selectedAddress !== "current" ? addressToSend.id : undefined,
@@ -282,16 +289,24 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         image_url: (i.image ?? "").split("/").pop(),
       })),
     };
-
-    // Add customer_info for sale role users using context customerInfo
-    if (user?.role === 'sale' && customerInfo) {
+  
+    // Add customer_info for sale role users
+    if (user?.role === 'sale') {
+      // Use address info for customer data
       payload.customer_info = {
-        name: customerInfo.name || "Customer",
-        phone: customerInfo.phone || "",
-        address: customerInfo.address || "",
-      };
-    }
+        name: addressToSend.label || "Customer",
+        phone: addressToSend.phone || "",
 
+        // Add other fields from address if available
+        company: addressToSend.customer_company || "",
+      };
+      
+      // For current address, also add coordinates to customer info
+      if (selectedAddress === "current" && addressToSend.coordinates) {
+        payload.customer_info.coordinates = addressToSend.coordinates;
+      }
+    }
+  
     try {
       console.log("Sending order with payload:", payload);
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
@@ -302,21 +317,17 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         toast.success("Order placed successfully!");
         
         // Show customer info for sale role
-        if (user?.role === 'sale' && customerInfo) {
-          toast.info(`Customer: ${customerInfo.name}, Phone: ${customerInfo.phone}`);
+        if (user?.role === 'sale' && payload.customer_info) {
+          toast.info(`Customer: ${payload.customer_info.name}, Phone: ${payload.customer_info.phone}`);
         }
         
-        // Clear cart and customer info ONLY AFTER SUCCESSFUL ORDER
         setCart([]);
         setTotal(0);
-        clearCustomerInfo(); // Clear customer info after successful order
-        
         router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}`);
       }
     } catch (err: any) {
       console.error("Order error:", err.response?.data || err);
       toast.error(err.response?.data?.message || "Order failed. Please try again.");
-      // DON'T clear customer info on error - keep it for retry
     }
   };
 
@@ -417,9 +428,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   return (
     <CheckoutContext.Provider
       value={{
-        customerInfo,
-        setCustomerInfo,
-        clearCustomerInfo,
         cart,
         total,
         addToCart,
