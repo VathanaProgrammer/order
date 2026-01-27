@@ -65,8 +65,8 @@ const CombinedCheckoutPage = () => {
   const [customerInfo, setCustomerInfo] = useState({
     name: "",
     phone: "",
-    email: "",
     notes: "",
+    coordinates: { lat: 11.567, lng: 104.928 },
   });
 
   const paymentMethods = [
@@ -319,7 +319,6 @@ const CombinedCheckoutPage = () => {
       orderData.customer_info = {
         name: customerInfo.name.trim(),
         phone: customerInfo.phone.trim() || userPhone || "",
-        email: customerInfo.email.trim() || "",
         notes: customerInfo.notes.trim() || "",
       };
   
@@ -466,18 +465,35 @@ const CombinedCheckoutPage = () => {
               )}
             </div>
 
+            {/* ADD THIS - Location Coordinates Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address (Optional)
+                Location Coordinates *
               </label>
-              <input
-                type="email"
-                name="email"
-                value={customerInfo.email}
-                onChange={handleCustomerInfoChange}
-                placeholder="Enter email address"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={
+                    customerInfo.coordinates
+                      ? `Lat: ${customerInfo.coordinates.lat.toFixed(6)}, Lng: ${customerInfo.coordinates.lng.toFixed(6)}`
+                      : ""
+                  }
+                  onClick={() => setShowMap(true)}
+                  className="flex-1 p-3 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                  placeholder="Click to select location on map"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowMap(true)}
+                  className="px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Select
+                </button>
+              </div>
+              {!customerInfo.coordinates && (
+                <p className="text-sm text-red-500 mt-1">Please select a location on the map</p>
+              )}
             </div>
 
             <div>
@@ -496,6 +512,66 @@ const CombinedCheckoutPage = () => {
           </div>
         </div>
       </section>
+
+{/* ADD THIS - Map Modal for Location Selection */}
+{showMap && (
+  <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
+    <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg max-h-[90vh] overflow-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold">Select Customer Location</h3>
+        <button
+          onClick={() => setShowMap(false)}
+          className="text-gray-500 hover:text-gray-700 text-xl p-1"
+        >
+          ✕
+        </button>
+      </div>
+
+      <GoogleMap
+        mapContainerStyle={containerStyle}
+        center={customerInfo.coordinates || { lat: 11.567, lng: 104.928 }}
+        zoom={15}
+        onClick={handleMapClick}
+      >
+        {customerInfo.coordinates && (
+          <Marker
+            position={customerInfo.coordinates}
+            draggable
+            onDragEnd={handleMarkerDragEnd}
+          />
+        )}
+      </GoogleMap>
+
+      <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+        <p className="text-sm font-medium text-gray-700">Selected Coordinates:</p>
+        {customerInfo.coordinates ? (
+          <p className="text-sm text-gray-600 mt-1">
+            Lat: {customerInfo.coordinates.lat.toFixed(6)}
+            <br />
+            Lng: {customerInfo.coordinates.lng.toFixed(6)}
+          </p>
+        ) : (
+          <p className="text-sm text-gray-500 mt-1">Click on the map to select location</p>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2 mt-4">
+        <button
+          onClick={() => setCustomerInfo(prev => ({ ...prev, coordinates: { lat: 11.567, lng: 104.928 }}))}
+          className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+        >
+          Clear
+        </button>
+        <button
+          onClick={() => setShowMap(false)}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Select Location
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* SEPARATE SHIPPING ADDRESS SECTION */}
       <section className="flex flex-col gap-3">
