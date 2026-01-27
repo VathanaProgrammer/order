@@ -441,14 +441,7 @@ const CombinedCheckoutPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {user?.role === "sale" ? "Customer Name" : "Label"} *
               </label>
-              <input
-                type="text"
-                placeholder="Home, Work, etc."
-                value={tempAddress.label || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              {user?.role === "sale" && (
+              {user?.role === "sale" ? (
                 <input
                 type="text"
                 placeholder="Enter customer name"
@@ -456,7 +449,13 @@ const CombinedCheckoutPage = () => {
                 onChange={(e) => setUser({ ...user, name: e.target.value })}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
-              )}
+              ): <input
+              type="text"
+              placeholder="Home, Work, etc."
+              value={tempAddress.label || ""}
+              onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />}
             </div>
 
             {/* Phone */}
