@@ -25,6 +25,7 @@ const BottomNav: React.FC = () => {
   const { t } = useLanguage();
 
   const { user } = useAuth();
+  const { customerInfo } = useCheckout();
   const pathname = usePathname();
   const isCheckoutPage = pathname === "/checkout";
 
@@ -35,32 +36,38 @@ const BottomNav: React.FC = () => {
   const formatPrice = (value: number) =>
     typeof value !== "number" || isNaN(value) ? "$0.00" : `$${value.toFixed(2)}`;
 
-  const handleClickCheckout = () => {
-    if (!user) return router.push("/sign-in");
-
-    if (isCheckoutPage) {
-      const errors: string[] = [];
-      if (cart.length > 0 && rewards.length > 0) {
-        errors.push("Cannot mix products and rewards!");
-      }
-      if (cart.length === 0 && rewards.length === 0) errors.push(t.yourCartIsEmpty);
-      if (isPaymentMissing) errors.push(t.pleaseSelectAPaymentMethod);
-      if (isAddressMissing) errors.push(t.pleaseSelectAShippingAddress);
-
-      if (errors.length > 0) {
-        errors.forEach((err) => toast.error(err));
-        return;
-      }
-
-      if (rewards.length > 0) {
-        placeRewardOrder?.();
+    const handleClickCheckout = () => {
+      if (!user) return router.push("/sign-in");
+    
+      if (isCheckoutPage) {
+        const errors: string[] = [];
+        if (cart.length > 0 && rewards.length > 0) {
+          errors.push("Cannot mix products and rewards!");
+        }
+        if (cart.length === 0 && rewards.length === 0) errors.push(t.yourCartIsEmpty);
+        if (isPaymentMissing) errors.push(t.pleaseSelectAPaymentMethod);
+        if (isAddressMissing) errors.push(t.pleaseSelectAShippingAddress);
+        
+        // Additional check for sale role - customer info is required
+        if (user?.role === "sale" && !customerInfo) {
+          errors.push("Please enter customer information first");
+        }
+    
+        if (errors.length > 0) {
+          errors.forEach((err) => toast.error(err));
+          return;
+        }
+    
+        if (rewards.length > 0) {
+          placeRewardOrder?.();
+        } else {
+          placeOrder?.();
+          // Customer info will be cleared ONLY after successful order
+        }
       } else {
-        placeOrder?.();
+        router.push("/checkout");
       }
-    } else {
-      router.push("/checkout");
-    }
-  };
+    };
 
   const handleChatRedirect = async () => {
     try {

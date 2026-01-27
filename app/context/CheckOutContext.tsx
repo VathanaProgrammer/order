@@ -218,16 +218,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
 
   // --- PLACE ORDER ---
   const placeOrder = async () => {
-    // Add this to get customer info from parent component
-    const getCustomerInfo = () => {
-      // This should be passed from the checkout page component
-      return {
-        customerName: "", // Get from checkout page state
-        customerPhone: "", // Get from checkout page state
-        customerAddress: "", // Get from checkout page state
-      };
-    };
-  
     let addressToSend: Address | null = null;
     
     if (selectedAddress === "current") {
@@ -236,11 +226,10 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
-      // For sale role, get customer info
+      // For sale role, use customerInfo from context
       if (user?.role === 'sale') {
-        const customerInfo = getCustomerInfo(); // You need to implement this
-        
-        if (!customerInfo.customerName || !customerInfo.customerPhone) {
+        // Use the customerInfo from context state
+        if (!customerInfo?.name || !customerInfo?.phone) {
           toast.error("Please enter customer name and phone number");
           return;
         }
@@ -249,9 +238,9 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         addressToSend = { 
           ...currentAddress, 
           short_address,
-          phone: customerInfo.customerPhone,
-          label: customerInfo.customerName,
-          details: customerInfo.customerAddress || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
+          phone: customerInfo.phone,
+          label: customerInfo.name,
+          details: customerInfo.address || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
         };
       } else {
         // Regular user
@@ -271,12 +260,12 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     } else {
       addressToSend = selectedAddress as Address;
     }
-  
+
     if (!addressToSend || cart.length === 0) {
       toast.error("Cart is empty or no address selected!");
       return;
     }
-  
+
     const payload: any = {
       api_user_id: user?.id,
       saved_address_id: selectedAddress !== "current" ? addressToSend.id : undefined,
@@ -293,15 +282,16 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         image_url: (i.image ?? "").split("/").pop(),
       })),
     };
-  
-    // Add customer_info for sale role users
-    if (user?.role === 'sale' && addressToSend) {
+
+    // Add customer_info for sale role users using context customerInfo
+    if (user?.role === 'sale' && customerInfo) {
       payload.customer_info = {
-        name: addressToSend.label || "Customer",
-        phone: addressToSend.phone || "",
+        name: customerInfo.name || "Customer",
+        phone: customerInfo.phone || "",
+        address: customerInfo.address || "",
       };
     }
-  
+
     try {
       console.log("Sending order with payload:", payload);
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
@@ -312,19 +302,21 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         toast.success("Order placed successfully!");
         
         // Show customer info for sale role
-        if (user?.role === 'sale' && payload.customer_info) {
-          toast.info(`Customer: ${payload.customer_info.name}, Phone: ${payload.customer_info.phone}`);
+        if (user?.role === 'sale' && customerInfo) {
+          toast.info(`Customer: ${customerInfo.name}, Phone: ${customerInfo.phone}`);
         }
         
+        // Clear cart and customer info ONLY AFTER SUCCESSFUL ORDER
         setCart([]);
         setTotal(0);
+        clearCustomerInfo(); // Clear customer info after successful order
+        
         router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}`);
       }
     } catch (err: any) {
       console.error("Order error:", err.response?.data || err);
       toast.error(err.response?.data?.message || "Order failed. Please try again.");
-    } finally {
-      clearCustomerInfo();
+      // DON'T clear customer info on error - keep it for retry
     }
   };
 
