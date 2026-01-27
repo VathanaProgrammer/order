@@ -32,13 +32,18 @@ export type Address = {
   short_address?: string;
 };
 
+type Coordinates = {
+  lat: number;
+  lng: number;
+} | null;
+
 // NEW: Customer Information Type
 export type CustomerInfo = {
   name: string;
   phone: string;
   email?: string;
   notes?: string;
-  coordinates?: { lat: number; lng: number }; // Separated from address
+  coordinates: Coordinates; 
 };
 
 type CheckoutContextType = {

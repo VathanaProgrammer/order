@@ -48,6 +48,8 @@ const CombinedCheckoutPage = () => {
     paymentMethod,
     setPaymentMethod,
     placeOrderWithCustomerInfo,
+    customerInfo,
+    setCustomerInfo,
   } = useCheckout();
 
   const { setLoading } = useLoading();
@@ -69,18 +71,18 @@ const CombinedCheckoutPage = () => {
   const { t } = useLanguage();
 
   // SEPARATE CUSTOMER INFORMATION STATE
-  const [customerInfo, setCustomerInfo] = useState<{
-    name: string;
-    phone: string;
-    email?: string;
-    notes?: string;
-    coordinates: Coordinates;
-  }>({
-    name: "",
-    phone: "",
-    notes: "",
-    coordinates: null,
-  });
+  // const [customerInfo, setCustomerInfo] = useState<{
+  //   name: string;
+  //   phone: string;
+  //   email?: string;
+  //   notes?: string;
+  //   coordinates: Coordinates;
+  // }>({
+  //   name: "",
+  //   phone: "",
+  //   notes: "",
+  //   coordinates: null,
+  // });
 
   const paymentMethods = [
     { name: t.QR, image: "/qr.jpg" },
