@@ -477,7 +477,7 @@ const placeOrder= async () => {
         
         // Redirect to confirmation page
         const orderId = res.data.order_id;
-        router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}`);
+        router.push(orderId ? `/order-confirmation/${orderId}` : "/order-confirmation");
       } else {
         toast.error(res.data?.message || "Failed to place order");
       }
