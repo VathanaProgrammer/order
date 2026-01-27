@@ -63,6 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       phone: userData.phone || null,
       mobile: userData.mobile || null,
       profile_url: userData.profile_url || null,
+      role: userData.role || '',
       reward_points: userData.reward_points || {
         total: 0,
         used: 0,
@@ -83,7 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userData = extractUserFromResponse(res.data);
         
         if (userData) {
-          console.log('✅ User found');
+          console.log('✅ User found', userData);
           setUser(userData);
         } else {
           console.log('❌ No valid user data');
