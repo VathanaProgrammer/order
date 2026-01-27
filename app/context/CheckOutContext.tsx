@@ -57,7 +57,12 @@ type CheckoutContextType = {
   paymentMethod: string;
   setPaymentMethod: (method: string) => void;
 
-  placeOrder: () => void;
+  placeOrder: (customerInfo?: {
+    name: string;
+    phone: string;
+    addressDetails: string;
+    coordinates?: { lat: number; lng: number };
+  }) => void;
   placeRewardOrder: () => void;
 };
 
@@ -202,66 +207,67 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // --- PLACE ORDER ---
-  const placeOrder = async () => {
-    // Add this to get customer info from parent component
-    const getCustomerInfo = () => {
-      // This should be passed from the checkout page component
-      return {
-        customerName: "", // Get from checkout page state
-        customerPhone: "", // Get from checkout page state
-        customerAddress: "", // Get from checkout page state
-      };
-    };
-  
+  const placeOrder = async (customerInfo?: {
+    name: string;
+    phone: string;
+    addressDetails: string;
+    coordinates?: { lat: number; lng: number };
+  }) => {
     let addressToSend: Address | null = null;
     
-    if (selectedAddress === "current") {
+    // For sale role with customer info
+    if (user?.role === 'sale' && customerInfo) {
+      if (!customerInfo.name || !customerInfo.phone || !customerInfo.addressDetails || !customerInfo.coordinates) {
+        toast.error("Customer information is incomplete");
+        return;
+      }
+      
+      // Use customer's delivery location (not salesperson's location)
+      const short_address = await getShortAddress(
+        customerInfo.coordinates.lat, 
+        customerInfo.coordinates.lng
+      );
+      
+      addressToSend = {
+        label: customerInfo.name,
+        phone: customerInfo.phone,
+        details: customerInfo.addressDetails,
+        coordinates: customerInfo.coordinates,
+        short_address,
+      };
+      
+      // Set as current address for the order
+      setCurrentAddress(addressToSend);
+      setSelectedAddress("current");
+    } 
+    // Regular user logic (keep existing)
+    else if (selectedAddress === "current") {
       if (!currentAddress.coordinates) {
         toast.error("Current address coordinates not set!");
         return;
       }
       
-      // For sale role, get customer info
-      if (user?.role === 'sale') {
-        const customerInfo = getCustomerInfo(); // You need to implement this
-        
-        if (!customerInfo.customerName || !customerInfo.customerPhone) {
-          toast.error("Please enter customer name and phone number");
-          return;
-        }
-        
-        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
-        addressToSend = { 
-          ...currentAddress, 
-          short_address,
-          phone: customerInfo.customerPhone,
-          label: customerInfo.customerName,
-          details: customerInfo.customerAddress || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
-        };
-      } else {
-        // Regular user
-        const userPhone = user?.phone || user?.mobile || "";
-        if (!userPhone) {
-          toast.error("Please add your phone number in your account settings");
-          return;
-        }
-        
-        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
-        addressToSend = { 
-          ...currentAddress, 
-          short_address,
-          phone: userPhone,
-        };
+      const userPhone = user?.phone || user?.mobile || "";
+      if (!userPhone) {
+        toast.error("Please add your phone number in your account settings");
+        return;
       }
+      
+      const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
+      addressToSend = { 
+        ...currentAddress, 
+        short_address,
+        phone: userPhone,
+      };
     } else {
       addressToSend = selectedAddress as Address;
     }
-  
+
     if (!addressToSend || cart.length === 0) {
       toast.error("Cart is empty or no address selected!");
       return;
     }
-  
+
     const payload: any = {
       api_user_id: user?.id,
       saved_address_id: selectedAddress !== "current" ? addressToSend.id : undefined,
@@ -278,15 +284,15 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         image_url: (i.image ?? "").split("/").pop(),
       })),
     };
-  
+
     // Add customer_info for sale role users
-    if (user?.role === 'sale' && addressToSend) {
+    if (user?.role === 'sale' && customerInfo) {
       payload.customer_info = {
-        name: addressToSend.label || "Customer",
-        phone: addressToSend.phone || "",
+        name: customerInfo.name,
+        phone: customerInfo.phone,
       };
     }
-  
+
     try {
       console.log("Sending order with payload:", payload);
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
@@ -297,8 +303,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         toast.success("Order placed successfully!");
         
         // Show customer info for sale role
-        if (user?.role === 'sale' && payload.customer_info) {
-          toast.info(`Customer: ${payload.customer_info.name}, Phone: ${payload.customer_info.phone}`);
+        if (user?.role === 'sale' && customerInfo) {
+          toast.info(`Customer: ${customerInfo.name}, Phone: ${customerInfo.phone}`);
         }
         
         setCart([]);

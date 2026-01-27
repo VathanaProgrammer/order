@@ -10,7 +10,16 @@ import { toast } from "react-toastify";
 import axios from "axios";
 import { useLanguage } from "@/context/LanguageContext";
 
-const BottomNav: React.FC = () => {
+interface BottomNavProps {
+  customerInfo?: {
+    name: string;
+    phone: string;
+    addressDetails: string;
+    coordinates?: { lat: number; lng: number };
+  };
+}
+
+const BottomNav: React.FC<BottomNavProps> = ({ customerInfo }) => {
   const router = useRouter();
   const {
     total,
@@ -40,12 +49,22 @@ const BottomNav: React.FC = () => {
 
     if (isCheckoutPage) {
       const errors: string[] = [];
+      
       if (cart.length > 0 && rewards.length > 0) {
         errors.push("Cannot mix products and rewards!");
       }
       if (cart.length === 0 && rewards.length === 0) errors.push(t.yourCartIsEmpty);
       if (isPaymentMissing) errors.push(t.pleaseSelectAPaymentMethod);
-      if (isAddressMissing) errors.push(t.pleaseSelectAShippingAddress);
+      
+      // For sale role, check customer info
+      if (user?.role === "sale") {
+        if (!customerInfo?.name || !customerInfo?.phone || !customerInfo?.addressDetails || !customerInfo?.coordinates) {
+          errors.push("Please complete customer information");
+        }
+      } else {
+        // For regular users, check address
+        if (isAddressMissing) errors.push(t.pleaseSelectAShippingAddress);
+      }
 
       if (errors.length > 0) {
         errors.forEach((err) => toast.error(err));
@@ -55,7 +74,18 @@ const BottomNav: React.FC = () => {
       if (rewards.length > 0) {
         placeRewardOrder?.();
       } else {
-        placeOrder?.();
+        // For sale role, pass customer info to placeOrder
+        if (user?.role === "sale") {
+          placeOrder({
+            name: customerInfo!.name,
+            phone: customerInfo!.phone,
+            addressDetails: customerInfo!.addressDetails,
+            coordinates: customerInfo!.coordinates,
+          });
+        } else {
+          // For regular users, call placeOrder without customer info
+          placeOrder();
+        }
       }
     } else {
       router.push("/checkout");
