@@ -346,7 +346,7 @@ const placeOrder= async () => {
 
   try {
     console.log("Sending order with customer info payload:", payload);
-    const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}//sales-order/save-customer-info`, payload, {
+    const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/sales-order/save-customer-info`, payload, {
       withCredentials: true,
       headers: { Accept: "application/json" },
     });
@@ -477,7 +477,7 @@ const placeOrder= async () => {
         
         // Redirect to confirmation page
         const orderId = res.data.order_id;
-        router.push(orderId ? `/order-confirmation/${orderId}` : "/order-confirmation");
+        router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}`);
       } else {
         toast.error(res.data?.message || "Failed to place order");
       }
