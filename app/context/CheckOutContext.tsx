@@ -57,12 +57,7 @@ type CheckoutContextType = {
   paymentMethod: string;
   setPaymentMethod: (method: string) => void;
 
-  placeOrder: (customerInfo?: {
-    name: string;
-    phone: string;
-    addressDetails: string;
-    coordinates?: { lat: number; lng: number };
-  }) => void;
+  placeOrder: () => void;
   placeRewardOrder: () => void;
 };
 
@@ -207,115 +202,116 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // --- PLACE ORDER ---
-  const placeOrder = async (customerInfo?: {
-    name: string;
-    phone: string;
-    addressDetails: string;
-    coordinates?: { lat: number; lng: number };
-  }) => {
-    let addressToSend: Address | null = null;
-    
-    // For sale role with customer info
-    if (user?.role === 'sale' && customerInfo) {
-      if (!customerInfo.name || !customerInfo.phone || !customerInfo.addressDetails || !customerInfo.coordinates) {
-        toast.error("Customer information is incomplete");
-        return;
-      }
-      
-      // Use customer's delivery location (not salesperson's location)
-      const short_address = await getShortAddress(
-        customerInfo.coordinates.lat, 
-        customerInfo.coordinates.lng
-      );
-      
-      addressToSend = {
-        label: customerInfo.name,
-        phone: customerInfo.phone,
-        details: customerInfo.addressDetails,
-        coordinates: customerInfo.coordinates,
-        short_address,
-      };
-      
-      // Set as current address for the order
-      setCurrentAddress(addressToSend);
-      setSelectedAddress("current");
-    } 
-    // Regular user logic (keep existing)
-    else if (selectedAddress === "current") {
-      if (!currentAddress.coordinates) {
-        toast.error("Current address coordinates not set!");
-        return;
-      }
-      
-      const userPhone = user?.phone || user?.mobile || "";
-      if (!userPhone) {
-        toast.error("Please add your phone number in your account settings");
-        return;
-      }
-      
-      const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
-      addressToSend = { 
-        ...currentAddress, 
-        short_address,
-        phone: userPhone,
-      };
-    } else {
-      addressToSend = selectedAddress as Address;
-    }
-
-    if (!addressToSend || cart.length === 0) {
-      toast.error("Cart is empty or no address selected!");
+// In CheckoutContext, update the placeOrder function:
+const placeOrder = async (customerInfo?: {
+  name: string;
+  phone: string;
+  addressDetails: string;
+  coordinates?: { lat: number; lng: number };
+}) => {
+  let addressToSend: Address | null = null;
+  
+  // For sale role with customer info
+  if (user?.role === 'sale' && customerInfo) {
+    if (!customerInfo.name || !customerInfo.phone || !customerInfo.addressDetails || !customerInfo.coordinates) {
+      toast.error("Customer information is incomplete");
       return;
     }
-
-    const payload: any = {
-      api_user_id: user?.id,
-      saved_address_id: selectedAddress !== "current" ? addressToSend.id : undefined,
-      address: selectedAddress === "current" ? addressToSend : undefined,
-      address_type: selectedAddress === "current" ? "current" : "saved",
-      paymentMethod,
-      total_qty: cart.reduce((sum, i) => sum + i.qty, 0),
-      total,
-      items: cart.map(i => ({
-        product_id: i.id,
-        qty: i.qty,
-        price_at_order: i.price,
-        total_line: Number((i.price * i.qty).toFixed(2)),
-        image_url: (i.image ?? "").split("/").pop(),
-      })),
+    
+    // Use customer's delivery location (not salesperson's location)
+    const short_address = await getShortAddress(
+      customerInfo.coordinates.lat, 
+      customerInfo.coordinates.lng
+    );
+    
+    addressToSend = {
+      label: customerInfo.name,
+      phone: customerInfo.phone,
+      details: customerInfo.addressDetails,
+      coordinates: customerInfo.coordinates,
+      short_address,
     };
-
-    // Add customer_info for sale role users
-    if (user?.role === 'sale' && customerInfo) {
-      payload.customer_info = {
-        name: customerInfo.name,
-        phone: customerInfo.phone,
-      };
+    
+    // Set as current address for the order
+    setCurrentAddress(addressToSend);
+    setSelectedAddress("current");
+  } 
+  // Regular user logic (keep existing)
+  else if (selectedAddress === "current") {
+    if (!currentAddress.coordinates) {
+      toast.error("Current address coordinates not set!");
+      return;
     }
-
-    try {
-      console.log("Sending order with payload:", payload);
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
-        withCredentials: true,
-        headers: { Accept: "application/json" },
-      });
-      if (res.data?.success) {
-        toast.success("Order placed successfully!");
-        
-        // Show customer info for sale role
-        if (user?.role === 'sale' && customerInfo) {
-          toast.info(`Customer: ${customerInfo.name}, Phone: ${customerInfo.phone}`);
-        }
-        
-        setCart([]);
-        setTotal(0);
-        router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}`);
-      }
-    } catch (err: any) {
-      console.error("Order error:", err.response?.data || err);
-      toast.error(err.response?.data?.message || "Order failed. Please try again.");
+    
+    const userPhone = user?.phone || user?.mobile || "";
+    if (!userPhone) {
+      toast.error("Please add your phone number in your account settings");
+      return;
     }
+    
+    const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
+    addressToSend = { 
+      ...currentAddress, 
+      short_address,
+      phone: userPhone,
+    };
+  } else {
+    addressToSend = selectedAddress as Address;
+  }
+
+  if (!addressToSend || cart.length === 0) {
+    toast.error("Cart is empty or no address selected!");
+    return;
+  }
+
+  const payload: any = {
+    api_user_id: user?.id,
+    saved_address_id: selectedAddress !== "current" ? addressToSend.id : undefined,
+    address: selectedAddress === "current" ? addressToSend : undefined,
+    address_type: selectedAddress === "current" ? "current" : "saved",
+    paymentMethod,
+    total_qty: cart.reduce((sum, i) => sum + i.qty, 0),
+    total,
+    items: cart.map(i => ({
+      product_id: i.id,
+      qty: i.qty,
+      price_at_order: i.price,
+      total_line: Number((i.price * i.qty).toFixed(2)),
+      image_url: (i.image ?? "").split("/").pop(),
+    })),
   };
+
+  // Add customer_info for sale role users
+  if (user?.role === 'sale' && customerInfo) {
+    payload.customer_info = {
+      name: customerInfo.name,
+      phone: customerInfo.phone,
+    };
+  }
+
+  try {
+    console.log("Sending order with payload:", payload);
+    const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
+      withCredentials: true,
+      headers: { Accept: "application/json" },
+    });
+    if (res.data?.success) {
+      toast.success("Order placed successfully!");
+      
+      // Show customer info for sale role
+      if (user?.role === 'sale' && customerInfo) {
+        toast.info(`Customer: ${customerInfo.name}, Phone: ${customerInfo.phone}`);
+      }
+      
+      setCart([]);
+      setTotal(0);
+      router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}`);
+    }
+  } catch (err: any) {
+    console.error("Order error:", err.response?.data || err);
+    toast.error(err.response?.data?.message || "Order failed. Please try again.");
+  }
+};
 
   // --- PLACE REWARD ORDER ---
   const placeRewardOrder = async () => {
