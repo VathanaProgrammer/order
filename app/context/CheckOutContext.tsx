@@ -477,7 +477,7 @@ const placeOrder= async () => {
         
         // Redirect to confirmation page
         const orderId = res.data.order_id;
-        router.push(orderId ? `/order-confirmation/${orderId}` : "/order-confirmation");
+        router.push("/checkout/order-success");
       } else {
         toast.error(res.data?.message || "Failed to place order");
       }
