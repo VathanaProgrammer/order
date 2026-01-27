@@ -29,7 +29,7 @@ type ExtendedAddress = ContextAddress & {
 const containerStyle = { width: "100%", height: "400px" };
 
 const CombinedCheckoutPage = () => {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const router = useRouter();
   const {
     cart,
@@ -383,7 +383,7 @@ const CombinedCheckoutPage = () => {
         <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
 
         {/* Current Location */}
-        <div
+{ user?.role !== "sale" &&  <div
           onClick={handleDetectCurrentLocation}
           className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${
             selectedAddress === "current" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
@@ -405,7 +405,7 @@ const CombinedCheckoutPage = () => {
           {isDetectingLocation && (
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
           )}
-        </div>
+        </div>}
 
         {/* Saved Addresses */}
         {savedAddresses.map((addr) => (
@@ -433,7 +433,7 @@ const CombinedCheckoutPage = () => {
           </div>
         ))}
 
-        {/* Add New Address Button / Form */}
+        {/* Add New Address Button / Form */}z
         {isAdding ? (
           <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
             {/* Name / Label */}
@@ -447,7 +447,7 @@ const CombinedCheckoutPage = () => {
                   user?.role === "sale" ? "Enter customer name" : "Home, Work, etc."
                 }
                 value={tempAddress.label || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
+                onChange={(e) => {if (user?.role === "sale"){ setUser({ ...user, name: e.target.value })} else {setTempAddress({ ...tempAddress, label: e.target.value })}}}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -545,7 +545,7 @@ const CombinedCheckoutPage = () => {
             className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
           >
             <span className="text-xl">+</span>
-            {user?.role === "sale" ? "Add New Customer Address" : t.addNewAddress}
+            {user?.role === "sale" ? "Add Customer Information" : t.addNewAddress}
           </button>
         )}
       </section>
