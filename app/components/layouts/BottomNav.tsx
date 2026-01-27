@@ -49,9 +49,9 @@ const BottomNav: React.FC = () => {
         if (isAddressMissing) errors.push(t.pleaseSelectAShippingAddress);
         
         // Additional check for sale role - customer info is required
-        if (user?.role === "sale" && !customerInfo) {
-          errors.push("Please enter customer information first");
-        }
+        // if (user?.role === "sale" && !customerInfo) {
+        //   errors.push("Please enter customer information first");
+        // }
     
         if (errors.length > 0) {
           errors.forEach((err) => toast.error(err));
