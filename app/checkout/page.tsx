@@ -415,7 +415,7 @@ const CombinedCheckoutPage = () => {
         )}
 
         {/* Saved Addresses */}
-        {savedAddresses.map((addr) => (
+        {user?.role !== "sale" && savedAddresses.map((addr) => (
           <div
             key={addr.id}
             onClick={() => handleSelectSavedAddress(addr)}
