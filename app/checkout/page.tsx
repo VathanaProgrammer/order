@@ -42,6 +42,7 @@ const CombinedCheckoutPage = () => {
     detectCurrentLocation,
     paymentMethod,
     setPaymentMethod,
+    placeOrder, // Added to use placeOrder function
   } = useCheckout();
 
   const { setLoading } = useLoading();
@@ -151,6 +152,22 @@ const CombinedCheckoutPage = () => {
         coordinates: { lat: e.latLng.lat(), lng: e.latLng.lng() },
       });
     }
+  };
+
+  // Function to clear saved addresses (customer information)
+  const clearSavedAddresses = () => {
+    setSavedAddresses([]);
+    setSelectedAddress('current');
+    setIsAdding(false);
+    
+    // Reset temp address fields
+    setTempAddress({
+      label: "",
+      phone: user?.role === "sale" ? "" : userPhone || "",
+      details: "",
+      coordinates: { lat: 11.567, lng: 104.928 },
+      api_user_id: user?.id,
+    });
   };
 
   // Save new address – now supports custom phone for sales role
@@ -266,123 +283,41 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Checkout handler
+  // Handle checkout and clear customer information
   const handleCheckout = async () => {
-    if (cart.length === 0) return toast.error("Your cart is empty");
-    if (!selectedAddress) return toast.error("Please select a shipping address");
-    if (!paymentMethod) return toast.error("Please select a payment method");
-  
-    // Additional validation for sale role
-    if (user?.role === "sale") {
-      if (selectedAddress === "current") {
-        // Check if customer info is entered in tempAddress
-        if (!tempAddress.label?.trim() || !tempAddress.phone?.trim()) {
-          toast.error("Please enter customer name and phone number");
-          return;
-        }
-      }
+    // Validation checks
+    if (cart.length === 0) {
+      toast.error("Your cart is empty");
+      return;
     }
-  
+
+    if (!selectedAddress) {
+      toast.error("Please select a shipping address");
+      return;
+    }
+
+    if (!paymentMethod) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
     setIsSubmittingOrder(true);
-    setLoading(true);
-  
     try {
-      const orderData: any = {
-        api_user_id: user?.id,
-        address_type: selectedAddress === "current" ? "current" : "saved",
-        paymentMethod,
-        total_qty: cart.reduce((sum, item) => sum + item.qty, 0),
-        total,
-        items: cart.map((item) => ({
-          product_id: item.id,
-          qty: item.qty,
-          price_at_order: item.price,
-          total_line: item.price * item.qty,
-          image_url: item.image || null,
-        })),
-      };
-  
-      // Add customer info for sale role
-      if (user?.role === "sale") {
-        let customerName = "";
-        let customerPhone = "";
+      // Call the placeOrder function from context
+      if (placeOrder) {
+        await placeOrder();
         
-        if (selectedAddress === "current") {
-          customerName = tempAddress.label || "";
-          customerPhone = tempAddress.phone || "";
-        } else if (selectedAddress && typeof selectedAddress !== "string") {
-          const savedAddr = selectedAddress as ExtendedAddress;
-          customerName = savedAddr.label || "";
-          customerPhone = savedAddr.phone || "";
-        }
+        // Clear saved addresses after successful order placement
+        clearSavedAddresses();
         
-        if (customerName && customerPhone) {
-          orderData.customer_info = {
-            name: customerName,
-            phone: customerPhone,
-          };
-        }
-      }
-  
-      if (selectedAddress === "current") {
-        if (!currentAddress?.coordinates) {
-          toast.error("Please detect your current location first");
-          return;
-        }
-  
-        // For sale role, use customer phone; for regular users, use user phone
-        let phoneForCurrent = "";
-        if (user?.role === "sale") {
-          phoneForCurrent = tempAddress.phone || "";
-          if (!phoneForCurrent) {
-            toast.error("Please enter customer phone number");
-            return;
-          }
-        } else {
-          phoneForCurrent = userPhone || "";
-          if (!phoneForCurrent) {
-            toast.error("Please add your phone in account settings");
-            return;
-          }
-        }
-  
-        // For sale role, label is customer name; for regular users, use "Current Location"
-        const labelForCurrent = user?.role === "sale"
-          ? (tempAddress.label || "Customer")
-          : "Current Location";
-  
-        orderData.address = {
-          label: labelForCurrent,
-          phone: phoneForCurrent,
-          details: tempAddress.details || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
-          coordinates: currentAddress.coordinates,
-        };
-      } else {
-        orderData.saved_address_id = (selectedAddress as ExtendedAddress).id;
-      }
-  
-      console.log("Order data:", orderData);
-      const response = await api.post("/orders", orderData);
-  
-      if (response.data.success) {
         toast.success("Order placed successfully!");
-        const orderId = response.data.order_id;
-        
-        // Show customer info for sale role
-        if (user?.role === "sale" && orderData.customer_info) {
-          toast.info(`Customer: ${orderData.customer_info.name}, Phone: ${orderData.customer_info.phone}`);
-        }
-        
-        router.push(orderId ? `/order-confirmation/${orderId}` : "/order-confirmation");
-      } else {
-        toast.error(response.data.message || "Failed to place order");
+        // Optionally navigate to order confirmation page
+        // router.push("/order-confirmation");
       }
     } catch (error: any) {
-      console.error("Checkout error:", error);
-      toast.error(error.response?.data?.message || "Failed to place order");
+      toast.error(error.message || "Failed to place order");
     } finally {
       setIsSubmittingOrder(false);
-      setLoading(false);
     }
   };
 
@@ -435,6 +370,15 @@ const CombinedCheckoutPage = () => {
               <span className="text-lg font-semibold">{t.total}:</span>
               <span className="text-2xl font-bold text-blue-600">${total.toFixed(2)}</span>
             </div>
+            
+            {/* Checkout Button in the Combined Page */}
+            <button
+              onClick={handleCheckout}
+              disabled={isSubmittingOrder || cart.length === 0 || !selectedAddress || !paymentMethod}
+              className="w-full mt-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            >
+              {isSubmittingOrder ? "Processing..." : t.checkout}
+            </button>
           </div>
         )}
       </section>
