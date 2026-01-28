@@ -47,9 +47,6 @@ const CombinedCheckoutPage = () => {
     detectCurrentLocation,
     paymentMethod,
     setPaymentMethod,
-    placeOrderWithCustomerInfo,
-    customerInfo,
-    setCustomerInfo,
   } = useCheckout();
 
   const { setLoading } = useLoading();
@@ -71,18 +68,18 @@ const CombinedCheckoutPage = () => {
   const { t } = useLanguage();
 
   // SEPARATE CUSTOMER INFORMATION STATE
-  // const [customerInfo, setCustomerInfo] = useState<{
-  //   name: string;
-  //   phone: string;
-  //   email?: string;
-  //   notes?: string;
-  //   coordinates: Coordinates;
-  // }>({
-  //   name: "",
-  //   phone: "",
-  //   notes: "",
-  //   coordinates: null,
-  // });
+  const [customerInfo, setCustomerInfo] = useState<{
+    name: string;
+    phone: string;
+    email?: string;
+    notes?: string;
+    coordinates: Coordinates;
+  }>({
+    name: "",
+    phone: "",
+    notes: "",
+    coordinates: null,
+  });
 
   const paymentMethods = [
     { name: t.QR, image: "/qr.jpg" },
@@ -513,17 +510,17 @@ const handleCustomerMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
               </label>
               <div className="flex gap-2">
               <input
-                type="text"
-                readOnly
-                value={
-                  customerInfo.coordinates
-                    ? `Lat: ${customerInfo.coordinates.lat.toFixed(6)}, Lng: ${customerInfo.coordinates.lng.toFixed(6)}`
-                    : ""
-                }
-                onClick={() => setShowCustomerMap(true)}
-                className="flex-1 p-3 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                placeholder="Click to select location on map"
-              />
+              type="text"
+              readOnly
+              value={
+                customerInfo.coordinates
+                  ? `Lat: ${customerInfo.coordinates.lat.toFixed(6)}, Lng: ${customerInfo.coordinates.lng.toFixed(6)}`
+                  : ""
+              }
+              onClick={() => setShowCustomerMap(true)} // Use showCustomerMap
+              className="flex-1 p-3 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+              placeholder="Click to select location on map"
+            />
               </div>
               {!customerInfo.coordinates && (
                 <p className="text-sm text-red-500 mt-1">Please select a location on the map</p>
@@ -547,65 +544,65 @@ const handleCustomerMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
         </div>
       </section>
 
-    {/* Map Modal for Customer Location Selection */}
-    {showCustomerMap && (
-      <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
-        <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg max-h-[90vh] overflow-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Select Customer Location</h3>
-            <button
-              onClick={() => setShowCustomerMap(false)} // Use showCustomerMap
-              className="text-gray-500 hover:text-gray-700 text-xl p-1"
-            >
-              ✕
-            </button>
-          </div>
-
-          <GoogleMap
-            mapContainerStyle={containerStyle}
-            center={customerInfo.coordinates || { lat: 11.567, lng: 104.928 }}
-            zoom={15}
-            onClick={handleCustomerMapClick}  // Use the customer handler
-          >
-            {customerInfo.coordinates && (
-              <Marker
-                position={customerInfo.coordinates}
-                draggable
-                onDragEnd={handleCustomerMarkerDragEnd}  // Use the customer handler
-              />
-            )}
-          </GoogleMap>
-
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm font-medium text-gray-700">Selected Coordinates:</p>
-            {customerInfo.coordinates ? (
-              <p className="text-sm text-gray-600 mt-1">
-                Lat: {customerInfo.coordinates.lat.toFixed(6)}
-                <br />
-                Lng: {customerInfo.coordinates.lng.toFixed(6)}
-              </p>
-            ) : (
-              <p className="text-sm text-gray-500 mt-1">Click on the map to select location</p>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-2 mt-4">
-            <button
-              onClick={() => setCustomerInfo(prev => ({ ...prev, coordinates: null }))} // Set to null
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-            >
-              Clear
-            </button>
-            <button
-              onClick={() => setShowCustomerMap(false)} // Use showCustomerMap
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Select Location
-            </button>
-          </div>
-        </div>
+{/* ADD THIS - Map Modal for Location Selection */}
+{showMap && (
+  <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
+    <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg max-h-[90vh] overflow-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold">Select Customer Location</h3>
+        <button
+          onClick={() => setShowMap(false)}
+          className="text-gray-500 hover:text-gray-700 text-xl p-1"
+        >
+          ✕
+        </button>
       </div>
-    )}
+
+      <GoogleMap
+        mapContainerStyle={containerStyle}
+        center={customerInfo.coordinates ? customerInfo.coordinates : { lat: 11.567, lng: 104.928 }}
+        zoom={15}
+        onClick={handleCustomerMapClick}  // Use the new handler
+      >
+        {customerInfo.coordinates && (
+          <Marker
+            position={customerInfo.coordinates}
+            draggable
+            onDragEnd={handleCustomerMarkerDragEnd}  // Use the new handler
+          />
+        )}
+      </GoogleMap>
+
+      <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+        <p className="text-sm font-medium text-gray-700">Selected Coordinates:</p>
+        {customerInfo.coordinates ? (
+          <p className="text-sm text-gray-600 mt-1">
+            Lat: {customerInfo.coordinates.lat.toFixed(6)}
+            <br />
+            Lng: {customerInfo.coordinates.lng.toFixed(6)}
+          </p>
+        ) : (
+          <p className="text-sm text-gray-500 mt-1">Click on the map to select location</p>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2 mt-4">
+        <button
+          onClick={() => setCustomerInfo(prev => ({ ...prev, coordinates: { lat: 11.567, lng: 104.928 }}))}
+          className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+        >
+          Clear
+        </button>
+        <button
+          onClick={() => setShowMap(false)}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Select Location
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* SEPARATE SHIPPING ADDRESS SECTION */}
       <section className="flex flex-col gap-3">
@@ -704,8 +701,8 @@ const handleCustomerMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
                 type="text"
                 readOnly
                 value={
-                  customerInfo.coordinates
-                    ? `Lat: ${customerInfo.coordinates.lat.toFixed(6)}, Lng: ${customerInfo.coordinates.lng.toFixed(6)}`
+                  tempAddress.coordinates
+                    ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
                     : ""
                 }
                 onClick={() => setShowMap(true)}
