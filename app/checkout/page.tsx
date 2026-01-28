@@ -21,11 +21,6 @@ type APIAddress = {
   coordinates?: { lat: number; lng: number };
 };
 
-type Coordinates = {
-  lat: number;
-  lng: number;
-} | null;
-
 // Extended type that includes both context and API properties
 type ExtendedAddress = ContextAddress & {
   api_user_id?: number;
@@ -47,6 +42,7 @@ const CombinedCheckoutPage = () => {
     detectCurrentLocation,
     paymentMethod,
     setPaymentMethod,
+    
   } = useCheckout();
 
   const { setLoading } = useLoading();
@@ -54,7 +50,6 @@ const CombinedCheckoutPage = () => {
   const [savedAddresses, setSavedAddresses] = useState<ExtendedAddress[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [showMap, setShowMap] = useState(false);
-  const [showCustomerMap, setShowCustomerMap] = useState(false);
   const [tempAddress, setTempAddress] = useState<Partial<APIAddress>>({
     label: "",
     phone: "",
@@ -68,17 +63,11 @@ const CombinedCheckoutPage = () => {
   const { t } = useLanguage();
 
   // SEPARATE CUSTOMER INFORMATION STATE
-  const [customerInfo, setCustomerInfo] = useState<{
-    name: string;
-    phone: string;
-    email?: string;
-    notes?: string;
-    coordinates: Coordinates;
-  }>({
+  const [customerInfo, setCustomerInfo] = useState({
     name: "",
     phone: "",
     notes: "",
-    coordinates: null,
+    coordinates: { lat: 11.567, lng: 104.928 },
   });
 
   const paymentMethods = [
@@ -139,9 +128,9 @@ const CombinedCheckoutPage = () => {
   // HANDLE CUSTOMER INFO CHANGES
   const handleCustomerInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setCustomerInfo((prev) => ({
+    setCustomerInfo(prev => ({
       ...prev,
-      [name]: value,
+      [name]: value
     }));
   };
 
@@ -163,32 +152,6 @@ const CombinedCheckoutPage = () => {
     setIsAdding(false);
   };
 
-// Handle map click for customer coordinates
-const handleCustomerMapClick = (e: google.maps.MapMouseEvent) => {
-  const lat = e.latLng?.lat();
-  const lng = e.latLng?.lng();
-  
-  if (lat !== undefined && lng !== undefined) {
-    setCustomerInfo(prev => ({
-      ...prev,
-      coordinates: { lat, lng }
-    }));
-  }
-};
-
-// Handle marker drag end for customer coordinates
-const handleCustomerMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
-  const lat = e.latLng?.lat();
-  const lng = e.latLng?.lng();
-  
-  if (lat !== undefined && lng !== undefined) {
-    setCustomerInfo(prev => ({
-      ...prev,
-      coordinates: { lat, lng }
-    }));
-  }
-};
-
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
       setTempAddress({
@@ -196,7 +159,7 @@ const handleCustomerMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
         coordinates: { lat: e.latLng.lat(), lng: e.latLng.lng() },
       });
     }
-  };  
+  };
 
   const handleMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
@@ -509,18 +472,25 @@ const handleCustomerMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
                 Location Coordinates *
               </label>
               <div className="flex gap-2">
-              <input
-              type="text"
-              readOnly
-              value={
-                customerInfo.coordinates
-                  ? `Lat: ${customerInfo.coordinates.lat.toFixed(6)}, Lng: ${customerInfo.coordinates.lng.toFixed(6)}`
-                  : ""
-              }
-              onClick={() => setShowCustomerMap(true)} // Use showCustomerMap
-              className="flex-1 p-3 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-              placeholder="Click to select location on map"
-            />
+                <input
+                  type="text"
+                  readOnly
+                  value={
+                    customerInfo.coordinates
+                      ? `Lat: ${customerInfo.coordinates.lat.toFixed(6)}, Lng: ${customerInfo.coordinates.lng.toFixed(6)}`
+                      : ""
+                  }
+                  onClick={() => setShowMap(true)}
+                  className="flex-1 p-3 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                  placeholder="Click to select location on map"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowMap(true)}
+                  className="px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Select
+                </button>
               </div>
               {!customerInfo.coordinates && (
                 <p className="text-sm text-red-500 mt-1">Please select a location on the map</p>
@@ -560,15 +530,15 @@ const handleCustomerMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
 
       <GoogleMap
         mapContainerStyle={containerStyle}
-        center={customerInfo.coordinates ? customerInfo.coordinates : { lat: 11.567, lng: 104.928 }}
+        center={customerInfo.coordinates || { lat: 11.567, lng: 104.928 }}
         zoom={15}
-        onClick={handleCustomerMapClick}  // Use the new handler
+        onClick={handleMapClick}
       >
         {customerInfo.coordinates && (
           <Marker
             position={customerInfo.coordinates}
             draggable
-            onDragEnd={handleCustomerMarkerDragEnd}  // Use the new handler
+            onDragEnd={handleMarkerDragEnd}
           />
         )}
       </GoogleMap>
