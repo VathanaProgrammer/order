@@ -15,23 +15,15 @@ import { useRouter } from "next/navigation";
 type APIAddress = {
   id?: number;
   api_user_id: number | undefined;
-  label: string;
+  label: string; // For sales: customer name, For regular users: address label
   phone?: string;
   details?: string;
   coordinates?: { lat: number; lng: number };
-  customer_name?: string; // Added for sales role
 };
 
 // Extended type that includes both context and API properties
 type ExtendedAddress = ContextAddress & {
   api_user_id?: number;
-  customer_name?: string; // Added for sales role
-};
-
-// Customer info type for sales role
-type CustomerInfo = {
-  name: string;
-  phone: string;
 };
 
 const containerStyle = { width: "100%", height: "400px" };
@@ -64,12 +56,6 @@ const CombinedCheckoutPage = () => {
     details: "",
     coordinates: { lat: 11.567, lng: 104.928 },
     api_user_id: user?.id,
-  });
-  
-  // Separate state for customer info (for sales role)
-  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
-    name: "",
-    phone: "",
   });
   
   const [showQRPopup, setShowQRPopup] = useState(false);
@@ -183,32 +169,29 @@ const CombinedCheckoutPage = () => {
       coordinates: { lat: 11.567, lng: 104.928 },
       api_user_id: user?.id,
     });
-    
-    // Reset customer info for sales
-    if (user?.role === "sale") {
-      setCustomerInfo({
-        name: "",
-        phone: "",
-      });
-    }
   };
 
-  // Save new address – now supports separate customer info for sales role
+  // Save new address - label is customer name for sales, address label for regular users
   const handleSaveNewAddress = async () => {
-    // For sale role, validate customer info
+    // Validate label (customer name for sales, address label for regular users)
+    if (!tempAddress.label?.trim()) {
+      toast.error(
+        user?.role === "sale" 
+          ? "Please enter customer name" 
+          : "Please enter a name/label for the address"
+      );
+      return;
+    }
+    
+    // Validate phone
     if (user?.role === "sale") {
-      if (!customerInfo.name?.trim()) {
-        toast.error("Please enter customer name");
-        return;
-      }
-      if (!customerInfo.phone?.trim()) {
+      if (!tempAddress.phone?.trim()) {
         toast.error("Please enter customer phone number");
         return;
       }
     } else {
-      // For regular users, validate address label
-      if (!tempAddress.label?.trim()) {
-        toast.error("Please enter a name/label for the address");
+      if (!userPhone?.trim()) {
+        toast.error("Please add your phone number in account settings");
         return;
       }
     }
@@ -218,13 +201,16 @@ const CombinedCheckoutPage = () => {
       toast.error("Please enter address details");
       return;
     }
+    
     if (!tempAddress.coordinates) {
       toast.error("Please select a location on the map");
       return;
     }
 
     // Determine phone number to use
-    const finalPhone = user?.role === "sale" ? customerInfo.phone.trim() : userPhone?.trim();
+    const finalPhone = user?.role === "sale" 
+      ? (tempAddress.phone || "").trim() 
+      : userPhone?.trim();
 
     if (!finalPhone) {
       toast.error(
@@ -243,26 +229,20 @@ const CombinedCheckoutPage = () => {
     setLoading(true);
 
     try {
-      // Prepare address data with customer_name for sales role
+      // Prepare address data
       const addressData: APIAddress = {
-        label: (tempAddress.label || "").trim(), // FIXED: Handle undefined
+        label: (tempAddress.label || "").trim(), // Customer name for sales, address label for regular users
         phone: finalPhone,
-        details: (tempAddress.details || "").trim(), // FIXED: Handle undefined
+        details: (tempAddress.details || "").trim(),
         coordinates: tempAddress.coordinates,
         api_user_id: tempAddress.api_user_id,
       };
-
-      // Add customer_name for sales role
-      if (user?.role === "sale") {
-        addressData.customer_name = customerInfo.name.trim();
-      }
 
       console.log("Saving address:", addressData);
 
       const res = await api.post("/addresses", addressData);
       const apiResponse = res.data?.data;
 
-      // Create new address object with all properties
       const newAddress: ExtendedAddress = {
         ...apiResponse,
         id: apiResponse.id,
@@ -271,7 +251,6 @@ const CombinedCheckoutPage = () => {
         details: apiResponse.details,
         coordinates: apiResponse.coordinates,
         api_user_id: apiResponse.api_user_id,
-        customer_name: apiResponse.customer_name, // Include customer_name
       };
 
       setSavedAddresses((prev) => [...prev, newAddress]);
@@ -286,14 +265,6 @@ const CombinedCheckoutPage = () => {
         coordinates: { lat: 11.567, lng: 104.928 },
         api_user_id: user?.id,
       });
-
-      // Reset customer info for sales
-      if (user?.role === "sale") {
-        setCustomerInfo({
-          name: "",
-          phone: "",
-        });
-      }
 
       toast.success("Address saved successfully");
     } catch (err: any) {
@@ -343,31 +314,13 @@ const CombinedCheckoutPage = () => {
       return;
     }
 
-    // Additional validation for sales role
-    if (user?.role === "sale") {
-      let customerName = "";
-      let customerPhone = "";
-
-      if (selectedAddress === "current") {
-        // For current location, check if we have customer info in state
-        if (!customerInfo.name.trim() || !customerInfo.phone.trim()) {
-          toast.error("Please enter customer name and phone number");
-          return;
-        }
-        customerName = customerInfo.name;
-        customerPhone = customerInfo.phone;
-      } else {
-        // For saved addresses, check if address has customer_name
-        const savedAddr = selectedAddress as ExtendedAddress;
-        if (!savedAddr.customer_name || !savedAddr.phone) {
-          toast.error("Selected address is missing customer information");
-          return;
-        }
-        customerName = savedAddr.customer_name;
-        customerPhone = savedAddr.phone;
+    // Additional validation for sales role when using current location
+    if (user?.role === "sale" && selectedAddress === "current") {
+      // For current location, check if we have customer info in tempAddress
+      if (!tempAddress.label?.trim() || !tempAddress.phone?.trim()) {
+        toast.error("Please enter customer name and phone number in the address form");
+        return;
       }
-
-      console.log("Processing order for customer:", { customerName, customerPhone });
     }
 
     setIsSubmittingOrder(true);
@@ -494,10 +447,7 @@ const CombinedCheckoutPage = () => {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold">
-                  {addr.label} 
-                  {addr.customer_name && ` - ${addr.customer_name}`}
-                </p>
+                <p className="font-semibold">{addr.label}</p>
                 <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
                 {addr.phone && (
                   <p className="text-sm text-gray-600 mt-1">
@@ -513,47 +463,15 @@ const CombinedCheckoutPage = () => {
         {/* Add New Address Button / Form */}
         {isAdding ? (
           <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
-            {/* Customer Name (for sales only) */}
-            {user?.role === "sale" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Customer Name *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter customer name"
-                  value={customerInfo.name}
-                  onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            )}
-
-            {/* Customer Phone (for sales only) */}
-            {user?.role === "sale" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Customer Phone *
-                </label>
-                <input
-                  type="tel"
-                  placeholder="Customer phone number"
-                  value={customerInfo.phone}
-                  onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            )}
-
-            {/* Address Label */}
+            {/* Name / Label */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {user?.role === "sale" ? "Address Label *" : "Label *"}
+                {user?.role === "sale" ? "Customer Name *" : "Label *"}
               </label>
               <input
                 type="text"
                 placeholder={
-                  user?.role === "sale" ? "Delivery location name" : "Home, Work, etc."
+                  user?.role === "sale" ? "Enter customer name" : "Home, Work, etc."
                 }
                 value={tempAddress.label || ""}
                 onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
@@ -561,17 +479,25 @@ const CombinedCheckoutPage = () => {
               />
             </div>
 
-            {/* Phone Display for Non-Sales Users */}
-            {user?.role !== "sale" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t.phone} *
-                </label>
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t.phone} *
+              </label>
+              {user?.role === "sale" ? (
+                <input
+                  type="tel"
+                  placeholder="Customer phone number"
+                  value={tempAddress.phone || ""}
+                  onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              ) : (
                 <div className="w-full p-3 border rounded-lg bg-gray-50 text-gray-700">
                   {userPhone ? `${userPhone} (from account)` : "No phone in profile"}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Address Details */}
             <div>
@@ -617,9 +543,8 @@ const CombinedCheckoutPage = () => {
                 disabled={
                   !tempAddress.details?.trim() ||
                   !tempAddress.coordinates ||
-                  (user?.role === "sale" 
-                    ? (!customerInfo.name?.trim() || !customerInfo.phone?.trim() || !tempAddress.label?.trim())
-                    : (!tempAddress.label?.trim() || !userPhone?.trim()))
+                  !tempAddress.label?.trim() ||
+                  (user?.role === "sale" ? !tempAddress.phone?.trim() : !userPhone?.trim())
                 }
               >
                 {t.saveAddress}
@@ -634,12 +559,6 @@ const CombinedCheckoutPage = () => {
                     coordinates: { lat: 11.567, lng: 104.928 },
                     api_user_id: user?.id,
                   });
-                  if (user?.role === "sale") {
-                    setCustomerInfo({
-                      name: "",
-                      phone: "",
-                    });
-                  }
                 }}
                 className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
               >
