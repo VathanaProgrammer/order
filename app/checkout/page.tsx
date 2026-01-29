@@ -57,7 +57,7 @@ const CombinedCheckoutPage = () => {
     coordinates: { lat: 11.567, lng: 104.928 },
     api_user_id: user?.id,
   });
-  
+
   const [showQRPopup, setShowQRPopup] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
@@ -160,7 +160,7 @@ const CombinedCheckoutPage = () => {
     setSavedAddresses([]);
     setSelectedAddress('current');
     setIsAdding(false);
-    
+
     // Reset temp address fields
     setTempAddress({
       label: "",
@@ -176,13 +176,13 @@ const CombinedCheckoutPage = () => {
     // Validate label (customer name for sales, address label for regular users)
     if (!tempAddress.label?.trim()) {
       toast.error(
-        user?.role === "sale" 
-          ? "Please enter customer name" 
+        user?.role === "sale"
+          ? "Please enter customer name"
           : "Please enter a name/label for the address"
       );
       return;
     }
-    
+
     // Validate phone
     if (user?.role === "sale") {
       if (!tempAddress.phone?.trim()) {
@@ -195,21 +195,21 @@ const CombinedCheckoutPage = () => {
         return;
       }
     }
-    
+
     // Validate address details
     if (!tempAddress.details?.trim()) {
       toast.error("Please enter address details");
       return;
     }
-    
+
     if (!tempAddress.coordinates) {
       toast.error("Please select a location on the map");
       return;
     }
 
     // Determine phone number to use
-    const finalPhone = user?.role === "sale" 
-      ? (tempAddress.phone || "").trim() 
+    const finalPhone = user?.role === "sale"
+      ? (tempAddress.phone || "").trim()
       : userPhone?.trim();
 
     if (!finalPhone) {
@@ -328,10 +328,10 @@ const CombinedCheckoutPage = () => {
       // Call the placeOrder function from context
       if (placeOrder) {
         await placeOrder();
-        
+
         // Clear saved addresses after successful order placement
         clearSavedAddresses();
-        
+
         toast.success("Order placed successfully!");
       }
     } catch (error: any) {
@@ -383,37 +383,18 @@ const CombinedCheckoutPage = () => {
             </div>
           </div>
         ))}
-
-        {cart.length > 0 && (
-          <div className="pt-4 border-t border-gray-300">
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-semibold">{t.total}:</span>
-              <span className="text-2xl font-bold text-blue-600">${total.toFixed(2)}</span>
-            </div>
-            
-            {/* Checkout Button in the Combined Page */}
-            <button
-              onClick={handleCheckout}
-              disabled={isSubmittingOrder || cart.length === 0 || !selectedAddress || !paymentMethod}
-              className="w-full mt-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-            >
-              {isSubmittingOrder ? "Processing..." : t.checkout}
-            </button>
-          </div>
-        )}
       </section>
 
       {/* Shipping Address Section */}
       <section className="flex flex-col gap-3">
         {user?.role !== "sale" && <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
-}
+        }
         {/* Current Location */}
         {user?.role !== "sale" && (
           <div
             onClick={handleDetectCurrentLocation}
-            className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${
-              selectedAddress === "current" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
-            } ${isDetectingLocation ? "opacity-70" : ""}`}
+            className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${selectedAddress === "current" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
+              } ${isDetectingLocation ? "opacity-70" : ""}`}
           >
             <div className="flex items-center gap-3">
               <span className="text-blue-500 text-xl">📍</span>
@@ -423,8 +404,8 @@ const CombinedCheckoutPage = () => {
                   {isDetectingLocation
                     ? t.detectingYourCurrentLocation
                     : currentAddress
-                    ? t.clickToUseYourCurrentLocation
-                    : t.clickToDetectYourCurrentLocation}
+                      ? t.clickToUseYourCurrentLocation
+                      : t.clickToDetectYourCurrentLocation}
                 </p>
               </div>
             </div>
@@ -439,11 +420,10 @@ const CombinedCheckoutPage = () => {
           <div
             key={addr.id}
             onClick={() => handleSelectSavedAddress(addr)}
-            className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${
-              currentSelectedAddress && (currentSelectedAddress as ExtendedAddress).id === addr.id
+            className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${currentSelectedAddress && (currentSelectedAddress as ExtendedAddress).id === addr.id
                 ? "border-blue-500 bg-blue-50"
                 : "border-gray-200 hover:bg-gray-50"
-            }`}
+              }`}
           >
             <div className="flex items-center justify-between">
               <div>
@@ -460,8 +440,113 @@ const CombinedCheckoutPage = () => {
           </div>
         ))}
 
+        {user?.role === "sale" && <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
+          {/* Name / Label */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {user?.role === "sale" ? "Customer Name *" : "Label *"}
+            </label>
+            <input
+              type="text"
+              placeholder={
+                user?.role === "sale" ? "Enter customer name" : "Home, Work, etc."
+              }
+              value={tempAddress.label || ""}
+              onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t.phone} *
+            </label>
+            {user?.role === "sale" ? (
+              <input
+                type="tel"
+                placeholder="Customer phone number"
+                value={tempAddress.phone || ""}
+                onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            ) : (
+              <div className="w-full p-3 border rounded-lg bg-gray-50 text-gray-700">
+                {userPhone ? `${userPhone} (from account)` : "No phone in profile"}
+              </div>
+            )}
+          </div>
+
+          {/* Address Details */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t.details || "Address Details"} *
+            </label>
+            <textarea
+              placeholder="Street, building, floor, notes..."
+              value={tempAddress.details || ""}
+              onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              rows={3}
+            />
+          </div>
+
+          {/* Location Picker */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t.clickToSelectLocation} *
+            </label>
+            <input
+              type="text"
+              readOnly
+              value={
+                tempAddress.coordinates
+                  ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
+                  : ""
+              }
+              onClick={() => setShowMap(true)}
+              className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+              placeholder={t.clickToSelectLocation}
+            />
+            {!tempAddress.coordinates && (
+              <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={handleSaveNewAddress}
+              className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
+              disabled={
+                !tempAddress.details?.trim() ||
+                !tempAddress.coordinates ||
+                !tempAddress.label?.trim() ||
+                (user?.role === "sale" ? !tempAddress.phone?.trim() : !userPhone?.trim())
+              }
+            >
+              {t.saveAddress}
+            </button>
+            <button
+              onClick={() => {
+                setIsAdding(false);
+                setTempAddress({
+                  label: "",
+                  phone: user?.role === "sale" ? "" : userPhone || "",
+                  details: "",
+                  coordinates: { lat: 11.567, lng: 104.928 },
+                  api_user_id: user?.id,
+                });
+              }}
+              className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+            >
+              {t.cancel}
+            </button>
+          </div>
+        </div>}
+
         {/* Add New Address Button / Form */}
-        {isAdding ? (
+        {user?.role !== "sale" && isAdding ? (
           <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
             {/* Name / Label */}
             <div>
@@ -644,11 +729,10 @@ const CombinedCheckoutPage = () => {
           <div
             key={method.name}
             onClick={() => handlePaymentMethodSelect(method.name)}
-            className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow ${
-              paymentMethod === method.name
+            className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow ${paymentMethod === method.name
                 ? "border-blue-500 bg-blue-50 shadow-lg"
                 : "border-gray-200 hover:shadow-md"
-            }`}
+              }`}
           >
             <div className="flex items-center gap-4">
               <img
