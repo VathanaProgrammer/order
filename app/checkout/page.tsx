@@ -28,6 +28,9 @@ type ExtendedAddress = ContextAddress & {
 
 const containerStyle = { width: "100%", height: "400px" };
 
+// Pagination configuration
+const ITEMS_PER_PAGE = 5;
+
 const CombinedCheckoutPage = () => {
   const { user, setUser } = useAuth();
   const router = useRouter();
@@ -64,6 +67,10 @@ const CombinedCheckoutPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const { t } = useLanguage();
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(ITEMS_PER_PAGE);
+
   const paymentMethods = [
     { name: t.QR, image: "/qr.jpg" },
     { name: t.cash, image: "/cash.jpg" },
@@ -89,6 +96,15 @@ const CombinedCheckoutPage = () => {
     });
   }, [savedAddresses, searchQuery]);
 
+  // Calculate pagination data
+  const paginatedAddresses = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredAddresses.slice(startIndex, endIndex);
+  }, [filteredAddresses, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredAddresses.length / itemsPerPage);
+
   // Fetch saved addresses
   useEffect(() => {
     const fetchSavedAddresses = async () => {
@@ -110,6 +126,11 @@ const CombinedCheckoutPage = () => {
       fetchSavedAddresses();
     }
   }, [setLoading, user]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, savedAddresses]);
 
   // Update tempAddress when user changes
   useEffect(() => {
@@ -178,6 +199,7 @@ const CombinedCheckoutPage = () => {
     setSelectedAddress('current');
     setIsAdding(false);
     setSearchQuery("");
+    setCurrentPage(1); // Reset to first page
 
     // Reset temp address fields
     setTempAddress({
@@ -275,6 +297,7 @@ const CombinedCheckoutPage = () => {
       setSelectedAddress(newAddress);
       setIsAdding(false);
       setSearchQuery("");
+      setCurrentPage(1); // Reset to first page after adding new address
 
       // Reset form fields
       setTempAddress({
@@ -313,6 +336,29 @@ const CombinedCheckoutPage = () => {
     } catch (error) {
       toast.error("Failed to download QR code");
     }
+  };
+
+  // Pagination handlers
+  const goToPage = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = parseInt(e.target.value);
+    setItemsPerPage(value);
+    setCurrentPage(1); // Reset to first page when changing items per page
   };
 
   return (
@@ -416,7 +462,10 @@ const CombinedCheckoutPage = () => {
             )}
             <div className="text-sm text-gray-500 mt-1 flex justify-between items-center">
               <span>
-                {filteredAddresses.length} of {savedAddresses.length} addresses
+                Showing {paginatedAddresses.length} of {filteredAddresses.length} addresses
+                {filteredAddresses.length !== savedAddresses.length && 
+                  ` (${savedAddresses.length} total)`
+                }
               </span>
               {filteredAddresses.length === 0 && searchQuery && (
                 <span className="text-red-500">No results found</span>
@@ -426,7 +475,7 @@ const CombinedCheckoutPage = () => {
         )}
 
         {/* Saved Addresses List */}
-        {filteredAddresses.map((addr) => (
+        {paginatedAddresses.map((addr) => (
           <div
             key={addr.id}
             onClick={() => handleSelectSavedAddress(addr)}
@@ -449,6 +498,59 @@ const CombinedCheckoutPage = () => {
             </div>
           </div>
         ))}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 p-4 border border-gray-200 rounded-xl">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Items per page:</span>
+              <select
+                value={itemsPerPage}
+                onChange={handleItemsPerPageChange}
+                className="border border-gray-300 rounded px-2 py-1 text-sm"
+              >
+                <option value="3">3</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 border rounded ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+              >
+                ← Previous
+              </button>
+
+              <div className="flex gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => goToPage(page)}
+                    className={`w-8 h-8 rounded-full ${currentPage === page ? 'bg-blue-600 text-white' : 'border hover:bg-gray-50'}`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 border rounded ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+              >
+                Next →
+              </button>
+            </div>
+
+            <div className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </div>
+          </div>
+        )}
 
         {/* Quick Clear Button for Sales */}
         {user?.role === "sale" && savedAddresses.length > 0 && (
