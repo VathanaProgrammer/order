@@ -91,7 +91,7 @@ const CombinedCheckoutPage = () => {
       const labelMatch = address.label?.toLowerCase().includes(query) || false;
       const phoneMatch = address.phone?.toLowerCase().includes(query) || false;
       const detailsMatch = address.details?.toLowerCase().includes(query) || false;
-      
+
       return labelMatch || phoneMatch || detailsMatch;
     });
   }, [savedAddresses, searchQuery]);
@@ -408,7 +408,7 @@ const CombinedCheckoutPage = () => {
       {/* Shipping Address Section */}
       <section className="flex flex-col gap-3">
         {user?.role !== "sale" && <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>}
-        
+
         {/* Current Location */}
         {user?.role !== "sale" && (
           <div
@@ -460,15 +460,16 @@ const CombinedCheckoutPage = () => {
                 </svg>
               </button>
             )}
-            <div className="text-sm text-gray-500 mt-1 flex justify-between items-center">
-              <div className="flex items-center justify-between!">
+            <div className="text-sm text-gray-500 mt-1">
+              <div className="flex justify-between items-center">
                 <span>
                   Showing {paginatedAddresses.length} of {filteredAddresses.length} addresses
-                  {filteredAddresses.length !== savedAddresses.length && 
+                  {filteredAddresses.length !== savedAddresses.length &&
                     ` (${savedAddresses.length} total)`
                   }
                 </span>
-                  <div className="flex items-center gap-2">
+
+                <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600">Items per page:</span>
                   <select
                     value={itemsPerPage}
@@ -482,8 +483,11 @@ const CombinedCheckoutPage = () => {
                   </select>
                 </div>
               </div>
+
               {filteredAddresses.length === 0 && searchQuery && (
-                <span className="text-red-500">No results found</span>
+                <div className="mt-2">
+                  <span className="text-red-500">No results found</span>
+                </div>
               )}
             </div>
           </div>
@@ -495,8 +499,8 @@ const CombinedCheckoutPage = () => {
             key={addr.id}
             onClick={() => handleSelectSavedAddress(addr)}
             className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${currentSelectedAddress && (currentSelectedAddress as ExtendedAddress).id === addr.id
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-200 hover:bg-gray-50"
+              ? "border-blue-500 bg-blue-50"
+              : "border-gray-200 hover:bg-gray-50"
               }`}
           >
             <div className="flex items-center justify-between">
@@ -839,8 +843,8 @@ const CombinedCheckoutPage = () => {
             key={method.name}
             onClick={() => handlePaymentMethodSelect(method.name)}
             className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow ${paymentMethod === method.name
-                ? "border-blue-500 bg-blue-50 shadow-lg"
-                : "border-gray-200 hover:shadow-md"
+              ? "border-blue-500 bg-blue-50 shadow-lg"
+              : "border-gray-200 hover:shadow-md"
               }`}
           >
             <div className="flex items-center gap-4">
