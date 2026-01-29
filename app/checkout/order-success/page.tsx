@@ -27,36 +27,9 @@ const page = () => {
     return `$${safeNumber(value).toFixed(2)}`;
   };
 
-  // Fetch order details
-  useEffect(() => {
-    const fetchOrderDetails = async () => {
-      if (!orderId || user?.role !== 'sale') return;
-
-      try {
-        setIsLoading(true);
-        const orderRes = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`,
-          { withCredentials: true }
-        );
-
-        if (orderRes.data?.success) {
-          setOrderDetails(orderRes.data.data);
-          // Don't auto-generate invoice, let user click button
-        }
-      } catch (error) {
-        console.error("Error fetching order details:", error);
-        toast.error("Failed to load order details");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchOrderDetails();
-  }, [orderId, user?.role]);
-
   // Generate invoice image
-  const generateInvoiceImage = () => {
-    if (!orderDetails) return;
+  const generateInvoiceImage = (orderData: any) => {
+    if (!orderData) return;
     
     setIsGeneratingInvoice(true);
     
@@ -67,6 +40,7 @@ const page = () => {
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           toast.error("Failed to create invoice canvas");
+          setIsGeneratingInvoice(false);
           return;
         }
 
@@ -104,10 +78,10 @@ const page = () => {
         yPos += 30;
         
         // Customer info
-        if (orderDetails.customer_info) {
-          ctx.fillText(`Customer: ${orderDetails.customer_info.name || 'N/A'}`, 50, yPos);
+        if (orderData.customer_info) {
+          ctx.fillText(`Customer: ${orderData.customer_info.name || 'N/A'}`, 50, yPos);
           yPos += 20;
-          ctx.fillText(`Phone: ${orderDetails.customer_info.phone || 'N/A'}`, 50, yPos);
+          ctx.fillText(`Phone: ${orderData.customer_info.phone || 'N/A'}`, 50, yPos);
           yPos += 30;
         }
         
@@ -132,8 +106,8 @@ const page = () => {
         ctx.fillStyle = '#000000';
         ctx.font = '12px Arial';
         
-        if (orderDetails.items && orderDetails.items.length > 0) {
-          orderDetails.items.forEach((item: any) => {
+        if (orderData.items && orderData.items.length > 0) {
+          orderData.items.forEach((item: any) => {
             const itemName = item.product_name || 'Product';
             const quantity = safeNumber(item.qty);
             const price = safeNumber(item.price_at_order);
@@ -158,7 +132,7 @@ const page = () => {
         yPos += 30;
         
         // Total
-        const totalAmount = safeNumber(orderDetails.total);
+        const totalAmount = safeNumber(orderData.total);
         ctx.font = 'bold 16px Arial';
         ctx.fillText('Total:', 450, yPos);
         ctx.fillText(formatCurrency(totalAmount), 550, yPos);
@@ -174,7 +148,7 @@ const page = () => {
         // Convert to image
         const dataUrl = canvas.toDataURL('image/png');
         setInvoiceImage(dataUrl);
-        toast.success("Invoice generated successfully!");
+        // Don't show success toast for auto-generation
       } catch (error) {
         console.error("Error generating invoice:", error);
         toast.error("Failed to generate invoice");
@@ -183,6 +157,36 @@ const page = () => {
       }
     }, 100);
   };
+
+  // Fetch order details and generate invoice immediately
+  useEffect(() => {
+    const fetchOrderDetailsAndGenerateInvoice = async () => {
+      if (!orderId || user?.role !== 'sale') return;
+
+      try {
+        setIsLoading(true);
+        
+        // Fetch order details
+        const orderRes = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`,
+          { withCredentials: true }
+        );
+
+        if (orderRes.data?.success) {
+          setOrderDetails(orderRes.data.data);
+          // Generate invoice immediately after getting order data
+          generateInvoiceImage(orderRes.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching order details:", error);
+        toast.error("Failed to load order details");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOrderDetailsAndGenerateInvoice();
+  }, [orderId, user?.role]);
 
   const downloadInvoiceAsImage = () => {
     if (!invoiceImage) return;
@@ -303,9 +307,10 @@ const page = () => {
             <h4 className="font-bold text-lg mb-3 text-gray-800">Invoice</h4>
             
             {isGeneratingInvoice ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="ml-3">Generating invoice...</span>
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
+                <span className="text-gray-600">Generating invoice...</span>
+                <p className="text-sm text-gray-500 mt-2">Please wait while we create your invoice</p>
               </div>
             ) : invoiceImage ? (
               <>
@@ -317,7 +322,7 @@ const page = () => {
                     className="w-full h-auto max-h-[300px] object-contain mx-auto"
                   />
                   <p className="text-xs text-gray-500 text-center mt-2">
-                    Preview of invoice #{orderId}
+                    Invoice #{orderId} - Ready for download
                   </p>
                 </div>
                 
@@ -355,18 +360,25 @@ const page = () => {
                     Open Full
                   </button>
                 </div>
+                
+                {/* Regenerate button (optional) */}
+                <div className="mt-4 pt-4 border-t border-gray-200 text-center">
+                  <button
+                    onClick={() => generateInvoiceImage(orderDetails)}
+                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition flex items-center gap-2 mx-auto"
+                  >
+                    <Icon icon="material-symbols:refresh" width={16} height={16} />
+                    Regenerate Invoice
+                  </button>
+                </div>
               </>
             ) : (
               <div className="text-center py-6">
-                <p className="text-gray-500 mb-4">Generate an invoice for this order</p>
-                <button
-                  onClick={generateInvoiceImage}
-                  disabled={isLoading || !orderDetails}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
-                >
-                  <Icon icon="material-symbols:receipt" width={20} height={20} />
-                  Generate Invoice
-                </button>
+                <p className="text-gray-500 mb-4">Invoice will be generated automatically...</p>
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
+                  <span>Loading...</span>
+                </div>
               </div>
             )}
           </div>
@@ -407,7 +419,7 @@ const page = () => {
 
       <p className="text-center text-sm font-medium text-gray-600 max-w-sm mb-6">
         {user?.role === 'sale' 
-          ? "Order placed successfully. Generate and download the invoice above."
+          ? "Order placed successfully. Your invoice is ready below."
           : "Thank you for your purchase! Your online order has been successfully placed."
         }
       </p>
@@ -417,16 +429,6 @@ const page = () => {
         <a href="/" className="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
           Home
         </a>
-
-        {/* New Order Button (for sales) */}
-        {user?.role === 'sale' && (
-          <a 
-            href="/" 
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-          >
-            New Order
-          </a>
-        )}
 
         {/* Track Order via Telegram Button */}
         {telegramLink && (
