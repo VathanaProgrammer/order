@@ -134,8 +134,6 @@ export default function ProductPage() {
   return (
     <div className="flex flex-col flex-1 hide-scrollbar">
       {/* <RewardSection /> */}
-
-      <h2>Test</h2>
       
       <div className="sticky top-0 z-20 bg-white">
         <div className="pb-2">

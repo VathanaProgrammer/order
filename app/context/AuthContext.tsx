@@ -80,7 +80,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         console.log('🔄 Fetching user on mount...');
         
-        const res = await api.get("/user");
+        const res = await api.get("/user", {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          },
+          // Adding a timestamp ensures Safari sees this as a brand new URL
+          params: {
+            _t: Date.now()
+          }
+        });
         
         const userData = extractUserFromResponse(res.data);
         
