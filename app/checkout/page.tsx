@@ -654,7 +654,7 @@ const CombinedCheckoutPage = () => {
         ) : (
           <button
             onClick={() => setIsAdding(true)}
-            className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
+            className={`mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2 ${user?.role === "sale" ? "hidden" : ""}`}
           >
             <span className="text-xl">+</span>
             {user?.role === "sale" ? "Add Customer Information" : t.addNewAddress}
