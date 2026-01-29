@@ -351,25 +351,6 @@ const page = () => {
                     <Icon icon="material-symbols:share" width={20} height={20} />
                     Share
                   </button>
-                  
-                  <button
-                    onClick={() => window.open(invoiceImage, '_blank')}
-                    className="py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition flex items-center justify-center gap-2"
-                  >
-                    <Icon icon="material-symbols:open-in-new" width={20} height={20} />
-                    Open Full
-                  </button>
-                </div>
-                
-                {/* Regenerate button (optional) */}
-                <div className="mt-4 pt-4 border-t border-gray-200 text-center">
-                  <button
-                    onClick={() => generateInvoiceImage(orderDetails)}
-                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition flex items-center gap-2 mx-auto"
-                  >
-                    <Icon icon="material-symbols:refresh" width={16} height={16} />
-                    Regenerate Invoice
-                  </button>
                 </div>
               </>
             ) : (
