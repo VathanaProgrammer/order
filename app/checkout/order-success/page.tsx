@@ -9,15 +9,15 @@ import { toast } from "react-toastify";
 const page = () => {
   const params = useSearchParams();
   const telegramLink = params.get("telegram");
-  const orderId = params.get("order_id"); // Get order ID from URL
+  const orderId = params.get("order_id");
   const { user } = useAuth();
   const [orderDetails, setOrderDetails] = useState<any>(null);
-  const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+  const [invoiceImage, setInvoiceImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch order details and invoice when component mounts
+  // Fetch order details when component mounts
   useEffect(() => {
-    const fetchOrderAndInvoice = async () => {
+    const fetchOrderDetails = async () => {
       if (!orderId || user?.role !== 'sale') return;
 
       try {
@@ -31,13 +31,8 @@ const page = () => {
 
         if (orderRes.data?.success) {
           setOrderDetails(orderRes.data.data);
-          
-          // Generate invoice if not already generated
-          if (!orderRes.data.data.invoice_url) {
-            await generateInvoice(orderId);
-          } else {
-            setInvoiceUrl(orderRes.data.data.invoice_url);
-          }
+          // Generate invoice image from data
+          generateInvoiceImage(orderRes.data.data);
         }
       } catch (error) {
         console.error("Error fetching order details:", error);
@@ -47,64 +42,195 @@ const page = () => {
       }
     };
 
-    fetchOrderAndInvoice();
+    fetchOrderDetails();
   }, [orderId, user?.role]);
 
-  const generateInvoice = async (orderId: string) => {
-    try {
-      const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}/generate-invoice`,
-        {},
-        { withCredentials: true }
-      );
-
-      if (res.data?.success) {
-        setInvoiceUrl(res.data.invoice_url);
-        toast.success("Invoice generated successfully");
-      }
-    } catch (error) {
-      console.error("Error generating invoice:", error);
-      toast.error("Failed to generate invoice");
+  // Generate invoice image from order data
+  const generateInvoiceImage = (orderData: any) => {
+    // Create canvas for invoice image
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return;
+    
+    // Canvas size
+    canvas.width = 800;
+    canvas.height = 1000;
+    
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Header
+    ctx.fillStyle = '#1E40AF';
+    ctx.fillRect(0, 0, canvas.width, 80);
+    
+    // Company name
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('INVOICE', canvas.width / 2, 40);
+    
+    // Order details
+    ctx.fillStyle = '#000000';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'left';
+    
+    let yPos = 120;
+    
+    // Invoice number
+    ctx.fillText(`Invoice #: ${orderId}`, 50, yPos);
+    yPos += 30;
+    
+    // Date
+    ctx.fillText(`Date: ${new Date().toLocaleDateString()}`, 50, yPos);
+    yPos += 30;
+    
+    // Customer info
+    if (orderData.customer_info) {
+      ctx.fillText(`Customer: ${orderData.customer_info.name}`, 50, yPos);
+      yPos += 20;
+      ctx.fillText(`Phone: ${orderData.customer_info.phone}`, 50, yPos);
+      yPos += 30;
     }
+    
+    // Line
+    ctx.strokeStyle = '#cccccc';
+    ctx.beginPath();
+    ctx.moveTo(50, yPos);
+    ctx.lineTo(750, yPos);
+    ctx.stroke();
+    yPos += 40;
+    
+    // Table header
+    ctx.fillStyle = '#4B5563';
+    ctx.font = 'bold 12px Arial';
+    ctx.fillText('Item', 50, yPos);
+    ctx.fillText('Qty', 350, yPos);
+    ctx.fillText('Price', 450, yPos);
+    ctx.fillText('Total', 550, yPos);
+    yPos += 30;
+    
+    // Items
+    ctx.fillStyle = '#000000';
+    ctx.font = '12px Arial';
+    
+    if (orderData.items && orderData.items.length > 0) {
+      orderData.items.forEach((item: any) => {
+        ctx.fillText(item.product_name || 'Product', 50, yPos);
+        ctx.fillText(item.qty.toString(), 350, yPos);
+        ctx.fillText(`$${item.price_at_order?.toFixed(2)}`, 450, yPos);
+        ctx.fillText(`$${(item.qty * item.price_at_order)?.toFixed(2)}`, 550, yPos);
+        yPos += 25;
+      });
+    }
+    
+    yPos += 20;
+    
+    // Total line
+    ctx.strokeStyle = '#cccccc';
+    ctx.beginPath();
+    ctx.moveTo(50, yPos);
+    ctx.lineTo(750, yPos);
+    ctx.stroke();
+    yPos += 30;
+    
+    // Total
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('Total:', 450, yPos);
+    ctx.fillText(`$${orderData.total?.toFixed(2)}`, 550, yPos);
+    yPos += 40;
+    
+    // Footer
+    ctx.fillStyle = '#6B7280';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Thank you for your business!', canvas.width / 2, canvas.height - 50);
+    ctx.fillText('Generated on ' + new Date().toLocaleString(), canvas.width / 2, canvas.height - 30);
+    
+    // Convert to image
+    const dataUrl = canvas.toDataURL('image/png');
+    setInvoiceImage(dataUrl);
   };
 
-  const downloadInvoice = async () => {
-    if (!invoiceUrl) return;
-
-    try {
-      // Fetch the invoice PDF
-      const response = await fetch(invoiceUrl);
-      const blob = await response.blob();
-      
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      
-      // Create filename: Invoice_{OrderID}_{CustomerName}_{Date}.pdf
-      const customerName = orderDetails?.customer_name || orderDetails?.customer_info?.name || 'Customer';
-      const date = new Date().toISOString().split('T')[0];
-      a.download = `Invoice_${orderId}_${customerName.replace(/\s+/g, '_')}_${date}.pdf`;
-      
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      
-      toast.success("Invoice downloaded successfully");
-    } catch (error) {
-      console.error("Error downloading invoice:", error);
-      toast.error("Failed to download invoice");
-    }
+  const downloadInvoiceAsImage = () => {
+    if (!invoiceImage) return;
+    
+    // Create download link
+    const link = document.createElement('a');
+    link.href = invoiceImage;
+    
+    const customerName = orderDetails?.customer_info?.name || 'customer';
+    const sanitizedName = customerName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    link.download = `invoice_${orderId}_${sanitizedName}.png`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success("Invoice image downloaded!");
   };
 
   const printInvoice = () => {
-    if (!invoiceUrl) return;
-    window.open(invoiceUrl, '_blank');
+    if (!invoiceImage) return;
+    
+    // Create print window
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Invoice #${orderId}</title>
+            <style>
+              body { margin: 0; padding: 20px; }
+              img { width: 100%; max-width: 800px; height: auto; }
+              @media print {
+                body { padding: 0; }
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${invoiceImage}" alt="Invoice">
+            <script>
+              window.onload = function() {
+                window.print();
+                setTimeout(function() {
+                  window.close();
+                }, 1000);
+              }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
+
+  const shareInvoice = () => {
+    if (!invoiceImage) return;
+    
+    // Convert data URL to blob
+    fetch(invoiceImage)
+      .then(res => res.blob())
+      .then(blob => {
+        const file = new File([blob], `invoice_${orderId}.png`, { type: 'image/png' });
+        
+        // Check if Web Share API is available
+        if (navigator.share && navigator.canShare({ files: [file] })) {
+          navigator.share({
+            files: [file],
+            title: `Invoice #${orderId}`,
+            text: `Invoice for order #${orderId}`
+          });
+        } else {
+          // Fallback: copy to clipboard or show download
+          toast.info("Invoice ready for download");
+        }
+      });
   };
 
   return (
-    <div className="h-full w-full flex flex-col justify-center items-center p-4">
+    <div className="h-full w-full flex flex-col justify-center items-center p-4 overflow-y-auto">
       <div className="mb-4">
         <Icon
           icon="icon-park-solid:success"
@@ -119,87 +245,174 @@ const page = () => {
       
       {/* Sales Role Specific Content */}
       {user?.role === 'sale' && orderId && (
-        <div className="w-full max-w-md mb-6">
+        <div className="w-full max-w-4xl mb-6">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
             <h4 className="font-bold text-lg mb-2 text-blue-800">Sales Order Details</h4>
-            <div className="space-y-2">
-              <p><span className="font-semibold">Order ID:</span> #{orderId}</p>
-              {orderDetails?.customer_info && (
-                <>
-                  <p><span className="font-semibold">Customer:</span> {orderDetails.customer_info.name}</p>
-                  <p><span className="font-semibold">Phone:</span> {orderDetails.customer_info.phone}</p>
-                  <p><span className="font-semibold">Amount:</span> ${orderDetails.total?.toFixed(2) || '0.00'}</p>
-                </>
-              )}
-              {orderDetails?.address_info && (
-                <p><span className="font-semibold">Address:</span> {orderDetails.address_info.address}</p>
-              )}
-            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span className="ml-2">Loading order details...</span>
+              </div>
+            ) : orderDetails ? (
+              <div className="space-y-2">
+                <p><span className="font-semibold">Order ID:</span> #{orderId}</p>
+                {orderDetails.customer_info && (
+                  <>
+                    <p><span className="font-semibold">Customer:</span> {orderDetails.customer_info.name}</p>
+                    <p><span className="font-semibold">Phone:</span> {orderDetails.customer_info.phone}</p>
+                  </>
+                )}
+                <p><span className="font-semibold">Amount:</span> ${orderDetails.total?.toFixed(2) || '0.00'}</p>
+                <p><span className="font-semibold">Date:</span> {new Date(orderDetails.created_at).toLocaleString()}</p>
+                {orderDetails.address_info?.address && (
+                  <p><span className="font-semibold">Address:</span> {orderDetails.address_info.address}</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-gray-500">No order details available</p>
+            )}
           </div>
 
-          {/* Invoice Actions */}
+          {/* Invoice Preview and Actions */}
           <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
             <h4 className="font-bold text-lg mb-3 text-gray-800">Invoice</h4>
             
             {isLoading ? (
-              <div className="flex items-center justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                <span className="ml-2">Loading invoice...</span>
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-3">Generating invoice...</span>
               </div>
-            ) : invoiceUrl ? (
-              <div className="flex flex-col gap-3">
-                <p className="text-sm text-gray-600 mb-2">
-                  Invoice is ready. You can download or print it.
-                </p>
-                <div className="flex gap-3">
+            ) : invoiceImage ? (
+              <>
+                {/* Invoice Preview */}
+                <div className="mb-4 border border-gray-300 rounded p-2 bg-gray-50">
+                  <img 
+                    src={invoiceImage} 
+                    alt="Invoice Preview" 
+                    className="w-full h-auto max-h-[400px] object-contain mx-auto"
+                  />
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    Preview of invoice #{orderId}
+                  </p>
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <button
-                    onClick={downloadInvoice}
-                    className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2"
+                    onClick={downloadInvoiceAsImage}
+                    className="py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2"
                   >
                     <Icon icon="material-symbols:download" width={20} height={20} />
-                    Download Invoice
+                    Download (PNG)
                   </button>
+                  
                   <button
                     onClick={printInvoice}
-                    className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2"
+                    className="py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2"
                   >
                     <Icon icon="material-symbols:print" width={20} height={20} />
-                    Print Invoice
+                    Print
+                  </button>
+                  
+                  <button
+                    onClick={shareInvoice}
+                    className="py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2"
+                  >
+                    <Icon icon="material-symbols:share" width={20} height={20} />
+                    Share
                   </button>
                 </div>
-              </div>
+                
+                {/* Quick Actions */}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <button
+                      onClick={() => {
+                        // Copy invoice image to clipboard
+                        if (invoiceImage) {
+                          const img = new Image();
+                          img.src = invoiceImage;
+                          img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx?.drawImage(img, 0, 0);
+                            canvas.toBlob(blob => {
+                              if (blob) {
+                                navigator.clipboard.write([
+                                  new ClipboardItem({
+                                    'image/png': blob
+                                  })
+                                ]).then(() => toast.success("Invoice copied to clipboard!"));
+                              }
+                            });
+                          };
+                        }
+                      }}
+                      className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition flex items-center gap-2"
+                    >
+                      <Icon icon="material-symbols:content-copy" width={18} height={18} />
+                      Copy Image
+                    </button>
+                    
+                    <a
+                      href={invoiceImage}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition flex items-center gap-2"
+                    >
+                      <Icon icon="material-symbols:open-in-new" width={18} height={18} />
+                      Open Full Size
+                    </a>
+                  </div>
+                </div>
+              </>
             ) : (
-              <div className="flex flex-col gap-3">
-                <p className="text-sm text-gray-600 mb-2">
-                  Generate invoice for this order.
-                </p>
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">Invoice not generated</p>
                 <button
-                  onClick={() => generateInvoice(orderId!)}
-                  disabled={isLoading}
-                  className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-blue-300 flex items-center justify-center gap-2"
+                  onClick={() => orderDetails && generateInvoiceImage(orderDetails)}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
-                  {isLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Icon icon="material-symbols:receipt" width={20} height={20} />
-                      Generate Invoice
-                    </>
-                  )}
+                  Generate Invoice
                 </button>
               </div>
             )}
           </div>
+          
+          {/* Order Items Summary */}
+          {orderDetails?.items && (
+            <div className="mt-6 border border-gray-200 rounded-lg p-4">
+              <h4 className="font-bold text-lg mb-3">Order Items</h4>
+              <div className="space-y-2">
+                {orderDetails.items.map((item: any, index: number) => (
+                  <div key={index} className="flex justify-between items-center border-b border-gray-100 pb-2">
+                    <div className="flex-1">
+                      <p className="font-medium">{item.product_name || `Item ${index + 1}`}</p>
+                      <p className="text-sm text-gray-600">
+                        {item.qty} × ${item.price_at_order?.toFixed(2)}
+                      </p>
+                    </div>
+                    <p className="font-semibold">
+                      ${(item.qty * item.price_at_order)?.toFixed(2)}
+                    </p>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center pt-2 border-t border-gray-300">
+                  <p className="font-bold">Total</p>
+                  <p className="font-bold text-lg">${orderDetails.total?.toFixed(2) || '0.00'}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       <p className="text-center text-sm font-medium text-gray-600 max-w-sm mb-6">
         {user?.role === 'sale' 
           ? "Order placed successfully. Invoice is ready for download."
-          : "Thank you for your purchase! Your online order has been successfully placed, and we will process it as quickly as possible to get it delivered to you."
+          : "Thank you for your purchase! Your online order has been successfully placed."
         }
       </p>
 
@@ -231,32 +444,6 @@ const page = () => {
           </a>
         )}
       </div>
-
-      {/* Order Summary for Sales */}
-      {user?.role === 'sale' && orderDetails?.items && (
-        <div className="mt-6 w-full max-w-md border-t border-gray-200 pt-4">
-          <h4 className="font-bold text-lg mb-3">Order Summary</h4>
-          <div className="space-y-2">
-            {orderDetails.items.map((item: any, index: number) => (
-              <div key={index} className="flex justify-between items-center border-b border-gray-100 pb-2">
-                <div>
-                  <p className="font-medium">{item.product_name || `Item ${index + 1}`}</p>
-                  <p className="text-sm text-gray-600">
-                    {item.qty} × ${item.price_at_order?.toFixed(2)}
-                  </p>
-                </div>
-                <p className="font-semibold">
-                  ${(item.qty * item.price_at_order)?.toFixed(2)}
-                </p>
-              </div>
-            ))}
-            <div className="flex justify-between items-center pt-2 border-t border-gray-300">
-              <p className="font-bold">Total</p>
-              <p className="font-bold text-lg">${orderDetails.total?.toFixed(2) || '0.00'}</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
