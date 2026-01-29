@@ -461,7 +461,7 @@ const CombinedCheckoutPage = () => {
               </button>
             )}
             <div className="text-sm text-gray-500 mt-1 flex justify-between items-center">
-              <div className="flex justify-between">
+              <div className="flex items-center justify-between!">
                 <span>
                   Showing {paginatedAddresses.length} of {filteredAddresses.length} addresses
                   {filteredAddresses.length !== savedAddresses.length && 
