@@ -43,6 +43,7 @@ const CombinedCheckoutPage = () => {
     paymentMethod,
     setPaymentMethod,
     placeOrder,
+    setCustomerInfo
   } = useCheckout();
 
   const { setLoading } = useLoading();
@@ -296,50 +297,15 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Handle checkout with proper customer info handling
-  const handleCheckout = async () => {
-    // Validation checks
-    if (cart.length === 0) {
-      toast.error("Your cart is empty");
-      return;
+  useEffect(() => {
+    if (user?.role === "sale") {
+      setCustomerInfo({
+        name: tempAddress.label || "",
+        phone: tempAddress.phone || "",
+        address: tempAddress.details || "",
+      });
     }
-
-    if (!selectedAddress) {
-      toast.error("Please select a shipping address");
-      return;
-    }
-
-    if (!paymentMethod) {
-      toast.error("Please select a payment method");
-      return;
-    }
-
-    // Additional validation for sales role when using current location
-    if (user?.role === "sale" && selectedAddress === "current") {
-      // For current location, check if we have customer info in tempAddress
-      if (!tempAddress.label?.trim() || !tempAddress.phone?.trim()) {
-        toast.error("Please enter customer name and phone number in the address form");
-        return;
-      }
-    }
-
-    setIsSubmittingOrder(true);
-    try {
-      // Call the placeOrder function from context
-      if (placeOrder) {
-        await placeOrder();
-
-        // Clear saved addresses after successful order placement
-        clearSavedAddresses();
-
-        toast.success("Order placed successfully!");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to place order");
-    } finally {
-      setIsSubmittingOrder(false);
-    }
-  };
+  }, [tempAddress.label, tempAddress.phone, tempAddress.details, user?.role]);
 
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar pb-24">
