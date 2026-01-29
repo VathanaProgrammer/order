@@ -7,7 +7,7 @@ import {
   ReactNode,
   useRef,
 } from "react";
-import api, { isSafari } from "@/api/api";
+import api from "@/api/api";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -173,13 +173,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('✅ Login successful');
       console.log('📥 Login response:', res.data);
       
-      // Handle possible token in response (Safari flow)
-      if (isSafari() && res.data?.token) {
-        console.log('🔑 Token received, saving...');
-        const newToken = res.data.token;
-        localStorage.setItem('auth_token', newToken);
-        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      }
+
       
       // Try to fetch user right after login
       try {
@@ -225,18 +219,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await api.post("/logout");
       
-      // Clean up Safari token
-      if (isSafari()) {
-        localStorage.removeItem('auth_token');
-        delete api.defaults.headers.common['Authorization'];
-      }
     } catch (error: any) {
       console.error("Logout error:", error);
-      // Still clean up locally even if API fails
-      if (isSafari()) {
-        localStorage.removeItem('auth_token');
-        delete api.defaults.headers.common['Authorization'];
-      }
     }
     
     setUser(null);
