@@ -43,7 +43,6 @@ const CombinedCheckoutPage = () => {
     paymentMethod,
     setPaymentMethod,
     placeOrder,
-    setCustomerInfo
   } = useCheckout();
 
   const { setLoading } = useLoading();
@@ -296,16 +295,6 @@ const CombinedCheckoutPage = () => {
       toast.error("Failed to download QR code");
     }
   };
-
-  useEffect(() => {
-    if (user?.role === "sale") {
-      setCustomerInfo({
-        name: tempAddress.label || "",
-        phone: tempAddress.phone || "",
-        address: tempAddress.details || "",
-      });
-    }
-  }, [tempAddress.label, tempAddress.phone, tempAddress.details, user?.role]);
 
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar pb-24">

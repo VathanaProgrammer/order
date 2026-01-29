@@ -42,13 +42,6 @@ type CheckoutContextType = {
   updateItemQty: (id: number, qty: number) => void;
   removeItem: (id: number) => void;
 
-  customerInfo: {
-    name: string;
-    phone: string;
-    address: string;
-  };
-  setCustomerInfo: (info: { name: string; phone: string; address: string }) => void;
-
   rewards: RewardItem[];
   totalPoints: number;
   addReward: (reward: Omit<RewardItem, "qty">, deltaQty: number) => void;
@@ -73,12 +66,6 @@ const CheckoutContext = createContext<CheckoutContextType | undefined>(undefined
 export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const router = useRouter();
-
-  const [customerInfo, setCustomerInfo] = useState({
-    name: "",
-    phone: "",
-    address: "",
-  });
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -426,8 +413,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         addToCart,
         updateItemQty,
         removeItem,
-        customerInfo,
-        setCustomerInfo,
         rewards,
         totalPoints,
         addReward,
