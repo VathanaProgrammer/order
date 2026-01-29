@@ -476,7 +476,6 @@ const CombinedCheckoutPage = () => {
                     onChange={handleItemsPerPageChange}
                     className="border border-gray-300 rounded px-2 py-1 text-sm"
                   >
-                    <option value="3">3</option>
                     <option value="5">5</option>
                     <option value="10">10</option>
                     <option value="20">20</option>
@@ -556,19 +555,6 @@ const CombinedCheckoutPage = () => {
               Page {currentPage} of {totalPages}
             </div>
           </div>
-        )}
-
-        {/* Quick Clear Button for Sales */}
-        {user?.role === "sale" && savedAddresses.length > 0 && (
-          <button
-            onClick={clearSavedAddresses}
-            className="mt-2 py-2 px-4 bg-red-100 border border-red-300 text-red-700 rounded-lg hover:bg-red-200 font-medium flex items-center justify-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            Clear All Customers
-          </button>
         )}
 
         {/* Sales Mode: Always show customer form */}
