@@ -461,12 +461,27 @@ const CombinedCheckoutPage = () => {
               </button>
             )}
             <div className="text-sm text-gray-500 mt-1 flex justify-between items-center">
-              <span>
-                Showing {paginatedAddresses.length} of {filteredAddresses.length} addresses
-                {filteredAddresses.length !== savedAddresses.length && 
-                  ` (${savedAddresses.length} total)`
-                }
-              </span>
+              <div className="flex items-center gap-2 justify-between">
+                <span>
+                  Showing {paginatedAddresses.length} of {filteredAddresses.length} addresses
+                  {filteredAddresses.length !== savedAddresses.length && 
+                    ` (${savedAddresses.length} total)`
+                  }
+                </span>
+                  <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Items per page:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={handleItemsPerPageChange}
+                    className="border border-gray-300 rounded px-2 py-1 text-sm"
+                  >
+                    <option value="3">3</option>
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                  </select>
+                </div>
+              </div>
               {filteredAddresses.length === 0 && searchQuery && (
                 <span className="text-red-500">No results found</span>
               )}
@@ -502,19 +517,6 @@ const CombinedCheckoutPage = () => {
         {/* Pagination Controls */}
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 p-4 border border-gray-200 rounded-xl">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Items per page:</span>
-              <select
-                value={itemsPerPage}
-                onChange={handleItemsPerPageChange}
-                className="border border-gray-300 rounded px-2 py-1 text-sm"
-              >
-                <option value="3">3</option>
-                <option value="5">5</option>
-                <option value="10">10</option>
-                <option value="20">20</option>
-              </select>
-            </div>
 
             <div className="flex items-center gap-2">
               <button
