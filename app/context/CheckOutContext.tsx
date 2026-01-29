@@ -303,7 +303,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         
         setCart([]);
         setTotal(0);
-        router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}`);
+        router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}&order_id=${res.data.order_id}`);
       }
     } catch (err: any) {
       console.error("Order error:", err.response?.data || err);
