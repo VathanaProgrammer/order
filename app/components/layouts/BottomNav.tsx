@@ -35,32 +35,50 @@ const BottomNav: React.FC = () => {
   const formatPrice = (value: number) =>
     typeof value !== "number" || isNaN(value) ? "$0.00" : `$${value.toFixed(2)}`;
 
-  const handleClickCheckout = () => {
-    if (!user) return router.push("/sign-in");
-
-    if (isCheckoutPage) {
-      const errors: string[] = [];
-      if (cart.length > 0 && rewards.length > 0) {
-        errors.push("Cannot mix products and rewards!");
-      }
-      if (cart.length === 0 && rewards.length === 0) errors.push(t.yourCartIsEmpty);
-      if (isPaymentMissing) errors.push(t.pleaseSelectAPaymentMethod);
-      if (isAddressMissing) errors.push(t.pleaseSelectAShippingAddress);
-
-      if (errors.length > 0) {
-        errors.forEach((err) => toast.error(err));
-        return;
-      }
-
-      if (rewards.length > 0) {
-        placeRewardOrder?.();
+    const handleClickCheckout = () => {
+      if (!user) return router.push("/sign-in");
+    
+      if (isCheckoutPage) {
+        const errors: string[] = [];
+        
+        if (cart.length > 0 && rewards.length > 0) {
+          errors.push("Cannot mix products and rewards!");
+        }
+        
+        if (cart.length === 0 && rewards.length === 0) {
+          errors.push(t.yourCartIsEmpty);
+        }
+        
+        if (isPaymentMissing) {
+          errors.push(t.pleaseSelectAPaymentMethod);
+        }
+        
+        // Only require selectedAddress for non-sales roles
+        if (user?.role !== 'sale' && isAddressMissing) {
+          errors.push(t.pleaseSelectAShippingAddress);
+        }
+        
+        // For sales role, we need to check if they're on the checkout page
+        // and if they have location coordinates
+        if (user?.role === 'sale' && isCheckoutPage) {
+          // We'll let the placeOrder function handle customer info validation
+          // since it has access to customerInfo context
+        }
+    
+        if (errors.length > 0) {
+          errors.forEach((err) => toast.error(err));
+          return;
+        }
+    
+        if (rewards.length > 0) {
+          placeRewardOrder?.();
+        } else {
+          placeOrder?.();
+        }
       } else {
-        placeOrder?.();
+        router.push("/checkout");
       }
-    } else {
-      router.push("/checkout");
-    }
-  };
+    };
 
   const handleChatRedirect = async () => {
     try {

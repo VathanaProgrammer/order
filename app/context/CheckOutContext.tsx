@@ -222,61 +222,70 @@ const placeOrder = async () => {
     return;
   }
 
-  if (!selectedAddress) {
-    toast.error("Please select a shipping address!");
-    return;
-  }
-
   let addressToSend: Address | null = null;
   
-  if (selectedAddress === "current") {
-    if (!currentAddress.coordinates) {
-      toast.error("Current address coordinates not set!");
+  // For sales role, we handle address differently
+  if (user?.role === 'sale') {
+    // Check if we have customer info
+    if (!customerInfo.name || !customerInfo.phone) {
+      toast.error("Please enter customer name and phone number");
       return;
     }
     
-    // For sale role, use customerInfo from context
-    if (user?.role === 'sale') {
-      // Check if customer info is provided
-      if (!customerInfo.name || !customerInfo.phone) {
-        toast.error("Please enter customer name and phone number");
+    // Always use current location for sales (no need to save address first)
+    if (!currentAddress.coordinates) {
+      toast.error("Please select a location on the map");
+      return;
+    }
+    
+    const short_address = await getShortAddress(
+      currentAddress.coordinates.lat, 
+      currentAddress.coordinates.lng
+    );
+    
+    // Create address object from customer info
+    addressToSend = {
+      id: undefined, // No saved address ID
+      label: customerInfo.name,
+      phone: customerInfo.phone,
+      details: customerInfo.address || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
+      coordinates: currentAddress.coordinates,
+      short_address,
+    };
+    
+    // Optionally save this address for records (but don't require it)
+    try {
+      const addressPayload = {
+        label: customerInfo.name,
+        phone: customerInfo.phone,
+        details: customerInfo.address || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
+        coordinates: currentAddress.coordinates,
+        api_user_id: user?.id,
+      };
+      
+      // Save address to database (optional - can fail silently)
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/addresses`, 
+        addressPayload,
+        { withCredentials: true, headers: { Accept: "application/json" } }
+      );
+    } catch (err) {
+      console.log("Address save optional - continuing with order", err);
+    }
+  } 
+  // Regular user flow
+  else {
+    if (!selectedAddress) {
+      toast.error("Please select a shipping address!");
+      return;
+    }
+    
+    if (selectedAddress === "current") {
+      if (!currentAddress.coordinates) {
+        toast.error("Current address coordinates not set!");
         return;
       }
       
-      const short_address = await getShortAddress(
-        currentAddress.coordinates.lat, 
-        currentAddress.coordinates.lng
-      );
-      
-      addressToSend = { 
-        ...currentAddress, 
-        short_address,
-        phone: customerInfo.phone,
-        label: customerInfo.name,
-        details: customerInfo.address || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
-      };
-      
-      // Optionally save this address for sales records
-      try {
-        const addressPayload = {
-          label: customerInfo.name,
-          phone: customerInfo.phone,
-          details: customerInfo.address || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
-          coordinates: currentAddress.coordinates,
-          api_user_id: user?.id,
-        };
-        
-        // Save address to database (optional)
-        await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL}/addresses`, 
-          addressPayload,
-          { withCredentials: true, headers: { Accept: "application/json" } }
-        );
-      } catch (err) {
-        console.log("Address save optional - continuing with order", err);
-      }
-    } else {
-      // Regular user
       const userPhone = user?.phone || user?.mobile || "";
       if (!userPhone) {
         toast.error("Please add your phone number in your account settings");
@@ -292,9 +301,9 @@ const placeOrder = async () => {
         short_address,
         phone: userPhone,
       };
+    } else {
+      addressToSend = selectedAddress as Address;
     }
-  } else {
-    addressToSend = selectedAddress as Address;
   }
 
   if (!addressToSend || cart.length === 0) {
@@ -304,9 +313,10 @@ const placeOrder = async () => {
 
   const payload: any = {
     api_user_id: user?.id,
-    saved_address_id: selectedAddress !== "current" ? addressToSend.id : undefined,
-    address: selectedAddress === "current" ? addressToSend : undefined,
-    address_type: selectedAddress === "current" ? "current" : "saved",
+    // For sales role with new address, don't send saved_address_id
+    saved_address_id: (user?.role !== 'sale' && selectedAddress !== "current") ? addressToSend.id : undefined,
+    address: addressToSend,
+    address_type: (user?.role === 'sale') ? 'current' : (selectedAddress === "current" ? "current" : "saved"),
     paymentMethod,
     total_qty: cart.reduce((sum, i) => sum + i.qty, 0),
     total,
@@ -339,7 +349,6 @@ const placeOrder = async () => {
     if (res.data?.success) {
       toast.success("Order placed successfully!");
       
-      // Show customer info for sale role
       if (user?.role === 'sale' && payload.customer_info) {
         toast.info(`Customer: ${payload.customer_info.name}, Phone: ${payload.customer_info.phone}`);
       }
@@ -347,7 +356,7 @@ const placeOrder = async () => {
       // Clear cart and customer info
       setCart([]);
       setTotal(0);
-      setCustomerInfo({ name: "", phone: "", address: "" }); // Reset customer info
+      setCustomerInfo({ name: "", phone: "", address: "" });
       
       router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}`);
     }
