@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Header from "@/components/layouts/Header";
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import { useCheckout, Address as ContextAddress } from "@/context/CheckOutContext";
@@ -61,6 +61,7 @@ const CombinedCheckoutPage = () => {
   const [showQRPopup, setShowQRPopup] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { t } = useLanguage();
 
   const paymentMethods = [
@@ -71,6 +72,22 @@ const CombinedCheckoutPage = () => {
   const IMAGE_URL = process.env.NEXT_PUBLIC_IMAGE_URL!;
 
   const currentSelectedAddress = selectedAddress === "current" ? currentAddress : selectedAddress;
+
+  // Filter saved addresses based on search query
+  const filteredAddresses = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return savedAddresses;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    return savedAddresses.filter(address => {
+      const labelMatch = address.label?.toLowerCase().includes(query) || false;
+      const phoneMatch = address.phone?.toLowerCase().includes(query) || false;
+      const detailsMatch = address.details?.toLowerCase().includes(query) || false;
+      
+      return labelMatch || phoneMatch || detailsMatch;
+    });
+  }, [savedAddresses, searchQuery]);
 
   // Fetch saved addresses
   useEffect(() => {
@@ -160,6 +177,7 @@ const CombinedCheckoutPage = () => {
     setSavedAddresses([]);
     setSelectedAddress('current');
     setIsAdding(false);
+    setSearchQuery("");
 
     // Reset temp address fields
     setTempAddress({
@@ -256,6 +274,7 @@ const CombinedCheckoutPage = () => {
       setSavedAddresses((prev) => [...prev, newAddress]);
       setSelectedAddress(newAddress);
       setIsAdding(false);
+      setSearchQuery("");
 
       // Reset form fields
       setTempAddress({
@@ -342,8 +361,8 @@ const CombinedCheckoutPage = () => {
 
       {/* Shipping Address Section */}
       <section className="flex flex-col gap-3">
-        {user?.role !== "sale" && <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
-        }
+        {user?.role !== "sale" && <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>}
+        
         {/* Current Location */}
         {user?.role !== "sale" && (
           <div
@@ -370,8 +389,44 @@ const CombinedCheckoutPage = () => {
           </div>
         )}
 
-        {/* Saved Addresses */}
-        {savedAddresses.map((addr) => (
+        {/* Search Bar for Saved Addresses */}
+        {savedAddresses.length > 0 && (
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search by name, phone, or address..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <div className="absolute left-3 top-3 text-gray-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+            <div className="text-sm text-gray-500 mt-1 flex justify-between items-center">
+              <span>
+                {filteredAddresses.length} of {savedAddresses.length} addresses
+              </span>
+              {filteredAddresses.length === 0 && searchQuery && (
+                <span className="text-red-500">No results found</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Saved Addresses List */}
+        {filteredAddresses.map((addr) => (
           <div
             key={addr.id}
             onClick={() => handleSelectSavedAddress(addr)}
@@ -395,124 +450,30 @@ const CombinedCheckoutPage = () => {
           </div>
         ))}
 
-        {user?.role === "sale" && <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
-          {/* Name / Label */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {user?.role === "sale" ? "Customer Name *" : "Label *"}
-            </label>
-            <input
-              type="text"
-              placeholder={
-                user?.role === "sale" ? "Enter customer name" : "Home, Work, etc."
-              }
-              value={tempAddress.label || ""}
-              onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+        {/* Quick Clear Button for Sales */}
+        {user?.role === "sale" && savedAddresses.length > 0 && (
+          <button
+            onClick={clearSavedAddresses}
+            className="mt-2 py-2 px-4 bg-red-100 border border-red-300 text-red-700 rounded-lg hover:bg-red-200 font-medium flex items-center justify-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Clear All Customers
+          </button>
+        )}
 
-          {/* Phone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.phone} *
-            </label>
-            {user?.role === "sale" ? (
-              <input
-                type="tel"
-                placeholder="Customer phone number"
-                value={tempAddress.phone || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            ) : (
-              <div className="w-full p-3 border rounded-lg bg-gray-50 text-gray-700">
-                {userPhone ? `${userPhone} (from account)` : "No phone in profile"}
-              </div>
-            )}
-          </div>
-
-          {/* Address Details */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.details || "Address Details"} *
-            </label>
-            <textarea
-              placeholder="Street, building, floor, notes..."
-              value={tempAddress.details || ""}
-              onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              rows={3}
-            />
-          </div>
-
-          {/* Location Picker */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.clickToSelectLocation} *
-            </label>
-            <input
-              type="text"
-              readOnly
-              value={
-                tempAddress.coordinates
-                  ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
-                  : ""
-              }
-              onClick={() => setShowMap(true)}
-              className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-              placeholder={t.clickToSelectLocation}
-            />
-            {!tempAddress.coordinates && (
-              <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={handleSaveNewAddress}
-              className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-              disabled={
-                !tempAddress.details?.trim() ||
-                !tempAddress.coordinates ||
-                !tempAddress.label?.trim() ||
-                (user?.role === "sale" ? !tempAddress.phone?.trim() : !userPhone?.trim())
-              }
-            >
-              {t.saveAddress}
-            </button>
-            <button
-              onClick={() => {
-                setIsAdding(false);
-                setTempAddress({
-                  label: "",
-                  phone: user?.role === "sale" ? "" : userPhone || "",
-                  details: "",
-                  coordinates: { lat: 11.567, lng: 104.928 },
-                  api_user_id: user?.id,
-                });
-              }}
-              className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-            >
-              {t.cancel}
-            </button>
-          </div>
-        </div>}
-
-        {/* Add New Address Button / Form */}
-        {user?.role !== "sale" && isAdding ? (
+        {/* Sales Mode: Always show customer form */}
+        {user?.role === "sale" && (
           <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
             {/* Name / Label */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {user?.role === "sale" ? "Customer Name *" : "Label *"}
+                Customer Name *
               </label>
               <input
                 type="text"
-                placeholder={
-                  user?.role === "sale" ? "Enter customer name" : "Home, Work, etc."
-                }
+                placeholder="Enter customer name"
                 value={tempAddress.label || ""}
                 onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -524,19 +485,13 @@ const CombinedCheckoutPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {t.phone} *
               </label>
-              {user?.role === "sale" ? (
-                <input
-                  type="tel"
-                  placeholder="Customer phone number"
-                  value={tempAddress.phone || ""}
-                  onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              ) : (
-                <div className="w-full p-3 border rounded-lg bg-gray-50 text-gray-700">
-                  {userPhone ? `${userPhone} (from account)` : "No phone in profile"}
-                </div>
-              )}
+              <input
+                type="tel"
+                placeholder="Customer phone number"
+                value={tempAddress.phone || ""}
+                onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
 
             {/* Address Details */}
@@ -584,7 +539,102 @@ const CombinedCheckoutPage = () => {
                   !tempAddress.details?.trim() ||
                   !tempAddress.coordinates ||
                   !tempAddress.label?.trim() ||
-                  (user?.role === "sale" ? !tempAddress.phone?.trim() : !userPhone?.trim())
+                  !tempAddress.phone?.trim()
+                }
+              >
+                Save Customer
+              </button>
+              <button
+                onClick={() => {
+                  setTempAddress({
+                    label: "",
+                    phone: "",
+                    details: "",
+                    coordinates: { lat: 11.567, lng: 104.928 },
+                    api_user_id: user?.id,
+                  });
+                }}
+                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+              >
+                {t.clear}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Regular Users: Add New Address Button / Form */}
+        {user?.role !== "sale" && isAdding ? (
+          <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
+            {/* Name / Label */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Label *
+              </label>
+              <input
+                type="text"
+                placeholder="Home, Work, etc."
+                value={tempAddress.label || ""}
+                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t.phone} *
+              </label>
+              <div className="w-full p-3 border rounded-lg bg-gray-50 text-gray-700">
+                {userPhone ? `${userPhone} (from account)` : "No phone in profile"}
+              </div>
+            </div>
+
+            {/* Address Details */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t.details || "Address Details"} *
+              </label>
+              <textarea
+                placeholder="Street, building, floor, notes..."
+                value={tempAddress.details || ""}
+                onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                rows={3}
+              />
+            </div>
+
+            {/* Location Picker */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t.clickToSelectLocation} *
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={
+                  tempAddress.coordinates
+                    ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
+                    : ""
+                }
+                onClick={() => setShowMap(true)}
+                className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                placeholder={t.clickToSelectLocation}
+              />
+              {!tempAddress.coordinates && (
+                <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleSaveNewAddress}
+                className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
+                disabled={
+                  !tempAddress.details?.trim() ||
+                  !tempAddress.coordinates ||
+                  !tempAddress.label?.trim() ||
+                  !userPhone?.trim()
                 }
               >
                 {t.saveAddress}
@@ -594,7 +644,7 @@ const CombinedCheckoutPage = () => {
                   setIsAdding(false);
                   setTempAddress({
                     label: "",
-                    phone: user?.role === "sale" ? "" : userPhone || "",
+                    phone: userPhone || "",
                     details: "",
                     coordinates: { lat: 11.567, lng: 104.928 },
                     api_user_id: user?.id,
@@ -606,15 +656,15 @@ const CombinedCheckoutPage = () => {
               </button>
             </div>
           </div>
-        ) : (
+        ) : user?.role !== "sale" ? (
           <button
             onClick={() => setIsAdding(true)}
-            className={`mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2 ${user?.role === "sale" ? "hidden" : ""}`}
+            className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
           >
             <span className="text-xl">+</span>
-            {user?.role === "sale" ? "Add Customer Information" : t.addNewAddress}
+            {t.addNewAddress}
           </button>
-        )}
+        ) : null}
       </section>
 
       {/* Map Modal */}
