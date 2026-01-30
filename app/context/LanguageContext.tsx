@@ -156,7 +156,8 @@ const translations = {
     congratulationsYouWon: "Congratulations! You won",
     newBalance: "New Balance",
     youNeed: "You need",
-    morePointsToSpin: "more points to spin!"
+    morePointsToSpin: "more points to spin!",
+    addCustomerInfo: "Add Customer Info",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -296,7 +297,8 @@ const translations = {
     congratulationsYouWon: "អបអរសាទរ! អ្នកបានឈ្នះ",
     newBalance: "សមតុល្យថ្មី",
     youNeed: "អ្នកត្រូវការ",
-    morePointsToSpin: "ពិន្ទុបន្ថែមដើម្បីបង្វិល!"
+    morePointsToSpin: "ពិន្ទុបន្ថែមដើម្បីបង្វិល!",
+    addCustomerInfo: "បញ្ចូលព័ត៌មានអតិថិជន"
   },
 };
 
