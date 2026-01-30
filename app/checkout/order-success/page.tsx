@@ -230,7 +230,7 @@ const page = () => {
         // Thank you message (centered)
         ctx.textAlign = 'center';
         ctx.font = 'bold 12px "Arial", sans-serif';
-        ctx.fillStyle = '#E41E26'; // ABA Red
+        ctx.fillStyle = '#1e74e4';
         ctx.fillText('THANK YOU!', canvas.width / 2, yPos);
         yPos += 15;
         ctx.font = '10px "Arial", sans-serif';
@@ -431,7 +431,7 @@ const page = () => {
         <div className="p-4">
           {/* Receipt Preview Card */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-4">
-            <div className="bg-red-600 text-white p-3">
+            {/* <div className="bg-red-600 text-white p-3">
               <div className="flex justify-between items-center">
                 <div className="flex items-center">
                   <Icon icon="mdi:receipt" width={20} height={20} className="mr-2" />
@@ -441,7 +441,7 @@ const page = () => {
                   #{orderId}
                 </span>
               </div>
-            </div>
+            </div> */}
             
             {isGeneratingInvoice ? (
               <div className="py-12 text-center">
@@ -573,12 +573,20 @@ const page = () => {
           >
             Home
           </a>
-          <a
-            href="/"
-            className="flex-1 py-3 bg-red-600 text-white rounded-lg font-medium text-center hover:bg-red-700 transition-colors"
-          >
-            New Sale
-          </a>
+    
+          {/* Telegram Link */}
+          {telegramLink && (
+            <div className="px-4 pb-4">
+              <a
+                href={telegramLink}
+                target="_blank"
+                className="block py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium text-center hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm"
+              >
+                <Icon icon="mdi:telegram" width={20} height={20} className="inline mr-2" />
+                Track on Telegram
+              </a>
+            </div>
+          )}
         </div>
       </div>
 
@@ -594,7 +602,7 @@ const page = () => {
               >
                 <Icon icon="mdi:close" width={24} height={24} />
               </button>
-              <span className="text-white font-medium">ABA Receipt</span>
+              <span className="text-white font-medium">SOB Receipt</span>
               <div className="w-10"></div>
             </div>
             
@@ -602,7 +610,7 @@ const page = () => {
             <div className="flex-1 overflow-auto bg-white flex items-center justify-center p-4">
               <img 
                 src={invoiceImage} 
-                alt="Full ABA Receipt" 
+                alt="Full SOB Receipt" 
                 className="max-w-full h-auto"
               />
             </div>
@@ -625,20 +633,6 @@ const page = () => {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Telegram Link */}
-      {telegramLink && (
-        <div className="px-4 pb-4">
-          <a
-            href={telegramLink}
-            target="_blank"
-            className="block py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium text-center hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm"
-          >
-            <Icon icon="mdi:telegram" width={20} height={20} className="inline mr-2" />
-            Track on Telegram
-          </a>
         </div>
       )}
     </div>
