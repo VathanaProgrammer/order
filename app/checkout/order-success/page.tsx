@@ -37,6 +37,40 @@ const page = () => {
     });
   };
 
+  // Format date as dd-mm-yyyy
+  const formatDateDDMMYYYY = (dateString: string) => {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${day}-${month}-${year} ${hours}:${minutes}`;
+  };
+
+  // Calculate dynamic canvas height based on items
+  const calculateCanvasHeight = (orderData: any): number => {
+    if (!orderData) return 600;
+    
+    let baseHeight = 300; // Base height for header and footer
+    const itemsCount = orderData.items?.length || 0;
+    const customerInfoHeight = orderData.customer_info ? 60 : 0;
+    
+    // Each item takes about 15px of height
+    const itemsHeight = itemsCount * 15;
+    
+    // Additional space for address if it's long
+    const address = orderData.address_info?.address || '';
+    const addressLines = Math.ceil(address.length / 40);
+    const addressHeight = addressLines * 12;
+    
+    // Total height calculation
+    const totalHeight = baseHeight + customerInfoHeight + itemsHeight + addressHeight + 100;
+    
+    // Return a minimum height and maximum reasonable height
+    return Math.max(600, Math.min(totalHeight, 2000));
+  };
+
   // SOB-style invoice generation
   const generateInvoiceImage = (orderData: any) => {
     if (!orderData) return;
@@ -45,24 +79,27 @@ const page = () => {
     
     setTimeout(() => {
       try {
+        // Calculate dynamic height
+        const canvasHeight = calculateCanvasHeight(orderData);
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
+        
         if (!ctx) {
           toast.error("Failed to create invoice");
           setIsGeneratingInvoice(false);
           return;
         }
 
-        // SOB receipt dimensions (typical thermal printer size)
+        // Set canvas dimensions
         canvas.width = 384; // Standard thermal printer width
-        canvas.height = 600;
+        canvas.height = canvasHeight;
         
         // Clean white background (SOB uses pure white)
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         // SOB Logo Header (simplified version)
-        ctx.fillStyle = '#1e4ce4'; // SOB Red
+        ctx.fillStyle = '#1e4ce4'; // SOB Blue
         ctx.fillRect(0, 0, canvas.width, 80);
         
         // White SOB text
@@ -87,14 +124,22 @@ const page = () => {
         ctx.textAlign = 'center';
         ctx.fillStyle = '#000000';
         
-        // Date and Time (SOB style)
+        // Date and Time (SOB style) - using dd-mm-yyyy format
         const now = new Date();
         ctx.font = '12px "Arial", sans-serif';
         ctx.fillText('Date/Time:', canvas.width / 2, yPos);
         yPos += 15;
         ctx.font = 'bold 12px "Arial", sans-serif';
+        
+        // Format: dd-mm-yyyy HH:mm
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = now.getFullYear();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        
         ctx.fillText(
-          `${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
+          `${day}-${month}-${year} ${hours}:${minutes}`,
           canvas.width / 2,
           yPos
         );
@@ -135,15 +180,14 @@ const page = () => {
           }
           if (orderData.address_info?.address) {
             const address = orderData.address_info.address;
-            if (address.length > 40) {
-              ctx.fillText(address.substring(0, 40), 20, yPos);
-              yPos += 12;
-              ctx.fillText(address.substring(40, 80), 20, yPos);
-              yPos += 12;
-            } else {
-              ctx.fillText(address, 20, yPos);
+            const maxLineLength = 40;
+            for (let i = 0; i < address.length; i += maxLineLength) {
+              const line = address.substring(i, i + maxLineLength);
+              ctx.fillText(line, 20, yPos);
               yPos += 12;
             }
+          } else {
+            yPos += 12; // Add spacing even if no address
           }
           yPos += 15;
         }
@@ -180,23 +224,40 @@ const page = () => {
             const itemName = item.product_name || 'Product';
             const quantity = safeNumber(item.qty);
             const price = safeNumber(item.price_at_order);
-            const itemTotal = quantity * price;
             
-            // Truncate long names
-            const displayName = itemName;
+            // Handle long item names by wrapping text
+            const maxWidth = 150; // pixels
+            ctx.font = '11px "Arial", sans-serif';
             
-            ctx.fillText(displayName, 20, yPos);
+            // Split long item names into multiple lines
+            const words = itemName.split(' ');
+            let line = '';
+            let lineY = yPos;
+            
+            for (let n = 0; n < words.length; n++) {
+              const testLine = line + words[n] + ' ';
+              const metrics = ctx.measureText(testLine);
+              const testWidth = metrics.width;
+              
+              if (testWidth > maxWidth && n > 0) {
+                ctx.fillText(line, 20, lineY);
+                line = words[n] + ' ';
+                lineY += 12;
+              } else {
+                line = testLine;
+              }
+            }
+            ctx.fillText(line, 20, lineY);
+            
+            // Quantity and Amount (aligned right)
             ctx.textAlign = 'right';
             ctx.fillText(quantity.toString(), 220, yPos);
             ctx.fillText(formatCurrency(price), 300, yPos);
             ctx.textAlign = 'left';
             
-            // Show total per item on next line (SOB style)
-            // yPos += 12;
-            // ctx.font = '10px "Arial", sans-serif';
-            // ctx.fillText(`Total: ${formatCurrency(itemTotal)}`, 20, yPos);
-            // yPos += 15;
-            // ctx.font = '11px "Arial", sans-serif';
+            // Move y position down based on how many lines the item name took
+            const linesUsed = Math.max(1, Math.ceil((lineY - yPos) / 12) + 1);
+            yPos += linesUsed * 12 + 5;
           });
         }
         
@@ -236,16 +297,23 @@ const page = () => {
         ctx.font = '10px "Arial", sans-serif';
         ctx.fillStyle = '#666666';
         ctx.fillText('For customer service:', canvas.width / 2, yPos);
-        // yPos += 12;
-        // ctx.fillText('+855 23 999 000', canvas.width / 2, yPos);
         yPos += 12;
         ctx.fillText('barista.sobkh.com', canvas.width / 2, yPos);
+        
+        // Order date (if exists)
+        if (orderData.created_at) {
+          yPos += 15;
+          ctx.font = '10px "Arial", sans-serif';
+          ctx.fillStyle = '#666666';
+          ctx.fillText(`Order Date: ${formatDateDDMMYYYY(orderData.created_at)}`, canvas.width / 2, yPos);
+        }
         
         // Convert to image
         const dataUrl = canvas.toDataURL('image/png');
         setInvoiceImage(dataUrl);
       } catch (error) {
         console.error("Error generating invoice:", error);
+        toast.error("Failed to generate receipt");
       } finally {
         setIsGeneratingInvoice(false);
       }
@@ -329,6 +397,7 @@ const page = () => {
               @media print {
                 body { padding: 0; }
                 img { width: 384px; }
+                @page { margin: 0; }
               }
             </style>
           </head>
@@ -365,6 +434,11 @@ const page = () => {
           <div className="bg-white rounded-lg p-4 mb-6 shadow-sm border border-gray-200">
             <p className="text-gray-600 mb-2">Order Reference</p>
             <p className="text-xl font-mono font-bold text-blue-600">#{orderId}</p>
+            {orderDetails?.created_at && (
+              <p className="text-sm text-gray-500 mt-2">
+                {formatDateDDMMYYYY(orderDetails.created_at)}
+              </p>
+            )}
           </div>
           
           <p className="text-gray-600 mb-8 px-4">
@@ -410,7 +484,11 @@ const page = () => {
             </button>
             <div className="ml-3">
               <h1 className="text-lg font-bold text-gray-800">Receipt #{orderId}</h1>
-              <p className="text-xs text-gray-500">Transaction Details</p>
+              {orderDetails?.created_at && (
+                <p className="text-xs text-gray-500">
+                  {formatDateDDMMYYYY(orderDetails.created_at)}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -420,7 +498,7 @@ const page = () => {
       {isLoading && (
         <div className="p-8 text-center">
           <div className="inline-flex flex-col items-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-red-500 border-t-transparent mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
             <p className="text-gray-600">Loading receipt...</p>
           </div>
         </div>
@@ -431,30 +509,21 @@ const page = () => {
         <div className="p-4">
           {/* Receipt Preview Card */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-4">
-            {/* <div className="bg-red-600 text-white p-3">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center">
-                  <Icon icon="mdi:receipt" width={20} height={20} className="mr-2" />
-                  <span className="font-bold">SOB-STYLE RECEIPT</span>
-                </div>
-                <span className="text-sm bg-white/20 px-2 py-1 rounded">
-                  #{orderId}
-                </span>
-              </div>
-            </div> */}
-            
             {isGeneratingInvoice ? (
               <div className="py-12 text-center">
                 <div className="inline-flex flex-col items-center">
-                  <div className="animate-spin rounded-full h-10 w-10 border-3 border-red-500 border-t-transparent mb-3"></div>
+                  <div className="animate-spin rounded-full h-10 w-10 border-3 border-blue-500 border-t-transparent mb-3"></div>
                   <p className="text-sm text-gray-600">Generating receipt...</p>
+                  <p className="text-xs text-gray-400 mt-2">
+                    {orderDetails.items?.length || 0} items
+                  </p>
                 </div>
               </div>
             ) : invoiceImage ? (
               <>
                 <div className="p-4">
                   <div 
-                    className="border border-gray-300 rounded bg-white overflow-hidden cursor-pointer"
+                    className="border border-gray-300 rounded bg-white overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => setShowFullInvoice(true)}
                   >
                     <img 
@@ -462,25 +531,28 @@ const page = () => {
                       alt="SOB Receipt" 
                       className="w-full h-auto"
                     />
-                    <div className="p-2 bg-gray-50 text-center">
-                      <p className="text-xs text-gray-500">Tap to preview</p>
+                    <div className="p-3 bg-gray-50 text-center border-t border-gray-200">
+                      <p className="text-sm text-gray-600">Tap to view full receipt</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {orderDetails.items?.length || 0} items • {formatCurrency(orderDetails.total)}
+                      </p>
                     </div>
                   </div>
                 </div>
                 
                 {/* Action Buttons */}
-                <div className="p-4 border-t border-gray-200">
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="p-4 border-t border-gray-200 bg-gray-50">
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={downloadInvoice}
-                      className="flex items-center justify-center py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      className="flex items-center justify-center py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors active:scale-95"
                     >
                       <Icon icon="mdi:download" width={18} height={18} className="mr-2" />
-                      Save
+                      Download
                     </button>
                     <button
                       onClick={printInvoice}
-                      className="flex items-center justify-center py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+                      className="flex items-center justify-center py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors active:scale-95"
                     >
                       <Icon icon="mdi:printer" width={18} height={18} className="mr-2" />
                       Print
@@ -488,7 +560,7 @@ const page = () => {
                   </div>
                   <button
                     onClick={shareInvoice}
-                    className="w-full mt-2 flex items-center justify-center py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="w-full mt-3 flex items-center justify-center py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors active:scale-95"
                   >
                     <Icon icon="mdi:share-variant" width={18} height={18} className="mr-2" />
                     Share Receipt
@@ -505,7 +577,7 @@ const page = () => {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Date & Time</span>
-                <span className="font-medium">{formatDate(orderDetails.created_at)}</span>
+                <span className="font-medium">{formatDateDDMMYYYY(orderDetails.created_at)}</span>
               </div>
               
               {orderDetails.customer_info && (
@@ -525,7 +597,7 @@ const page = () => {
               
               <div className="flex justify-between">
                 <span className="text-gray-600">Items</span>
-                <span className="font-medium">{orderDetails.total_qty}</span>
+                <span className="font-medium">{orderDetails.total_qty} items</span>
               </div>
               
               <div className="flex justify-between">
@@ -536,7 +608,7 @@ const page = () => {
               <div className="pt-3 border-t border-gray-200">
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-bold text-gray-800">Total Amount</span>
-                  <span className="text-xl font-bold text-red-600">{formatCurrency(orderDetails.total)}</span>
+                  <span className="text-xl font-bold text-blue-600">{formatCurrency(orderDetails.total)}</span>
                 </div>
               </div>
             </div>
@@ -545,9 +617,12 @@ const page = () => {
           {/* Quick Items Preview */}
           {orderDetails.items && orderDetails.items.length > 0 && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-              <h3 className="font-bold text-gray-800 mb-3 pb-2 border-b">Items ({orderDetails.items.length})</h3>
-              <div className="space-y-2">
-                {orderDetails.items.slice(0, 3).map((item: any, index: number) => (
+              <div className="flex justify-between items-center mb-3 pb-2 border-b">
+                <h3 className="font-bold text-gray-800">Items ({orderDetails.items.length})</h3>
+                <span className="text-sm text-gray-500">{orderDetails.total_qty} total</span>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                {orderDetails.items.map((item: any, index: number) => (
                   <div key={index} className="flex justify-between py-2 border-b border-gray-100 last:border-0">
                     <div className="flex-1">
                       <p className="font-medium text-sm">{item.product_name}</p>
@@ -573,19 +648,16 @@ const page = () => {
           >
             Home
           </a>
-    
-          {/* Telegram Link */}
+          
           {telegramLink && (
-            <div className="px-1">
-              <a
-                href={telegramLink}
-                target="_blank"
-                className="block py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium text-center hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm"
-              >
-                <Icon icon="mdi:telegram" width={20} height={20} className="inline mr-2" />
-                Track on Telegram
-              </a>
-            </div>
+            <a
+              href={telegramLink}
+              target="_blank"
+              className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium text-center hover:bg-blue-700 transition-colors flex items-center justify-center"
+            >
+              <Icon icon="mdi:telegram" width={20} height={20} className="mr-2" />
+              Telegram
+            </a>
           )}
         </div>
       </div>
@@ -595,14 +667,14 @@ const page = () => {
         <div className="fixed inset-0 bg-black z-50">
           <div className="h-full flex flex-col">
             {/* Modal Header */}
-            <div className="bg-black/90 p-2 flex justify-between items-center">
+            <div className="bg-black/90 p-3 flex justify-between items-center">
               <button
                 onClick={() => setShowFullInvoice(false)}
-                className="text-white p-1 hover:bg-white/10 rounded-lg"
+                className="text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <Icon icon="mdi:close" width={24} height={24} />
               </button>
-              {/* <span className="text-white font-medium">SOB Receipt</span> */}
+              <span className="text-white font-medium">Receipt #{orderId}</span>
               <div className="w-8"></div>
             </div>
             
@@ -617,16 +689,16 @@ const page = () => {
             
             {/* Modal Actions */}
             <div className="bg-black/90 p-4">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={downloadInvoice}
-                  className="py-3 bg-white text-black rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                  className="py-3 bg-white text-black rounded-lg font-medium hover:bg-gray-100 transition-colors active:scale-95"
                 >
                   Download
                 </button>
                 <button
                   onClick={printInvoice}
-                  className="py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                  className="py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors active:scale-95"
                 >
                   Print
                 </button>
