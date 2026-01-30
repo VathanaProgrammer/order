@@ -37,25 +37,23 @@ if (typeof window !== 'undefined') {
 
 api.interceptors.request.use(
   (config) => {
-    // 1. Double-check storage if the local variable is null
-    if (!currentToken && typeof window !== 'undefined') {
-      currentToken = localStorage.getItem('auth_token');
-    }
+    // Always pull fresh from storage to avoid "Variable Desync"
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : currentToken;
 
-    if (currentToken) {
-      // 2. Standard Header (Primary)
-      config.headers['Authorization'] = `Bearer ${currentToken}`;
+    if (token) {
+      // Modern Axios way to set headers safely
+      if (config.headers.set) {
+        config.headers.set('Authorization', `Bearer ${token}`);
+      } else {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
       
-      // 3. iOS Specific Fixes
       if (isSafari()) {
         config.params = { 
           ...config.params, 
-          token: currentToken, // Fallback for PHP/Laravel
-          _t: Date.now()       // Prevents Safari from serving a cached 401
+          token: token, 
+          _t: Date.now() 
         };
-        
-        // Ensure headers are actually assigned to the config object
-        config.headers.set('Authorization', `Bearer ${currentToken}`);
       }
     }
     return config;
