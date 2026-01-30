@@ -37,20 +37,22 @@ if (typeof window !== 'undefined') {
 
 api.interceptors.request.use(
   (config) => {
-    const safari = isSafari();
-    // Use currentToken first, fallback to fresh localStorage read
     const token = currentToken || (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
 
     if (token) {
-      // ✅ FIX 1: ALWAYS set the Header. Never skip this.
-      config.headers.set('Authorization', `Bearer ${token}`);
-
-      // ✅ FIX 2: Only add query param as an ADDITIONAL backup for Safari
-      if (safari && config.method?.toLowerCase() === 'get') {
-        config.params = { ...config.params, token };
+      // Use the most basic assignment for maximum mobile compatibility
+      config.headers['Authorization'] = `Bearer ${token}`;
+      
+      // On iOS, GET requests often cache the 'Unauthorized' result. 
+      // We add a timestamp to FORCE a fresh check.
+      if (isSafari()) {
+        config.params = { 
+          ...config.params, 
+          token: token, // Fallback for PHP
+          _t: Date.now() // Cache breaker
+        };
       }
     }
-
     return config;
   },
   (error) => Promise.reject(error)
