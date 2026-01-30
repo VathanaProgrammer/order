@@ -37,7 +37,7 @@ const page = () => {
     });
   };
 
-  // Mobile-optimized invoice generation
+  // ABA-style invoice generation
   const generateInvoiceImage = (orderData: any) => {
     if (!orderData) return;
     
@@ -53,109 +53,193 @@ const page = () => {
           return;
         }
 
-        // Mobile-friendly size (smaller for faster generation)
-        canvas.width = 600;
-        canvas.height = 800;
+        // ABA receipt dimensions (typical thermal printer size)
+        canvas.width = 384; // Standard thermal printer width
+        canvas.height = 600;
         
-        // Clean background
+        // Clean white background (ABA uses pure white)
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Header (simpler for mobile)
-        ctx.fillStyle = '#2563EB';
-        ctx.fillRect(0, 0, canvas.width, 70);
+        // ABA Logo Header (simplified version)
+        ctx.fillStyle = '#E41E26'; // ABA Red
+        ctx.fillRect(0, 0, canvas.width, 80);
         
-        // Title
+        // White ABA text
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 20px Arial';
+        ctx.font = 'bold 28px "Arial", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('RECEIPT', canvas.width / 2, 40);
+        ctx.fillText('ABA', canvas.width / 2, 40);
         
-        ctx.font = '14px Arial';
-        ctx.fillText(`#${orderId}`, canvas.width / 2, 60);
+        ctx.font = 'bold 14px "Arial", sans-serif';
+        ctx.fillText('RECEIPT', canvas.width / 2, 60);
         
-        // Content
-        let yPos = 90;
+        // Separator line (ABA style)
+        ctx.strokeStyle = '#E41E26';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(20, 90);
+        ctx.lineTo(canvas.width - 20, 90);
+        ctx.stroke();
+        
+        // Receipt details (centered like ABA)
+        let yPos = 115;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#000000';
+        
+        // Date and Time (ABA style)
+        const now = new Date();
+        ctx.font = '12px "Arial", sans-serif';
+        ctx.fillText('Date/Time:', canvas.width / 2, yPos);
+        yPos += 15;
+        ctx.font = 'bold 12px "Arial", sans-serif';
+        ctx.fillText(
+          `${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
+          canvas.width / 2,
+          yPos
+        );
+        yPos += 25;
+        
+        // Receipt Number
+        ctx.font = '12px "Arial", sans-serif';
+        ctx.fillText('Receipt No:', canvas.width / 2, yPos);
+        yPos += 15;
+        ctx.font = 'bold 14px "Arial", sans-serif';
+        ctx.fillText(`#${orderId}`, canvas.width / 2, yPos);
+        yPos += 25;
+        
+        // Merchant info (left aligned)
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#1F2937';
+        ctx.font = 'bold 13px "Arial", sans-serif';
+        ctx.fillText('MERCHANT', 20, yPos);
+        yPos += 15;
         
-        // Date
-        ctx.font = '12px Arial';
-        ctx.fillText('Date:', 30, yPos);
-        ctx.font = 'bold 12px Arial';
-        ctx.fillText(new Date().toLocaleDateString(), 100, yPos);
-        yPos += 20;
+        ctx.font = '11px "Arial", sans-serif';
+        ctx.fillText('Your Store Name', 20, yPos);
+        yPos += 12;
+        ctx.fillText('Phnom Penh, Cambodia', 20, yPos);
+        yPos += 25;
         
-        // Customer
+        // Customer info
         if (orderData.customer_info?.name) {
-          ctx.font = '12px Arial';
-          ctx.fillStyle = '#6B7280';
-          ctx.fillText('Customer:', 30, yPos);
-          ctx.font = 'bold 12px Arial';
-          ctx.fillStyle = '#1F2937';
-          ctx.fillText(orderData.customer_info.name.substring(0, 30), 100, yPos);
-          yPos += 20;
+          ctx.font = 'bold 13px "Arial", sans-serif';
+          ctx.fillText('CUSTOMER', 20, yPos);
+          yPos += 15;
+          
+          ctx.font = '11px "Arial", sans-serif';
+          ctx.fillText(orderData.customer_info.name, 20, yPos);
+          yPos += 12;
+          if (orderData.customer_info.phone) {
+            ctx.fillText(`Phone: ${orderData.customer_info.phone}`, 20, yPos);
+            yPos += 12;
+          }
+          if (orderData.address_info?.address) {
+            const address = orderData.address_info.address;
+            if (address.length > 40) {
+              ctx.fillText(address.substring(0, 40), 20, yPos);
+              yPos += 12;
+              ctx.fillText(address.substring(40, 80), 20, yPos);
+              yPos += 12;
+            } else {
+              ctx.fillText(address, 20, yPos);
+              yPos += 12;
+            }
+          }
+          yPos += 15;
         }
         
-        // Line
-        ctx.strokeStyle = '#E5E7EB';
+        // Separator
+        ctx.strokeStyle = '#CCCCCC';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(30, yPos);
-        ctx.lineTo(canvas.width - 30, yPos);
+        ctx.moveTo(20, yPos);
+        ctx.lineTo(canvas.width - 20, yPos);
         ctx.stroke();
-        yPos += 30;
-        
-        // Table header
-        ctx.fillStyle = '#2563EB';
-        ctx.font = 'bold 12px Arial';
-        ctx.fillText('ITEM', 30, yPos);
-        ctx.fillText('QTY', 350, yPos);
-        ctx.fillText('TOTAL', 450, yPos);
         yPos += 20;
         
-        // Items
-        ctx.fillStyle = '#1F2937';
-        ctx.font = '12px Arial';
+        // Table Header (ABA style - simple)
+        ctx.font = 'bold 12px "Arial", sans-serif';
+        ctx.fillText('ITEM', 20, yPos);
+        ctx.fillText('QTY', 200, yPos);
+        ctx.fillText('AMOUNT', 280, yPos);
+        yPos += 20;
+        
+        // Separator
+        ctx.beginPath();
+        ctx.moveTo(20, yPos - 5);
+        ctx.lineTo(canvas.width - 20, yPos - 5);
+        ctx.stroke();
+        yPos += 10;
+        
+        // Items (left aligned)
+        ctx.font = '11px "Arial", sans-serif';
+        ctx.fillStyle = '#000000';
         
         if (orderData.items?.length > 0) {
           orderData.items.forEach((item: any) => {
-            const itemName = item.product_name || 'Item';
+            const itemName = item.product_name || 'Product';
             const quantity = safeNumber(item.qty);
             const price = safeNumber(item.price_at_order);
             const itemTotal = quantity * price;
             
-            // Shorten long names for mobile
-            const displayName = itemName.length > 20 ? itemName.substring(0, 20) + '...' : itemName;
+            // Truncate long names
+            const displayName = itemName.length > 25 ? itemName.substring(0, 25) + '...' : itemName;
             
-            ctx.fillText(displayName, 30, yPos);
-            ctx.fillText(quantity.toString(), 360, yPos);
-            ctx.fillText(formatCurrency(itemTotal), 460, yPos);
-            yPos += 18;
+            ctx.fillText(displayName, 20, yPos);
+            ctx.textAlign = 'right';
+            ctx.fillText(quantity.toString(), 220, yPos);
+            ctx.fillText(formatCurrency(price), 300, yPos);
+            ctx.textAlign = 'left';
+            
+            // Show total per item on next line (ABA style)
+            yPos += 12;
+            ctx.font = '10px "Arial", sans-serif';
+            ctx.fillText(`Total: ${formatCurrency(itemTotal)}`, 20, yPos);
+            yPos += 15;
+            ctx.font = '11px "Arial", sans-serif';
           });
         }
         
+        yPos += 5;
+        
+        // Separator
+        ctx.strokeStyle = '#CCCCCC';
+        ctx.beginPath();
+        ctx.moveTo(20, yPos);
+        ctx.lineTo(canvas.width - 20, yPos);
+        ctx.stroke();
         yPos += 20;
         
-        // Total
-        ctx.strokeStyle = '#E5E7EB';
-        ctx.beginPath();
-        ctx.moveTo(30, yPos);
-        ctx.lineTo(canvas.width - 30, yPos);
-        ctx.stroke();
-        yPos += 30;
-        
-        ctx.font = 'bold 16px Arial';
-        ctx.fillText('TOTAL:', 350, yPos);
+        // Total (right aligned like ABA)
+        ctx.font = 'bold 13px "Arial", sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('TOTAL:', canvas.width - 120, yPos);
         const totalAmount = safeNumber(orderData.total);
-        ctx.fillText(formatCurrency(totalAmount), 460, yPos);
+        ctx.fillText(formatCurrency(totalAmount), canvas.width - 20, yPos);
+        yPos += 25;
         
-        // Footer
-        yPos = canvas.height - 40;
-        ctx.fillStyle = '#9CA3AF';
-        ctx.font = '10px Arial';
+        // Payment Method
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 12px "Arial", sans-serif';
+        ctx.fillText('PAYMENT METHOD:', 20, yPos);
+        yPos += 15;
+        ctx.font = '11px "Arial", sans-serif';
+        ctx.fillText(orderData.payment_method || 'Cash', 20, yPos);
+        yPos += 25;
+        
+        // Thank you message (centered)
         ctx.textAlign = 'center';
-        ctx.fillText('Thank you for your business!', canvas.width / 2, yPos);
-        ctx.fillText(new Date().toLocaleDateString(), canvas.width / 2, yPos + 15);
+        ctx.font = 'bold 12px "Arial", sans-serif';
+        ctx.fillStyle = '#E41E26'; // ABA Red
+        ctx.fillText('THANK YOU!', canvas.width / 2, yPos);
+        yPos += 15;
+        ctx.font = '10px "Arial", sans-serif';
+        ctx.fillStyle = '#666666';
+        ctx.fillText('For customer service:', canvas.width / 2, yPos);
+        yPos += 12;
+        ctx.fillText('+855 23 999 000', canvas.width / 2, yPos);
+        yPos += 12;
+        ctx.fillText('www.yourstore.com', canvas.width / 2, yPos);
         
         // Convert to image
         const dataUrl = canvas.toDataURL('image/png');
@@ -195,17 +279,17 @@ const page = () => {
     fetchOrderDetails();
   }, [orderId, user?.role]);
 
-  // Mobile-optimized actions
+  // Actions
   const downloadInvoice = () => {
     if (!invoiceImage) return;
     
     const link = document.createElement('a');
     link.href = invoiceImage;
-    link.download = `receipt_${orderId}.png`;
+    link.download = `aba_receipt_${orderId}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success("Downloaded!");
+    toast.success("Receipt downloaded!");
   };
 
   const shareInvoice = async () => {
@@ -214,13 +298,13 @@ const page = () => {
     try {
       const response = await fetch(invoiceImage);
       const blob = await response.blob();
-      const file = new File([blob], `receipt_${orderId}.png`, { type: 'image/png' });
+      const file = new File([blob], `aba_receipt_${orderId}.png`, { type: 'image/png' });
       
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: `Receipt #${orderId}`,
-          text: `Order receipt #${orderId}`
+          title: `ABA Receipt #${orderId}`,
+          text: `ABA-style receipt for order #${orderId}`
         });
       } else {
         downloadInvoice();
@@ -232,24 +316,59 @@ const page = () => {
 
   const printInvoice = () => {
     if (!invoiceImage) return;
-    window.open(invoiceImage, '_blank');
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Receipt #${orderId}</title>
+            <style>
+              body { margin: 0; padding: 10px; background: white; }
+              img { max-width: 100%; height: auto; }
+              @media print {
+                body { padding: 0; }
+                img { width: 384px; }
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${invoiceImage}" alt="ABA Receipt" />
+            <script>
+              window.onload = function() {
+                window.print();
+                setTimeout(function() { window.close(); }, 1000);
+              }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
   };
 
   // If not sales role, show simple success
   if (user?.role !== 'sale') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-gray-50 p-4 flex flex-col items-center justify-center">
         <div className="w-full max-w-sm text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Icon icon="icon-park-solid:success" width={40} height={40} style={{ color: "#22c55e" }} />
+          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-md border border-gray-200">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+              <Icon icon="mdi:check-circle" width={48} height={48} style={{ color: "#10B981" }} />
+            </div>
           </div>
           
           <h1 className="text-2xl font-bold text-gray-800 mb-3">
-            Order Successful! 🎉
+            Payment Successful
           </h1>
           
+          <div className="bg-white rounded-lg p-4 mb-6 shadow-sm border border-gray-200">
+            <p className="text-gray-600 mb-2">Order Reference</p>
+            <p className="text-xl font-mono font-bold text-blue-600">#{orderId}</p>
+          </div>
+          
           <p className="text-gray-600 mb-8 px-4">
-            Your order #{orderId} has been placed. We'll notify you when it's ready.
+            Your transaction has been completed successfully.
           </p>
           
           <div className="space-y-3">
@@ -257,42 +376,43 @@ const page = () => {
               <a
                 href={telegramLink}
                 target="_blank"
-                className="block w-full py-4 bg-blue-600 text-white rounded-xl font-medium text-center active:scale-95 transition-transform"
+                className="block w-full py-4 bg-blue-600 text-white rounded-lg font-medium text-center hover:bg-blue-700 transition-colors shadow-sm"
               >
-                📱 Track on Telegram
+                <Icon icon="mdi:telegram" width={20} height={20} className="inline mr-2" />
+                Track Order
               </a>
             )}
             
             <a
               href="/"
-              className="block w-full py-4 bg-gray-100 text-gray-700 rounded-xl font-medium text-center active:bg-gray-200 transition-colors"
+              className="block w-full py-4 bg-gray-100 text-gray-700 rounded-lg font-medium text-center hover:bg-gray-200 transition-colors"
             >
-              ← Back to Home
+              Return to Homepage
             </a>
           </div>
-          
-          <p className="text-xs text-gray-400 mt-8">
-            Need help? Contact support at +855 123 456 789
-          </p>
         </div>
       </div>
     );
   }
 
-  // Sales role - Mobile-optimized interface
+  // Sales role - ABA-style interface
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pb-24">
-      {/* Fixed Header */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <button 
-            onClick={() => window.history.back()}
-            className="p-2 -ml-2"
-          >
-            <Icon icon="material-symbols:arrow-back" width={24} height={24} />
-          </button>
-          <h1 className="text-lg font-bold text-gray-800">Order #{orderId}</h1>
-          <div className="w-8"></div> {/* Spacer for balance */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="px-4 py-3">
+          <div className="flex items-center">
+            <button 
+              onClick={() => window.history.back()}
+              className="p-2 -ml-2 text-gray-600"
+            >
+              <Icon icon="mdi:arrow-left" width={24} height={24} />
+            </button>
+            <div className="ml-3">
+              <h1 className="text-lg font-bold text-gray-800">Receipt #{orderId}</h1>
+              <p className="text-xs text-gray-500">Transaction Details</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -300,247 +420,209 @@ const page = () => {
       {isLoading && (
         <div className="p-8 text-center">
           <div className="inline-flex flex-col items-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-            <p className="text-gray-600">Loading order...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-red-500 border-t-transparent mb-4"></div>
+            <p className="text-gray-600">Loading receipt...</p>
           </div>
         </div>
       )}
 
       {/* Main Content */}
       {!isLoading && orderDetails && (
-        <div className="p-4 space-y-4">
-          {/* Quick Summary Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                  <Icon icon="material-symbols:check-circle" width={20} height={20} style={{ color: "#22c55e" }} />
+        <div className="p-4">
+          {/* Receipt Preview Card */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-4">
+            <div className="bg-red-600 text-white p-3">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center">
+                  <Icon icon="mdi:receipt" width={20} height={20} className="mr-2" />
+                  <span className="font-bold">ABA-STYLE RECEIPT</span>
                 </div>
-                <div>
-                  <h2 className="font-bold text-gray-800">Order Confirmed</h2>
-                  <p className="text-xs text-gray-500">{formatDate(orderDetails.created_at)}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-bold text-blue-600">{formatCurrency(orderDetails.total)}</div>
-                <div className="text-xs text-gray-500">{orderDetails.total_qty} items</div>
-              </div>
-            </div>
-            
-            {/* Customer Info */}
-            {orderDetails.customer_info && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="flex items-start">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-                    <Icon icon="material-symbols:person" width={16} height={16} style={{ color: "#3b82f6" }} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-800">{orderDetails.customer_info.name}</p>
-                    <p className="text-sm text-gray-600">{orderDetails.customer_info.phone}</p>
-                    {orderDetails.address_info?.address && (
-                      <p className="text-sm text-gray-500 mt-1">{orderDetails.address_info.address.substring(0, 50)}...</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Invoice Preview Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-800">Receipt</h3>
-              {isGeneratingInvoice ? (
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                  Generating...
+                <span className="text-sm bg-white/20 px-2 py-1 rounded">
+                  #{orderId}
                 </span>
-              ) : (
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                  Ready
-                </span>
-              )}
+              </div>
             </div>
             
             {isGeneratingInvoice ? (
-              <div className="py-8 text-center">
+              <div className="py-12 text-center">
                 <div className="inline-flex flex-col items-center">
-                  <div className="animate-spin rounded-full h-10 w-10 border-3 border-blue-500 border-t-transparent mb-3"></div>
-                  <p className="text-sm text-gray-600">Creating receipt...</p>
+                  <div className="animate-spin rounded-full h-10 w-10 border-3 border-red-500 border-t-transparent mb-3"></div>
+                  <p className="text-sm text-gray-600">Generating receipt...</p>
                 </div>
               </div>
             ) : invoiceImage ? (
               <>
-                <div 
-                  className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50 mb-4"
-                  onClick={() => setShowFullInvoice(true)}
-                >
-                  <img 
-                    src={invoiceImage} 
-                    alt="Receipt preview" 
-                    className="w-full h-auto"
-                  />
-                  <div className="bg-gradient-to-t from-white/90 to-transparent p-3 text-center">
-                    <p className="text-sm text-gray-600">👆 Tap to view full receipt</p>
+                <div className="p-4">
+                  <div 
+                    className="border border-gray-300 rounded bg-white overflow-hidden cursor-pointer"
+                    onClick={() => setShowFullInvoice(true)}
+                  >
+                    <img 
+                      src={invoiceImage} 
+                      alt="ABA Receipt" 
+                      className="w-full h-auto"
+                    />
+                    <div className="p-2 bg-gray-50 text-center">
+                      <p className="text-xs text-gray-500">Tap to preview</p>
+                    </div>
                   </div>
                 </div>
                 
-                {/* Quick Actions */}
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={downloadInvoice}
-                    className="flex items-center justify-center py-3 bg-blue-600 text-white rounded-xl active:scale-95 transition-transform"
-                  >
-                    <Icon icon="material-symbols:download" width={20} height={20} className="mr-2" />
-                    Save
-                  </button>
+                {/* Action Buttons */}
+                <div className="p-4 border-t border-gray-200">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={downloadInvoice}
+                      className="flex items-center justify-center py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Icon icon="mdi:download" width={18} height={18} className="mr-2" />
+                      Save
+                    </button>
+                    <button
+                      onClick={printInvoice}
+                      className="flex items-center justify-center py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+                    >
+                      <Icon icon="mdi:printer" width={18} height={18} className="mr-2" />
+                      Print
+                    </button>
+                  </div>
                   <button
                     onClick={shareInvoice}
-                    className="flex items-center justify-center py-3 bg-green-600 text-white rounded-xl active:scale-95 transition-transform"
+                    className="w-full mt-2 flex items-center justify-center py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    <Icon icon="material-symbols:share" width={20} height={20} className="mr-2" />
-                    Share
+                    <Icon icon="mdi:share-variant" width={18} height={18} className="mr-2" />
+                    Share Receipt
                   </button>
                 </div>
-                
-                <button
-                  onClick={printInvoice}
-                  className="w-full mt-2 flex items-center justify-center py-3 bg-gray-100 text-gray-700 rounded-xl active:bg-gray-200 transition-colors"
-                >
-                  <Icon icon="material-symbols:print" width={20} height={20} className="mr-2" />
-                  Print Receipt
-                </button>
               </>
             ) : null}
           </div>
 
-          {/* Items List */}
-          {orderDetails.items && orderDetails.items.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-              <h3 className="font-bold text-gray-800 mb-3">Order Items</h3>
-              <div className="space-y-3">
-                {orderDetails.items.slice(0, 3).map((item: any, index: number) => {
-                  const quantity = safeNumber(item.qty);
-                  const price = safeNumber(item.price_at_order);
-                  const itemTotal = quantity * price;
-                  
-                  return (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-800 text-sm">
-                          {item.product_name || `Item ${index + 1}`}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {quantity} × {formatCurrency(price)}
-                        </p>
-                      </div>
-                      <p className="font-semibold text-gray-800">
-                        {formatCurrency(itemTotal)}
-                      </p>
-                    </div>
-                  );
-                })}
-                
-                {orderDetails.items.length > 3 && (
-                  <div className="pt-3 border-t border-gray-100">
-                    <p className="text-center text-sm text-gray-500">
-                      +{orderDetails.items.length - 3} more items
-                    </p>
-                  </div>
-                )}
+          {/* Transaction Summary */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+            <h3 className="font-bold text-gray-800 mb-3 pb-2 border-b">Transaction Summary</h3>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Date & Time</span>
+                <span className="font-medium">{formatDate(orderDetails.created_at)}</span>
               </div>
               
-              <div className="mt-4 pt-4 border-t border-gray-200">
+              {orderDetails.customer_info && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Customer</span>
+                    <span className="font-medium">{orderDetails.customer_info.name}</span>
+                  </div>
+                  {orderDetails.customer_info.phone && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Phone</span>
+                      <span className="font-medium">{orderDetails.customer_info.phone}</span>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Items</span>
+                <span className="font-medium">{orderDetails.total_qty}</span>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Payment Method</span>
+                <span className="font-medium">{orderDetails.payment_method || 'Cash'}</span>
+              </div>
+              
+              <div className="pt-3 border-t border-gray-200">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-gray-800">Total</span>
-                  <span className="text-xl font-bold text-blue-600">
-                    {formatCurrency(orderDetails.total)}
-                  </span>
+                  <span className="text-lg font-bold text-gray-800">Total Amount</span>
+                  <span className="text-xl font-bold text-red-600">{formatCurrency(orderDetails.total)}</span>
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Payment Method */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-            <h3 className="font-bold text-gray-800 mb-2">Payment</h3>
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                <Icon icon="material-symbols:payments" width={20} height={20} style={{ color: "#3b82f6" }} />
-              </div>
-              <div>
-                <p className="font-medium text-gray-800">
-                  {orderDetails.payment_method || 'Cash'} Payment
-                </p>
-                <p className="text-sm text-gray-500">Status: Paid</p>
+          {/* Quick Items Preview */}
+          {orderDetails.items && orderDetails.items.length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+              <h3 className="font-bold text-gray-800 mb-3 pb-2 border-b">Items ({orderDetails.items.length})</h3>
+              <div className="space-y-2">
+                {orderDetails.items.slice(0, 3).map((item: any, index: number) => (
+                  <div key={index} className="flex justify-between py-2 border-b border-gray-100 last:border-0">
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{item.product_name}</p>
+                      <p className="text-xs text-gray-500">Qty: {item.qty} × {formatCurrency(item.price_at_order)}</p>
+                    </div>
+                    <p className="font-semibold">
+                      {formatCurrency(safeNumber(item.qty) * safeNumber(item.price_at_order))}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
-      {/* Fixed Bottom Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-        <div className="flex gap-2">
+      {/* Fixed Bottom Bar */}
+      <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+        <div className="flex gap-3">
           <a
             href="/"
-            className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium text-center active:bg-gray-200 transition-colors"
+            className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium text-center hover:bg-gray-200 transition-colors"
           >
-            ← Home
+            Home
           </a>
           <a
             href="/"
-            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-medium text-center active:scale-95 transition-transform"
+            className="flex-1 py-3 bg-red-600 text-white rounded-lg font-medium text-center hover:bg-red-700 transition-colors"
           >
-            New Order
+            New Sale
           </a>
         </div>
       </div>
 
       {/* Full Invoice Modal */}
       {showFullInvoice && invoiceImage && (
-        <div 
-          className="fixed inset-0 bg-black z-50 flex flex-col"
-          onClick={() => setShowFullInvoice(false)}
-        >
-          <div className="sticky top-0 bg-black/80 backdrop-blur-sm p-4 flex justify-between items-center">
-            <button
-              onClick={() => setShowFullInvoice(false)}
-              className="text-white p-2"
-            >
-              <Icon icon="material-symbols:close" width={24} height={24} />
-            </button>
-            <p className="text-white font-medium">Receipt #{orderId}</p>
-            <div className="w-10"></div> {/* Spacer */}
-          </div>
-          
-          <div className="flex-1 overflow-auto">
-            <img 
-              src={invoiceImage} 
-              alt="Full receipt" 
-              className="w-full h-auto min-h-full object-contain bg-white"
-            />
-          </div>
-          
-          <div className="sticky bottom-0 bg-black/80 backdrop-blur-sm p-4">
-            <div className="grid grid-cols-3 gap-2">
+        <div className="fixed inset-0 bg-black z-50">
+          <div className="h-full flex flex-col">
+            {/* Modal Header */}
+            <div className="bg-black/90 p-4 flex justify-between items-center">
               <button
-                onClick={downloadInvoice}
-                className="py-3 bg-white text-black rounded-xl font-medium active:scale-95 transition-transform"
+                onClick={() => setShowFullInvoice(false)}
+                className="text-white p-2 hover:bg-white/10 rounded-lg"
               >
-                Save
+                <Icon icon="mdi:close" width={24} height={24} />
               </button>
-              <button
-                onClick={printInvoice}
-                className="py-3 bg-blue-600 text-white rounded-xl font-medium active:scale-95 transition-transform"
-              >
-                Print
-              </button>
-              <button
-                onClick={shareInvoice}
-                className="py-3 bg-green-600 text-white rounded-xl font-medium active:scale-95 transition-transform"
-              >
-                Share
-              </button>
+              <span className="text-white font-medium">ABA Receipt</span>
+              <div className="w-10"></div>
+            </div>
+            
+            {/* Receipt Image */}
+            <div className="flex-1 overflow-auto bg-white flex items-center justify-center p-4">
+              <img 
+                src={invoiceImage} 
+                alt="Full ABA Receipt" 
+                className="max-w-full h-auto"
+              />
+            </div>
+            
+            {/* Modal Actions */}
+            <div className="bg-black/90 p-4">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={downloadInvoice}
+                  className="py-3 bg-white text-black rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                >
+                  Download
+                </button>
+                <button
+                  onClick={printInvoice}
+                  className="py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  Print
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -548,14 +630,14 @@ const page = () => {
 
       {/* Telegram Link */}
       {telegramLink && (
-        <div className="px-4 mb-4">
+        <div className="px-4 pb-4">
           <a
             href={telegramLink}
             target="_blank"
-            className="block py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium text-center active:scale-95 transition-transform shadow-lg"
+            className="block py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium text-center hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm"
           >
-            <Icon icon="material-symbols:telegram" width={20} height={20} className="inline mr-2" />
-            Track Order on Telegram
+            <Icon icon="mdi:telegram" width={20} height={20} className="inline mr-2" />
+            Track on Telegram
           </a>
         </div>
       )}
