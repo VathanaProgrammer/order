@@ -557,10 +557,115 @@ const CombinedCheckoutPage = () => {
           </div>
         )}
 
+        {/* Sales Mode: Always show customer form */}
+        {user?.role === "sale" && isAdding ? (
+          <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
+            {/* Name / Label */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Customer Name *
+              </label>
+              <input
+                type="text"
+                placeholder="Enter customer name"
+                value={tempAddress.label || ""}
+                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
 
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t.phone} *
+              </label>
+              <input
+                type="tel"
+                placeholder="Customer phone number"
+                value={tempAddress.phone || ""}
+                onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Address Details */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t.details || "Address Details"} *
+              </label>
+              <textarea
+                placeholder="Street, building, floor, notes..."
+                value={tempAddress.details || ""}
+                onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                rows={3}
+              />
+            </div>
+
+            {/* Location Picker */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t.clickToSelectLocation} *
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={
+                  tempAddress.coordinates
+                    ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
+                    : ""
+                }
+                onClick={() => setShowMap(true)}
+                className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                placeholder={t.clickToSelectLocation}
+              />
+              {!tempAddress.coordinates && (
+                <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleSaveNewAddress}
+                className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
+                disabled={
+                  !tempAddress.details?.trim() ||
+                  !tempAddress.coordinates ||
+                  !tempAddress.label?.trim() ||
+                  !tempAddress.phone?.trim()
+                }
+              >
+                Save Customer
+              </button>
+              <button
+                onClick={() => {
+                  setTempAddress({
+                    label: "",
+                    phone: "",
+                    details: "",
+                    coordinates: { lat: 11.567, lng: 104.928 },
+                    api_user_id: user?.id,
+                  });
+                }}
+                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+              >
+                {t.clear}
+              </button>
+            </div>
+          </div>
+        ) : user?.role === "sale" ? (
+          <button
+            onClick={() => setIsAdding(true)}
+            className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
+          >
+            <span className="text-xl">+</span>
+            {t.addNewAddress}
+          </button>
+        ) : null}
 
         {/* Regular Users: Add New Address Button / Form */}
-        {isAdding ? (
+        {user?.role !== "sale" && isAdding ? (
           <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
             {/* Name / Label */}
             <div>
@@ -653,15 +758,15 @@ const CombinedCheckoutPage = () => {
               </button>
             </div>
           </div>
-        ) : (
+        ) : user?.role !== "sale" ? (
           <button
             onClick={() => setIsAdding(true)}
             className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
           >
             <span className="text-xl">+</span>
-            { user?.role === "sale" ? t.addCustomerInfo : t.addNewAddress}
+            {t.addNewAddress}
           </button>
-        )}
+        ) : null}
       </section>
 
       {/* Map Modal */}
