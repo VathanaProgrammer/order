@@ -192,11 +192,11 @@ const page = () => {
             ctx.textAlign = 'left';
             
             // Show total per item on next line (SOB style)
-            yPos += 12;
-            ctx.font = '10px "Arial", sans-serif';
-            ctx.fillText(`Total: ${formatCurrency(itemTotal)}`, 20, yPos);
-            yPos += 15;
-            ctx.font = '11px "Arial", sans-serif';
+            // yPos += 12;
+            // ctx.font = '10px "Arial", sans-serif';
+            // ctx.fillText(`Total: ${formatCurrency(itemTotal)}`, 20, yPos);
+            // yPos += 15;
+            // ctx.font = '11px "Arial", sans-serif';
           });
         }
         
@@ -595,7 +595,7 @@ const page = () => {
         <div className="fixed inset-0 bg-black z-50">
           <div className="h-full flex flex-col">
             {/* Modal Header */}
-            <div className="bg-black/90 p-4 flex justify-between items-center">
+            <div className="bg-black/90 p-2 flex justify-between items-center">
               <button
                 onClick={() => setShowFullInvoice(false)}
                 className="text-white p-1 hover:bg-white/10 rounded-lg"
