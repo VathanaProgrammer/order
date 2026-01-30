@@ -41,11 +41,10 @@ const page = () => {
 
   // Calculate dynamic canvas height based on items
   const calculateCanvasHeight = (orderData: any): number => {
-    if (!orderData) return 500;
+    if (!orderData) return 400;
     
-    let baseHeight = 220; // Reduced base height
+    let baseHeight = 180; // Reduced base height
     const itemsCount = orderData.items?.length || 0;
-    const customerInfoHeight = orderData.customer_info ? 40 : 0;
     
     // Each item takes about 12px of height
     const itemsHeight = itemsCount * 12;
@@ -56,10 +55,10 @@ const page = () => {
     const addressHeight = addressLines * 10;
     
     // Total height calculation
-    const totalHeight = baseHeight + customerInfoHeight + itemsHeight + addressHeight + 50;
+    const totalHeight = baseHeight + itemsHeight + addressHeight + 30;
     
     // Return a minimum height
-    return Math.max(500, Math.min(totalHeight, 2000));
+    return Math.max(400, Math.min(totalHeight, 1500));
   };
 
   // SOB-style invoice generation (Khmer version)
@@ -91,111 +90,98 @@ const page = () => {
         
         // SOB Logo Header (simplified)
         ctx.fillStyle = '#1e4ce4';
-        ctx.fillRect(0, 0, canvas.width, 60); // Reduced header height
+        ctx.fillRect(0, 0, canvas.width, 50); // Reduced header height
         
         // White SOB text
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 24px "Arial", sans-serif';
+        ctx.font = 'bold 22px "Arial", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('SOB', canvas.width / 2, 35);
+        ctx.fillText('SOB', canvas.width / 2, 30);
         
-        ctx.font = 'bold 12px "Arial", sans-serif';
-        ctx.fillText('បង្កាន់ដៃ', canvas.width / 2, 50);
+        ctx.font = 'bold 11px "Arial", sans-serif';
+        ctx.fillText('បង្កាន់ដៃ', canvas.width / 2, 45);
         
         // Separator line
         ctx.strokeStyle = '#1e3fe4';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(20, 65);
-        ctx.lineTo(canvas.width - 20, 65);
+        ctx.moveTo(20, 55);
+        ctx.lineTo(canvas.width - 20, 55);
         ctx.stroke();
         
-        // Receipt details - compact layout
-        let yPos = 85;
-        ctx.textAlign = 'center';
+        // Date and Customer info in same row
+        let yPos = 75;
+        ctx.textAlign = 'left';
         ctx.fillStyle = '#000000';
         
-        // Date and Time (Khmer)
+        // Date on left
         const now = new Date();
-        ctx.font = '10px "Arial", sans-serif';
-        ctx.fillText('កាលបរិច្ឆេទ/ពេលវេលា៖', canvas.width / 2, yPos);
-        yPos += 12;
-        ctx.font = 'bold 11px "Arial", sans-serif';
-        
+        ctx.font = 'bold 10px "Arial", sans-serif';
         const day = String(now.getDate()).padStart(2, '0');
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const year = now.getFullYear();
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
+        ctx.fillText(`${day}-${month}-${year} ${hours}:${minutes}`, 20, yPos);
         
-        ctx.fillText(
-          `${day}-${month}-${year} ${hours}:${minutes}`,
-          canvas.width / 2,
-          yPos
-        );
-        yPos += 20;
-        
-        // Receipt Number
-        ctx.font = '10px "Arial", sans-serif';
-        ctx.fillText('លេខបង្កាន់ដៃ៖', canvas.width / 2, yPos);
-        yPos += 12;
-        ctx.font = 'bold 12px "Arial", sans-serif';
-        ctx.fillText(`#${orderId}`, canvas.width / 2, yPos);
-        yPos += 20;
-        
-        // Customer info (no merchant info as requested)
+        // Customer name on right (if available)
         if (orderData.customer_info?.name) {
+          ctx.textAlign = 'right';
+          ctx.fillText(`អតិថិជន: ${orderData.customer_info.name}`, canvas.width - 20, yPos);
           ctx.textAlign = 'left';
-          ctx.font = 'bold 11px "Arial", sans-serif';
-          ctx.fillText('អតិថិជន', 20, yPos);
-          yPos += 12;
-          
-          ctx.font = '10px "Arial", sans-serif';
-          ctx.fillText(`ឈ្មោះ៖ ${orderData.customer_info.name}`, 20, yPos);
-          yPos += 10;
-          if (orderData.customer_info.phone) {
-            ctx.fillText(`ទូរស័ព្ទ៖ ${orderData.customer_info.phone}`, 20, yPos);
-            yPos += 10;
-          }
-          if (orderData.address_info?.address) {
-            const address = orderData.address_info.address;
-            const maxLineLength = 40;
-            for (let i = 0; i < address.length; i += maxLineLength) {
-              const line = address.substring(i, i + maxLineLength);
-              ctx.fillText(line, 20, yPos);
-              yPos += 10;
-            }
-          } else {
-            yPos += 10;
-          }
+        }
+        
+        yPos += 15;
+        
+        // Customer phone and address below
+        if (orderData.customer_info?.phone) {
+          ctx.font = '9px "Arial", sans-serif';
+          ctx.textAlign = 'right';
+          ctx.fillText(`ទូរស័ព្ទ: ${orderData.customer_info.phone}`, canvas.width - 20, yPos);
+          ctx.textAlign = 'left';
           yPos += 10;
         }
         
+        if (orderData.address_info?.address) {
+          const address = orderData.address_info.address;
+          const maxLineLength = 40;
+          ctx.font = '9px "Arial", sans-serif';
+          ctx.textAlign = 'right';
+          for (let i = 0; i < address.length; i += maxLineLength) {
+            const line = address.substring(i, i + maxLineLength);
+            ctx.fillText(line, canvas.width - 20, yPos);
+            yPos += 10;
+          }
+          ctx.textAlign = 'left';
+        }
+        
+        yPos += 10;
+        
         // Separator
         ctx.strokeStyle = '#CCCCCC';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 0.5;
         ctx.beginPath();
         ctx.moveTo(20, yPos);
         ctx.lineTo(canvas.width - 20, yPos);
         ctx.stroke();
-        yPos += 15;
+        yPos += 10;
         
         // Table Header
-        ctx.font = 'bold 11px "Arial", sans-serif';
+        ctx.font = 'bold 10px "Arial", sans-serif';
         ctx.fillText('ទំនិញ', 20, yPos);
         ctx.fillText('ចំនួន', 200, yPos);
         ctx.fillText('តម្លៃ', 280, yPos);
-        yPos += 15;
+        yPos += 12;
         
         // Separator
         ctx.beginPath();
         ctx.moveTo(20, yPos - 5);
         ctx.lineTo(canvas.width - 20, yPos - 5);
         ctx.stroke();
-        yPos += 8;
+        yPos += 5;
         
         // Items
-        ctx.font = '10px "Arial", sans-serif';
+        ctx.font = '9px "Arial", sans-serif';
         ctx.fillStyle = '#000000';
         
         if (orderData.items?.length > 0) {
@@ -206,7 +192,6 @@ const page = () => {
             
             // Handle long item names
             const maxWidth = 150;
-            ctx.font = '10px "Arial", sans-serif';
             
             const words = itemName.split(' ');
             let line = '';
@@ -220,7 +205,7 @@ const page = () => {
               if (testWidth > maxWidth && n > 0) {
                 ctx.fillText(line, 20, lineY);
                 line = words[n] + ' ';
-                lineY += 10;
+                lineY += 9;
               } else {
                 line = testLine;
               }
@@ -234,12 +219,12 @@ const page = () => {
             ctx.textAlign = 'left';
             
             // Move y position down
-            const linesUsed = Math.max(1, Math.ceil((lineY - yPos) / 10) + 1);
-            yPos += linesUsed * 10 + 3;
+            const linesUsed = Math.max(1, Math.ceil((lineY - yPos) / 9) + 1);
+            yPos += linesUsed * 9 + 2;
           });
         }
         
-        yPos += 3;
+        yPos += 2;
         
         // Separator
         ctx.strokeStyle = '#CCCCCC';
@@ -247,47 +232,32 @@ const page = () => {
         ctx.moveTo(20, yPos);
         ctx.lineTo(canvas.width - 20, yPos);
         ctx.stroke();
-        yPos += 15;
+        yPos += 10;
         
         // Total
-        ctx.font = 'bold 12px "Arial", sans-serif';
+        ctx.font = 'bold 11px "Arial", sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText('សរុប៖', canvas.width - 120, yPos);
         const totalAmount = safeNumber(orderData.total);
         ctx.fillText(formatCurrency(totalAmount), canvas.width - 20, yPos);
-        yPos += 20;
+        yPos += 15;
         
         // Payment Method
         ctx.textAlign = 'left';
-        ctx.font = 'bold 11px "Arial", sans-serif';
+        ctx.font = 'bold 10px "Arial", sans-serif';
         ctx.fillText('វិធីសាស្ត្រទូទាត់៖', 20, yPos);
-        yPos += 12;
-        ctx.font = '10px "Arial", sans-serif';
+        yPos += 10;
+        ctx.font = '9px "Arial", sans-serif';
         const paymentMethod = orderData.payment_method || 'Cash';
         const paymentMethodKhmer = paymentMethod === 'Cash' ? 'សាច់ប្រាក់' : paymentMethod;
         ctx.fillText(paymentMethodKhmer, 20, yPos);
-        yPos += 20;
         
-        // Thank you message
+        // Simple footer with website only
+        yPos = canvas.height - 15;
         ctx.textAlign = 'center';
-        ctx.font = 'bold 11px "Arial", sans-serif';
-        ctx.fillStyle = '#1e74e4';
-        ctx.fillText('សូមអរគុណ!', canvas.width / 2, yPos);
-        yPos += 12;
-        ctx.font = '9px "Arial", sans-serif';
+        ctx.font = '8px "Arial", sans-serif';
         ctx.fillStyle = '#666666';
-        ctx.fillText('សម្រាប់សេវាកម្មអតិថិជន៖', canvas.width / 2, yPos);
-        yPos += 10;
         ctx.fillText('barista.sobkh.com', canvas.width / 2, yPos);
-        
-        // Order date
-        if (orderData.created_at) {
-          yPos += 12;
-          ctx.font = '9px "Arial", sans-serif';
-          ctx.fillStyle = '#666666';
-          const orderDate = formatDateDDMMYYYY(orderData.created_at);
-          ctx.fillText(`កាលបរិច្ឆេទបញ្ជាទិញ៖ ${orderDate}`, canvas.width / 2, yPos);
-        }
         
         // Convert to image
         const dataUrl = canvas.toDataURL('image/png');
