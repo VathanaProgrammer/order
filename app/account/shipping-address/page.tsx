@@ -60,9 +60,24 @@ export default function ShippingAddressPage() {
   }, [setLoading]);
 
   const handleSaveAddress = async () => {
-    if (!newAddress.label || !newAddress.phone || !newAddress.details || !newAddress.coordinates) {
+    // Validation
+    if (!newAddress.label || !newAddress.details || !newAddress.coordinates) {
       toast.error("Please fill in all required fields and select location on map.");
       return;
+    }
+
+    // For sales: label is customer name, require phone
+    if (user?.role === "sale") {
+      if (!newAddress.phone) {
+        toast.error("Please enter customer phone number");
+        return;
+      }
+    } else {
+      // For regular users: phone is optional (can use profile phone)
+      if (!newAddress.phone && !user?.phone && !user?.mobile) {
+        toast.error("Please enter phone number or add it to your profile");
+        return;
+      }
     }
 
     if (!newAddress.api_user_id) {
@@ -73,56 +88,64 @@ export default function ShippingAddressPage() {
     setLoading(true);
     try {
       if (isEditing && editingId) {
-        // Edit existing address - try different approaches
+        // Edit existing address
         console.log("Editing address ID:", editingId, "Data:", newAddress);
         
-        // Try different endpoints for Laravel
-        let res;
-        try {
-          // Try 1: Standard PUT
-          res = await api.put(`/addresses/${editingId}`, newAddress);
-        } catch (err1) {
-          console.log("Standard PUT failed, trying POST with _method");
-          // Try 2: POST with _method (some Laravel setups)
-          res = await api.post(`/addresses/${editingId}`, {
-            ...newAddress,
-            _method: 'PUT'
-          });
-        }
+        // Try PUT request with the updated data
+        const res = await api.put(`/addresses/${editingId}`, {
+          ...newAddress,
+          // Ensure all required fields are included
+          label: newAddress.label.trim(),
+          phone: newAddress.phone?.trim() || user?.phone || user?.mobile || "",
+          details: newAddress.details.trim(),
+          coordinates: newAddress.coordinates,
+          api_user_id: newAddress.api_user_id
+        });
         
         const updated: Address = res.data.data;
-        console.log("Updated address:", updated);
+        console.log("Updated address response:", updated);
         
         setSavedAddresses(prev => 
           prev.map(addr => addr.id === editingId ? updated : addr)
         );
         setSelectedAddress(updated.id ?? null);
-        toast.success(t.addressUpdatedSuccessfully);
+        toast.success(t.addressUpdatedSuccessfully || "Address updated successfully");
+        
+        // Refresh the list
+        fetchAddress();
       } else {
         // Add new address
         console.log("Adding new address:", newAddress);
-        const res = await api.post("/addresses", newAddress);
+        const res = await api.post("/addresses", {
+          ...newAddress,
+          label: newAddress.label.trim(),
+          phone: newAddress.phone?.trim() || user?.phone || user?.mobile || "",
+          details: newAddress.details.trim()
+        });
         const saved: Address = res.data.data;
-        console.log("Saved address:", saved);
+        console.log("Saved address response:", saved);
         
         setSavedAddresses(prev => [...prev, saved]);
         setSelectedAddress(saved.id ?? null);
-        toast.success(t.addressSavedSuccessfully);
+        toast.success(t.addressSavedSuccessfully || "Address saved successfully");
+        
+        // Refresh the list
+        fetchAddress();
       }
 
       // Reset form
       resetForm();
-      // Refresh the list
-      fetchAddress();
     } catch (err: any) {
       console.error("Save/Edit error:", err);
       console.error("Error response:", err.response?.data);
-      console.error("Full error:", err);
+      console.error("Error status:", err.response?.status);
       
-      if (err.response?.data?.message) {
+      if (err.response?.status === 404) {
+        toast.error("API endpoint not found. Please check backend routes.");
+      } else if (err.response?.data?.message) {
         toast.error(err.response.data.message);
       } else {
-        toast.error("Failed to save address. Please check if the API route exists.");
+        toast.error(isEditing ? "Failed to update address" : "Failed to save address");
       }
     } finally {
       setLoading(false);
@@ -133,7 +156,8 @@ export default function ShippingAddressPage() {
     console.log("Editing address:", address);
     setNewAddress({
       ...address,
-      api_user_id: user?.id || undefined
+      api_user_id: user?.id || undefined,
+      coordinates: address.coordinates || undefined
     });
     setEditingId(address.id || null);
     setIsEditing(true);
@@ -150,50 +174,36 @@ export default function ShippingAddressPage() {
     try {
       console.log("Deleting address ID:", id);
       
-      let deleteSuccessful = false;
+      // Try standard DELETE
+      await api.delete(`/addresses/${id}`);
       
-      // Try multiple approaches for Laravel DELETE
-      try {
-        // Try 1: Standard DELETE
-        await api.delete(`/addresses/${id}`);
-        deleteSuccessful = true;
-      } catch (err1) {
-        console.log("Standard DELETE failed, trying POST with _method");
-        
-        // Try 2: POST with _method (some Laravel setups)
-        try {
-          await api.post(`/addresses/${id}`, {
-            _method: 'DELETE'
-          });
-          deleteSuccessful = true;
-        } catch (err2) {
-          console.log("POST with _method also failed");
-          throw err2;
-        }
+      setSavedAddresses(prev => prev.filter(addr => addr.id !== id));
+      
+      if (selectedAddress === id) {
+        setSelectedAddress(null);
       }
       
-      if (deleteSuccessful) {
+      toast.success(t.addressDeletedSuccessfully || "Address deleted successfully");
+    } catch (err: any) {
+      console.error("Delete error:", err);
+      
+      // If DELETE fails, try POST with _method
+      try {
+        await api.post(`/addresses/${id}`, {
+          _method: 'DELETE'
+        });
+        
         setSavedAddresses(prev => prev.filter(addr => addr.id !== id));
         
         if (selectedAddress === id) {
           setSelectedAddress(null);
         }
         
-        toast.success(t.addressDeletedSuccessfully);
+        toast.success(t.addressDeletedSuccessfully || "Address deleted successfully");
+      } catch (err2) {
+        console.error("Alternative delete also failed:", err2);
+        toast.error("Failed to delete address");
       }
-    } catch (err: any) {
-      console.error("Delete error:", err);
-      console.error("Error response:", err.response?.data);
-      
-      // Show more specific error message
-      if (err.response?.status === 404) {
-        toast.error("Delete route not found. Please check API routes.");
-      } else {
-        toast.error("Failed to delete address. Please try again.");
-      }
-      
-      // Refresh the list in case of error
-      fetchAddress();
     } finally {
       setLoading(false);
     }
@@ -202,7 +212,7 @@ export default function ShippingAddressPage() {
   const resetForm = () => {
     setNewAddress({
       label: "",
-      phone: "",
+      phone: user?.role === "sale" ? "" : user?.phone || user?.mobile || "",
       details: "",
       coordinates: undefined,
       api_user_id: user?.id || undefined
@@ -217,15 +227,22 @@ export default function ShippingAddressPage() {
     resetForm();
   };
 
+  // Function to get user phone for display
+  const getUserPhone = () => {
+    return user?.phone || user?.mobile || "";
+  };
+
   return (
     <div className="flex flex-col h-full gap-6">
-      <Header title={t.shippingAddress} />
+      <Header title={user?.role === "sale" ? "Customer Information" : t.shippingAddress} />
 
-      {/* Saved Addresses */}
+      {/* Saved Addresses / Customers List */}
       <div className="flex flex-col gap-3">
         {savedAddresses.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
-            {t.noSavedAddressesYetAddYourFirstAddressBelow}
+            {user?.role === "sale" 
+              ? "No customers saved yet. Add your first customer below."
+              : t.noSavedAddressesYetAddYourFirstAddressBelow}
           </div>
         ) : (
           savedAddresses.map((addr) => (
@@ -243,6 +260,11 @@ export default function ShippingAddressPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-lg">{addr.label}</span>
+                      {user?.role === "sale" && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          Customer
+                        </span>
+                      )}
                     </div>
                     <p className="text-gray-600 text-sm mt-1">{addr.details}</p>
                     <p className="text-gray-600 text-sm mt-1">
@@ -282,20 +304,23 @@ export default function ShippingAddressPage() {
         )}
       </div>
 
-      {/* Add / Edit Address Form */}
+      {/* Add / Edit Address/Customer Form */}
       {isAdding ? (
         <div className="border rounded-xl p-4 flex flex-col gap-3 bg-white shadow-md mt-4">
           <h3 className="text-lg font-semibold mb-2">
-            {isEditing ? t.editAddress : t.addNewAddress}
+            {isEditing 
+              ? (user?.role === "sale" ? "Edit Customer" : t.editAddress)
+              : (user?.role === "sale" ? "Add New Customer" : t.addNewAddress)
+            }
           </h3>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.label} *
+              {user?.role === "sale" ? "Customer Name *" : t.label + " *"}
             </label>
             <input
               type="text"
-              placeholder={t.labelHomeWork}
+              placeholder={user?.role === "sale" ? "Enter customer name" : t.labelHomeWork}
               className="bg-gray-50 border border-gray-300 rounded-lg p-3 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={newAddress.label}
               onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
@@ -304,23 +329,53 @@ export default function ShippingAddressPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.phone} *
+              {t.phone} {user?.role === "sale" ? "*" : ""}
             </label>
+            {user?.role !== "sale" && getUserPhone() ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    id="profile-phone"
+                    name="phone-source"
+                    checked={!newAddress.phone}
+                    onChange={() => setNewAddress({ ...newAddress, phone: "" })}
+                  />
+                  <label htmlFor="profile-phone" className="text-sm">
+                    Use profile phone: {getUserPhone()}
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    id="custom-phone"
+                    name="phone-source"
+                    checked={!!newAddress.phone}
+                    onChange={() => setNewAddress({ ...newAddress, phone: "" })}
+                  />
+                  <label htmlFor="custom-phone" className="text-sm">
+                    Use different phone:
+                  </label>
+                </div>
+              </div>
+            ) : null}
+            
             <input
               type="text"
-              placeholder={t.phone}
-              className="bg-gray-50 border border-gray-300 rounded-lg p-3 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={newAddress.phone}
+              placeholder={user?.role === "sale" ? "Customer phone number" : t.phone}
+              className="bg-gray-50 border border-gray-300 rounded-lg p-3 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mt-2"
+              value={newAddress.phone || ""}
               onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
+              disabled={user?.role !== "sale" && !newAddress.phone && !!getUserPhone()}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.details} *
+              {user?.role === "sale" ? "Delivery Address *" : t.details + " *"}
             </label>
             <textarea
-              placeholder={t.details}
+              placeholder={user?.role === "sale" ? "Street, building, floor, delivery notes..." : t.details}
               className="bg-gray-50 border border-gray-300 rounded-lg p-3 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={newAddress.details}
               onChange={(e) => setNewAddress({ ...newAddress, details: e.target.value })}
@@ -361,9 +416,18 @@ export default function ShippingAddressPage() {
             <button
               onClick={handleSaveAddress}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
-              disabled={!newAddress.label || !newAddress.phone || !newAddress.details || !newAddress.coordinates}
+              disabled={
+                !newAddress.label || 
+                !newAddress.details || 
+                !newAddress.coordinates ||
+                (user?.role === "sale" && !newAddress.phone) ||
+                (user?.role !== "sale" && !newAddress.phone && !getUserPhone())
+              }
             >
-              {isEditing ? t.saveChanges || "Save Changes" : t.saveAddress}
+              {isEditing 
+                ? (user?.role === "sale" ? "Update Customer" : t.saveChanges || "Save Changes")
+                : (user?.role === "sale" ? "Save Customer" : t.saveAddress)
+              }
             </button>
           </div>
         </div>
@@ -373,7 +437,7 @@ export default function ShippingAddressPage() {
           className="mt-4 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 w-full font-semibold flex items-center justify-center gap-2"
         >
           <span className="text-xl">+</span>
-          {t.addNewAddress}
+          {user?.role === "sale" ? "Add New Customer" : t.addNewAddress}
         </button>
       )}
 
