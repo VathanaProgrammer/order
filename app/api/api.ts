@@ -37,20 +37,25 @@ if (typeof window !== 'undefined') {
 
 api.interceptors.request.use(
   (config) => {
-    const token = currentToken || (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
+    // 1. Double-check storage if the local variable is null
+    if (!currentToken && typeof window !== 'undefined') {
+      currentToken = localStorage.getItem('auth_token');
+    }
 
-    if (token) {
-      // Use the most basic assignment for maximum mobile compatibility
-      config.headers['Authorization'] = `Bearer ${token}`;
+    if (currentToken) {
+      // 2. Standard Header (Primary)
+      config.headers['Authorization'] = `Bearer ${currentToken}`;
       
-      // On iOS, GET requests often cache the 'Unauthorized' result. 
-      // We add a timestamp to FORCE a fresh check.
+      // 3. iOS Specific Fixes
       if (isSafari()) {
         config.params = { 
           ...config.params, 
-          token: token, // Fallback for PHP
-          _t: Date.now() // Cache breaker
+          token: currentToken, // Fallback for PHP/Laravel
+          _t: Date.now()       // Prevents Safari from serving a cached 401
         };
+        
+        // Ensure headers are actually assigned to the config object
+        config.headers.set('Authorization', `Bearer ${currentToken}`);
       }
     }
     return config;
