@@ -660,7 +660,7 @@ const CombinedCheckoutPage = () => {
             className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
           >
             <span className="text-xl">+</span>
-            {t.addNewAddress}
+            {t.addCustomerInfo}
           </button>
         ) : null}
 
