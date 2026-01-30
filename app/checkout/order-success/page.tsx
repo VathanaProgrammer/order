@@ -598,11 +598,11 @@ const page = () => {
             <div className="bg-black/90 p-4 flex justify-between items-center">
               <button
                 onClick={() => setShowFullInvoice(false)}
-                className="text-white p-2 hover:bg-white/10 rounded-lg"
+                className="text-white p-1 hover:bg-white/10 rounded-lg"
               >
                 <Icon icon="mdi:close" width={24} height={24} />
               </button>
-              <span className="text-white font-medium">SOB Receipt</span>
+              {/* <span className="text-white font-medium">SOB Receipt</span> */}
               <div className="w-8"></div>
             </div>
             
