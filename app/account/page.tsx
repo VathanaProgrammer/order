@@ -260,7 +260,7 @@ const Page: React.FC = () => {
 
         {/* Account Options */}
         <div className="mt-8 space-y-4 pb-20">
-          {user?.role === 'sale' ? (accountSections.map((item, i) => (
+          {accountSections.map((item, i) => (
             <div
               key={i}
               className="bg-gray-300 p-4 rounded-2xl shadow-sm flex flex-col gap-1 hover:shadow-md transition"
@@ -282,31 +282,7 @@ const Page: React.FC = () => {
                 {item.action}
               </button>
             </div>
-          ))[0]) :
-            (accountSections.map((item, i) => (
-              <div
-                key={i}
-                className="bg-gray-300 p-4 rounded-2xl shadow-sm flex flex-col gap-1 hover:shadow-md transition"
-              >
-                <div className="flex items-center gap-2">
-                  <Icon
-                    icon={item.icon}
-                    width={22}
-                    height={22}
-                    className="text-gray-700"
-                  />
-                  <h3 className="font-medium text-gray-800">{item.title}</h3>
-                </div>
-                <p className="text-sm text-gray-500">{item.desc}</p>
-                <button 
-                  onClick={() => router.push(item.route ? item.route : '')} 
-                  className="mt-2 text-sm font-medium text-blue-600 hover:underline self-start"
-                >
-                  {item.action}
-                </button>
-              </div>
-            ))
-          )}
+          ))}
         </div>
 
         {/* Logout */}
