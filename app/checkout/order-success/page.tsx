@@ -37,7 +37,7 @@ const page = () => {
     });
   };
 
-  // ABA-style invoice generation
+  // SOB-style invoice generation
   const generateInvoiceImage = (orderData: any) => {
     if (!orderData) return;
     
@@ -53,41 +53,41 @@ const page = () => {
           return;
         }
 
-        // ABA receipt dimensions (typical thermal printer size)
+        // SOB receipt dimensions (typical thermal printer size)
         canvas.width = 384; // Standard thermal printer width
         canvas.height = 600;
         
-        // Clean white background (ABA uses pure white)
+        // Clean white background (SOB uses pure white)
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // ABA Logo Header (simplified version)
-        ctx.fillStyle = '#E41E26'; // ABA Red
+        // SOB Logo Header (simplified version)
+        ctx.fillStyle = '#1e4ce4'; // SOB Red
         ctx.fillRect(0, 0, canvas.width, 80);
         
-        // White ABA text
+        // White SOB text
         ctx.fillStyle = '#FFFFFF';
         ctx.font = 'bold 28px "Arial", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('ABA', canvas.width / 2, 40);
+        ctx.fillText('SOB', canvas.width / 2, 40);
         
         ctx.font = 'bold 14px "Arial", sans-serif';
         ctx.fillText('RECEIPT', canvas.width / 2, 60);
         
-        // Separator line (ABA style)
-        ctx.strokeStyle = '#E41E26';
+        // Separator line (SOB style)
+        ctx.strokeStyle = '#1e3fe4';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(20, 90);
         ctx.lineTo(canvas.width - 20, 90);
         ctx.stroke();
         
-        // Receipt details (centered like ABA)
+        // Receipt details (centered like SOB)
         let yPos = 115;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#000000';
         
-        // Date and Time (ABA style)
+        // Date and Time (SOB style)
         const now = new Date();
         ctx.font = '12px "Arial", sans-serif';
         ctx.fillText('Date/Time:', canvas.width / 2, yPos);
@@ -115,7 +115,7 @@ const page = () => {
         yPos += 15;
         
         ctx.font = '11px "Arial", sans-serif';
-        ctx.fillText('Your Store Name', 20, yPos);
+        ctx.fillText('SOB', 20, yPos);
         yPos += 12;
         ctx.fillText('Phnom Penh, Cambodia', 20, yPos);
         yPos += 25;
@@ -127,7 +127,7 @@ const page = () => {
           yPos += 15;
           
           ctx.font = '11px "Arial", sans-serif';
-          ctx.fillText(orderData.customer_info.name, 20, yPos);
+          ctx.fillText(`Name: ${orderData.customer_info.name}`, 20, yPos);
           yPos += 12;
           if (orderData.customer_info.phone) {
             ctx.fillText(`Phone: ${orderData.customer_info.phone}`, 20, yPos);
@@ -157,7 +157,7 @@ const page = () => {
         ctx.stroke();
         yPos += 20;
         
-        // Table Header (ABA style - simple)
+        // Table Header (SOB style - simple)
         ctx.font = 'bold 12px "Arial", sans-serif';
         ctx.fillText('ITEM', 20, yPos);
         ctx.fillText('QTY', 200, yPos);
@@ -183,7 +183,7 @@ const page = () => {
             const itemTotal = quantity * price;
             
             // Truncate long names
-            const displayName = itemName.length > 25 ? itemName.substring(0, 25) + '...' : itemName;
+            const displayName = itemName;
             
             ctx.fillText(displayName, 20, yPos);
             ctx.textAlign = 'right';
@@ -191,7 +191,7 @@ const page = () => {
             ctx.fillText(formatCurrency(price), 300, yPos);
             ctx.textAlign = 'left';
             
-            // Show total per item on next line (ABA style)
+            // Show total per item on next line (SOB style)
             yPos += 12;
             ctx.font = '10px "Arial", sans-serif';
             ctx.fillText(`Total: ${formatCurrency(itemTotal)}`, 20, yPos);
@@ -210,7 +210,7 @@ const page = () => {
         ctx.stroke();
         yPos += 20;
         
-        // Total (right aligned like ABA)
+        // Total (right aligned like SOB)
         ctx.font = 'bold 13px "Arial", sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText('TOTAL:', canvas.width - 120, yPos);
@@ -236,10 +236,10 @@ const page = () => {
         ctx.font = '10px "Arial", sans-serif';
         ctx.fillStyle = '#666666';
         ctx.fillText('For customer service:', canvas.width / 2, yPos);
+        // yPos += 12;
+        // ctx.fillText('+855 23 999 000', canvas.width / 2, yPos);
         yPos += 12;
-        ctx.fillText('+855 23 999 000', canvas.width / 2, yPos);
-        yPos += 12;
-        ctx.fillText('www.yourstore.com', canvas.width / 2, yPos);
+        ctx.fillText('barista.sobkh.com', canvas.width / 2, yPos);
         
         // Convert to image
         const dataUrl = canvas.toDataURL('image/png');
@@ -285,7 +285,7 @@ const page = () => {
     
     const link = document.createElement('a');
     link.href = invoiceImage;
-    link.download = `aba_receipt_${orderId}.png`;
+    link.download = `sob_receipt_${orderId}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -298,13 +298,13 @@ const page = () => {
     try {
       const response = await fetch(invoiceImage);
       const blob = await response.blob();
-      const file = new File([blob], `aba_receipt_${orderId}.png`, { type: 'image/png' });
+      const file = new File([blob], `SOB_receipt_${orderId}.png`, { type: 'image/png' });
       
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: `ABA Receipt #${orderId}`,
-          text: `ABA-style receipt for order #${orderId}`
+          title: `SOB Receipt #${orderId}`,
+          text: `SOB-style receipt for order #${orderId}`
         });
       } else {
         downloadInvoice();
@@ -333,7 +333,7 @@ const page = () => {
             </style>
           </head>
           <body>
-            <img src="${invoiceImage}" alt="ABA Receipt" />
+            <img src="${invoiceImage}" alt="SOB Receipt" />
             <script>
               window.onload = function() {
                 window.print();
@@ -395,7 +395,7 @@ const page = () => {
     );
   }
 
-  // Sales role - ABA-style interface
+  // Sales role - SOB-style interface
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -435,7 +435,7 @@ const page = () => {
               <div className="flex justify-between items-center">
                 <div className="flex items-center">
                   <Icon icon="mdi:receipt" width={20} height={20} className="mr-2" />
-                  <span className="font-bold">ABA-STYLE RECEIPT</span>
+                  <span className="font-bold">SOB-STYLE RECEIPT</span>
                 </div>
                 <span className="text-sm bg-white/20 px-2 py-1 rounded">
                   #{orderId}
@@ -459,7 +459,7 @@ const page = () => {
                   >
                     <img 
                       src={invoiceImage} 
-                      alt="ABA Receipt" 
+                      alt="SOB Receipt" 
                       className="w-full h-auto"
                     />
                     <div className="p-2 bg-gray-50 text-center">
@@ -576,7 +576,7 @@ const page = () => {
     
           {/* Telegram Link */}
           {telegramLink && (
-            <div className="px-4 pb-4">
+            <div>
               <a
                 href={telegramLink}
                 target="_blank"
@@ -603,7 +603,7 @@ const page = () => {
                 <Icon icon="mdi:close" width={24} height={24} />
               </button>
               <span className="text-white font-medium">SOB Receipt</span>
-              <div className="w-10"></div>
+              <div className="w-8"></div>
             </div>
             
             {/* Receipt Image */}
@@ -626,7 +626,7 @@ const page = () => {
                 </button>
                 <button
                   onClick={printInvoice}
-                  className="py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                  className="py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
                 >
                   Print
                 </button>
