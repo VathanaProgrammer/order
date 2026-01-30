@@ -576,7 +576,7 @@ const page = () => {
     
           {/* Telegram Link */}
           {telegramLink && (
-            <div>
+            <div className="px-1">
               <a
                 href={telegramLink}
                 target="_blank"
