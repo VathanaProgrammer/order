@@ -11,7 +11,7 @@ export const isSafari = (): boolean => {
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
-  withCredentials: false,
+  withCredentials: true,
 });
 
 let currentToken: string | null = null;
@@ -37,27 +37,25 @@ if (typeof window !== 'undefined') {
 
 api.interceptors.request.use(
   (config) => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    // Always pull fresh from storage to avoid "Variable Desync"
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : currentToken;
 
     if (token) {
-      const cleanToken = token.trim();
+      // Modern Axios way to set headers safely
+      if (config.headers.set) {
+        config.headers.set('Authorization', `Bearer ${token}`);
+      } else {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
       
-      // Force set headers (WebKit preferred way)
-      config.headers['Authorization'] = `Bearer ${cleanToken}`;
-      
-      // For iOS, the URL param is your "Safety Net"
       if (isSafari()) {
         config.params = { 
           ...config.params, 
-          token: cleanToken, 
+          token: token, 
           _t: Date.now() 
         };
       }
     }
-    
-    // Explicitly set Accept header for Safari
-    config.headers['Accept'] = 'application/json';
-    
     return config;
   },
   (error) => Promise.reject(error)
