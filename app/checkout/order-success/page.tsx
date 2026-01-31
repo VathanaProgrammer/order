@@ -241,7 +241,7 @@ const page = () => {
       )}
 
       <div className="p-4 backdrop-blur-md border-t flex gap-3">
-        <a href="/" className="flex-1 py-3 bg-gray-200 text-center rounded-xl font-bold text-gray-700">{t.home}</a>
+        <a href="/" className="flex-1 py-3 bg-blue-100 text-center rounded-xl font-bold text-gray-700">{t.home}</a>
         {telegramLink && (
           <a href={telegramLink} target="_blank" className="flex-1 py-3 bg-blue-600 text-white text-center rounded-xl font-bold flex items-center justify-center gap-2">
             <Icon icon="mdi:telegram" width={20}/> Telegram
