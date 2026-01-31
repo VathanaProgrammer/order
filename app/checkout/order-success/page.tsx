@@ -240,7 +240,7 @@ const page = () => {
         </div>
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t flex gap-3">
+      <div className="p-4 bg-white/80 backdrop-blur-md border-t flex gap-3">
         <a href="/" className="flex-1 py-3 bg-gray-200 text-center rounded-xl font-bold text-gray-700">{t.home}</a>
         {telegramLink && (
           <a href={telegramLink} target="_blank" className="flex-1 py-3 bg-blue-600 text-white text-center rounded-xl font-bold flex items-center justify-center gap-2">
