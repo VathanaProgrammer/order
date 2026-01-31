@@ -130,7 +130,7 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
         toast.success("Sales login successful!");
         
         // Redirect to sales dashboard
-        router.push("/sales/dashboard");
+        router.push("/");
       } else {
         throw new Error(response.data.msg || "Login failed");
       }
@@ -209,7 +209,7 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
       toast.success("Sales logged out successfully!");
       
       // Redirect to sales login page
-      router.push("/sales/login");
+      router.push("/sign-in-sale");
     }
   };
 
