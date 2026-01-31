@@ -43,7 +43,7 @@ const SalesLoginPage = () => {
         
         <form className="mt-8 space-y-6" onSubmit={handleSalesLogin}>
           <div className="rounded-md shadow-sm -space-y-px">
-            <div>
+            <div className="mb-4">
               <label htmlFor="username" className="sr-only">
                 Username
               </label>
@@ -96,7 +96,7 @@ const SalesLoginPage = () => {
                   Signing in...
                 </span>
               ) : (
-                "Sign in to Sales Portal"
+                "Sign in"
               )}
             </button>
           </div>
