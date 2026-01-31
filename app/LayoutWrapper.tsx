@@ -16,6 +16,7 @@ export default function LayoutWrapper({
     "/checkout",
     "/sign-up",
     "/sign-in",
+    "/sign-in-sale",
     "/checkout/payment",
     "/checkout/review",
     "/checkout/success",
@@ -31,7 +32,7 @@ export default function LayoutWrapper({
 
   const hideTopBar = noTopBarRoutes.includes(pathname);
 
-  const noBottomBarRoutes = ["/verify-otp", "/sign-in", "/sign-up" ];
+  const noBottomBarRoutes = ["/verify-otp", "/sign-in", "/sign-up", "/sign-in-sale"];
   const hideBottomBar = noBottomBarRoutes.includes(pathname);
 
   return (
