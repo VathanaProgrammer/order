@@ -158,6 +158,7 @@ const translations = {
     youNeed: "You need",
     morePointsToSpin: "more points to spin!",
     addCustomerInfo: "Add Customer Info",
+    trackOnTelegram: "Track on Telegram",
   },
   km: {
     back: "ត្រឡប់ក្រោយ",
@@ -298,7 +299,8 @@ const translations = {
     newBalance: "សមតុល្យថ្មី",
     youNeed: "អ្នកត្រូវការ",
     morePointsToSpin: "ពិន្ទុបន្ថែមដើម្បីបង្វិល!",
-    addCustomerInfo: "បញ្ចូលព័ត៌មានអតិថិជន"
+    addCustomerInfo: "បញ្ចូលព័ត៌មានអតិថិជន",
+    trackOnTelegram: "តាមដានការបញ្ជាទិញ",
   },
 };
 

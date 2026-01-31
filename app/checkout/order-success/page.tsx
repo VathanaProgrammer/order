@@ -5,12 +5,14 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { useLanguage } from "@/context/LanguageContext";
 
 const page = () => {
   const params = useSearchParams();
   const telegramLink = params.get("telegram");
   const orderId = params.get("order_id");
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [invoiceImage, setInvoiceImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -232,6 +234,7 @@ const generateInvoiceImage = (orderData: any) => {
   }, 50);
 };
 
+
   // Fetch data
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -365,7 +368,7 @@ const generateInvoiceImage = (orderData: any) => {
                 className="block w-full py-4 bg-blue-600 text-white rounded-lg font-medium text-center hover:bg-blue-700 transition-colors shadow-sm"
               >
                 <Icon icon="mdi:telegram" width={20} height={20} className="inline mr-2" />
-                តាមដានបញ្ជាទិញ
+                {t.trackOnTelegram}
               </a>
             )}
             
@@ -555,12 +558,12 @@ const generateInvoiceImage = (orderData: any) => {
 
       {/* Fixed Bottom Bar */}
       <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <a
             href="/"
             className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium text-center hover:bg-gray-200 transition-colors"
           >
-            ទំព័រដើម
+            {t.home}
           </a>
           
           {telegramLink && (
@@ -569,8 +572,8 @@ const generateInvoiceImage = (orderData: any) => {
               target="_blank"
               className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium text-center hover:bg-blue-700 transition-colors flex items-center justify-center"
             >
-              <Icon icon="mdi:telegram" width={20} height={20} className="mr-2" />
-              Telegram
+              <Icon icon="mdi:telegram" width={20} height={20} className="mr-1" />
+              {t.trackOnTelegram}
             </a>
           )}
         </div>
