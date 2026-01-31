@@ -101,9 +101,9 @@ const page = () => {
 
         // Total Box
         y += 10;
-        ctx.fillStyle = '#eff6ff'; // blue-50
+        ctx.fillStyle = '#b2ccee'; // blue-50
         ctx.fillRect(0, y, width, 70);
-        ctx.fillStyle = '#1e4ce4';
+        ctx.fillStyle = '#cbcbcc';
         ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'left';
         ctx.fillText('Total Amount', 20, y + 40);
