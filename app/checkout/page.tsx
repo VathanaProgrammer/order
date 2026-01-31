@@ -544,12 +544,12 @@ const CombinedCheckoutPage = () => {
                   ) : (
                     <div className="flex justify-between items-center">
                       <span>No customer found with "{searchQuery}"</span>
-                      <button
+                      {/* <button
                         onClick={handleAddNewCustomer}
                         className="px-3 py-1 text-sm bg-blue-100 text-blue-700 border border-blue-300 rounded hover:bg-blue-200"
                       >
                         + New Customer
-                      </button>
+                      </button> */}
                     </div>
                   )}
                 </div>
