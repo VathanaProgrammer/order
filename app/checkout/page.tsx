@@ -664,7 +664,7 @@ const CombinedCheckoutPage = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t.details} *
                   </label>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center gap-2">
                     <textarea
                       placeholder="#123, Sen Sok"
                       value={tempAddress.details || ""}
@@ -896,7 +896,10 @@ const CombinedCheckoutPage = () => {
                 {t.clear}
               </button>
               <button
-                onClick={() => setShowMap(false)}
+                onClick={() => {
+                  setShowMap(false);
+                  toast.success("Location selected successfully!");
+                }}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 {t.select}
