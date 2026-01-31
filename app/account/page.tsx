@@ -226,7 +226,7 @@ const Page: React.FC = () => {
 
         {/* Profile Section */}
         <div className="w-full mt-10 flex flex-col items-center justify-center">
-          {user?.role === "sale" && <div className="relative w-[120px] h-[120px]">
+          {user?.role !== "sale" && <div className="relative w-[120px] h-[120px]">
             <Image
               id="profileImage"
               src={profileImage}
