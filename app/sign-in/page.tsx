@@ -87,6 +87,7 @@ const Page = () => {
               </span>
             </p>
           </div>
+          <span className="text-center text-[16px] font-medium mt-8 text-blue-600 cursor-pointer" onClick={()=>router.push('/sign-in-sale')}>Sign In as Sales</span>
         </form>
       </div>
     </div>
