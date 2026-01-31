@@ -662,34 +662,32 @@ const CombinedCheckoutPage = () => {
                 {/* Address Details */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.details || "Address Details"} *
+                    {t.details} *
                   </label>
-                  <textarea
-                    placeholder="Street, building, floor, notes..."
-                    value={tempAddress.details || ""}
-                    onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    rows={3}
-                  />
+                  <div className="flex justify-between items-center">
+                    <textarea
+                      placeholder="#123, Sen Sok"
+                      value={tempAddress.details || ""}
+                      onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
+                      className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      rows={3}
+                    />
+                    <input
+                      type="button"
+                      readOnly
+                      value={t.clickToSelectLocation}
+                      onClick={() => setShowMap(true)}
+                      className="p-1 border rounded-lg text-white cursor-pointer bg-blue-500 hover:bg-blue-600"
+                      placeholder={t.clickToSelectLocation}
+                    />
+                  </div>
                 </div>
 
                 {/* Location Picker */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {/* <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t.clickToSelectLocation} *
-                  </label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={
-                      tempAddress.coordinates
-                        ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
-                        : ""
-                    }
-                    onClick={() => setShowMap(true)}
-                    className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                    placeholder={t.clickToSelectLocation}
-                  />
+                  </label> */}
                   {!tempAddress.coordinates && (
                     <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
                   )}
