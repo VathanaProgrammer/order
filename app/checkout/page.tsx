@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 type APIAddress = {
   id?: number;
   api_user_id: number | undefined;
-  label: string; // For sales: customer name, For regular users: address label
+  label: string;
   phone?: string;
   details?: string;
   coordinates?: { lat: number; lng: number };
@@ -71,6 +71,9 @@ const CombinedCheckoutPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(ITEMS_PER_PAGE);
 
+  // State to control when to show search results
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
   const paymentMethods = [
     { name: t.QR, image: "/qr.jpg" },
     { name: t.cash, image: "/cash.jpg" },
@@ -83,7 +86,7 @@ const CombinedCheckoutPage = () => {
   // Filter saved addresses based on search query
   const filteredAddresses = useMemo(() => {
     if (!searchQuery.trim()) {
-      return savedAddresses;
+      return [];
     }
 
     const query = searchQuery.toLowerCase().trim();
@@ -95,6 +98,21 @@ const CombinedCheckoutPage = () => {
       return labelMatch || phoneMatch || detailsMatch;
     });
   }, [savedAddresses, searchQuery]);
+
+  // Check if we should auto-fill phone number when searching
+  useEffect(() => {
+    if (searchQuery.trim() && user?.role === "sale") {
+      // Check if search query looks like a phone number
+      const phoneRegex = /^[\d\s\-\+\(\)]{8,}$/;
+      if (phoneRegex.test(searchQuery.replace(/\s/g, ''))) {
+        // Auto-fill phone in temp address
+        setTempAddress(prev => ({
+          ...prev,
+          phone: searchQuery.trim()
+        }));
+      }
+    }
+  }, [searchQuery, user?.role]);
 
   // Calculate pagination data
   const paginatedAddresses = useMemo(() => {
@@ -130,6 +148,7 @@ const CombinedCheckoutPage = () => {
   // Reset to page 1 when search changes
   useEffect(() => {
     setCurrentPage(1);
+    setShowSearchResults(!!searchQuery.trim());
   }, [searchQuery, savedAddresses]);
 
   // Update tempAddress when user changes
@@ -173,6 +192,8 @@ const CombinedCheckoutPage = () => {
   const handleSelectSavedAddress = (addr: ExtendedAddress) => {
     setSelectedAddress(addr);
     setIsAdding(false);
+    setSearchQuery("");
+    setShowSearchResults(false);
   };
 
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
@@ -193,22 +214,34 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Function to clear saved addresses (customer information)
-  const clearSavedAddresses = () => {
-    setSavedAddresses([]);
-    setSelectedAddress('current');
-    setIsAdding(false);
-    setSearchQuery("");
-    setCurrentPage(1); // Reset to first page
-
-    // Reset temp address fields
-    setTempAddress({
-      label: "",
-      phone: user?.role === "sale" ? "" : userPhone || "",
-      details: "",
-      coordinates: { lat: 11.567, lng: 104.928 },
-      api_user_id: user?.id,
-    });
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    
+    if (value.trim() && user?.role === "sale") {
+      // If it's a sales user and searching, show the form if no results found
+      const hasResults = savedAddresses.some(address => 
+        address.label?.toLowerCase().includes(value.toLowerCase()) ||
+        address.phone?.includes(value) ||
+        address.details?.toLowerCase().includes(value.toLowerCase())
+      );
+      
+      if (!hasResults) {
+        setIsAdding(true);
+        // Auto-fill phone if it looks like a phone number
+        const phoneRegex = /^[\d\s\-\+\(\)]{8,}$/;
+        if (phoneRegex.test(value.replace(/\s/g, ''))) {
+          setTempAddress(prev => ({
+            ...prev,
+            phone: value.trim(),
+            label: "" // Clear label to let user enter name
+          }));
+        }
+      } else {
+        setIsAdding(false);
+      }
+    }
   };
 
   // Save new address - label is customer name for sales, address label for regular users
@@ -271,7 +304,7 @@ const CombinedCheckoutPage = () => {
     try {
       // Prepare address data
       const addressData: APIAddress = {
-        label: (tempAddress.label || "").trim(), // Customer name for sales, address label for regular users
+        label: (tempAddress.label || "").trim(),
         phone: finalPhone,
         details: (tempAddress.details || "").trim(),
         coordinates: tempAddress.coordinates,
@@ -297,7 +330,8 @@ const CombinedCheckoutPage = () => {
       setSelectedAddress(newAddress);
       setIsAdding(false);
       setSearchQuery("");
-      setCurrentPage(1); // Reset to first page after adding new address
+      setShowSearchResults(false);
+      setCurrentPage(1);
 
       // Reset form fields
       setTempAddress({
@@ -358,7 +392,21 @@ const CombinedCheckoutPage = () => {
   const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = parseInt(e.target.value);
     setItemsPerPage(value);
-    setCurrentPage(1); // Reset to first page when changing items per page
+    setCurrentPage(1);
+  };
+
+  // Handle adding new customer for sales
+  const handleAddNewCustomer = () => {
+    setIsAdding(true);
+    setSearchQuery("");
+    setShowSearchResults(false);
+    setTempAddress({
+      label: "",
+      phone: "",
+      details: "",
+      coordinates: { lat: 11.567, lng: 104.928 },
+      api_user_id: user?.id,
+    });
   };
 
   return (
@@ -435,131 +483,38 @@ const CombinedCheckoutPage = () => {
           </div>
         )}
 
-        {/* Search Bar for Saved Addresses */}
-        {savedAddresses.length > 0 && (
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search by name, phone, or address..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            <div className="absolute left-3 top-3 text-gray-400">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-            <div className="text-sm text-gray-500 mt-1">
-              <div className="flex justify-between items-center">
-                <span>
-                  Showing {paginatedAddresses.length} of {filteredAddresses.length} addresses
-                  {filteredAddresses.length !== savedAddresses.length &&
-                    ` (${savedAddresses.length} total)`
-                  }
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">Items per page:</span>
-                  <select
-                    value={itemsPerPage}
-                    onChange={handleItemsPerPageChange}
-                    className="border border-gray-300 rounded px-2 py-1 text-sm"
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                  </select>
-                </div>
-              </div>
-
-              {filteredAddresses.length === 0 && searchQuery && (
-                <div className="mt-2">
-                  <span className="text-red-500">No results found</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Saved Addresses List */}
-        {paginatedAddresses.map((addr) => (
-          <div
-            key={addr.id}
-            onClick={() => handleSelectSavedAddress(addr)}
-            className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${currentSelectedAddress && (currentSelectedAddress as ExtendedAddress).id === addr.id
-              ? "border-blue-500 bg-blue-50"
-              : "border-gray-200 hover:bg-gray-50"
-              }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold">{addr.label}</p>
-                <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
-                {addr.phone && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    {t.phone}: {addr.phone}
-                  </p>
-                )}
-              </div>
-              <span className="text-blue-500 text-lg">📍</span>
-            </div>
-          </div>
-        ))}
-
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 p-4 border border-gray-200 rounded-xl">
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 border rounded ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
-              >
-                ← Previous
-              </button>
-
-              <div className="flex gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => goToPage(page)}
-                    className={`w-8 h-8 rounded-full ${currentPage === page ? 'bg-blue-600 text-white' : 'border hover:bg-gray-50'}`}
-                  >
-                    {page}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1 border rounded ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
-              >
-                Next →
-              </button>
-            </div>
-
-            <div className="text-sm text-gray-600">
-              Page {currentPage} of {totalPages}
-            </div>
-          </div>
-        )}
-
-        {/* Sales Mode: Always show customer form */}
+        {/* Sales Mode: Always show customer form when adding */}
         {user?.role === "sale" && isAdding ? (
           <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
+            {/* Search Bar for Sales Users */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search customer by name, phone, or address..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <div className="absolute left-3 top-3 text-gray-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setShowSearchResults(false);
+                  }}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
             {/* Name / Label */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -640,6 +595,9 @@ const CombinedCheckoutPage = () => {
               </button>
               <button
                 onClick={() => {
+                  setIsAdding(false);
+                  setSearchQuery("");
+                  setShowSearchResults(false);
                   setTempAddress({
                     label: "",
                     phone: "",
@@ -650,18 +608,137 @@ const CombinedCheckoutPage = () => {
                 }}
                 className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
               >
-                {t.clear}
+                {t.cancel}
               </button>
             </div>
           </div>
         ) : user?.role === "sale" ? (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
-          >
-            <span className="text-xl">+</span>
-            {t.addCustomerInfo}
-          </button>
+          <div className="space-y-3">
+            {/* Search Bar for Sales Users */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search customer by name, phone, or address..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <div className="absolute left-3 top-3 text-gray-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setShowSearchResults(false);
+                  }}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Show search results only when searching */}
+            {showSearchResults && searchQuery.trim() && (
+              <div className="space-y-3">
+                <div className="text-sm text-gray-500">
+                  {filteredAddresses.length > 0 ? (
+                    <span>Found {filteredAddresses.length} customer(s)</span>
+                  ) : (
+                    <div className="text-center p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <p className="text-gray-700">No customer found with "{searchQuery}"</p>
+                      <p className="text-sm text-gray-500 mt-1">Fill the form below to create a new customer</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Search Results - Customer List */}
+                {paginatedAddresses.map((addr) => (
+                  <div
+                    key={addr.id}
+                    onClick={() => handleSelectSavedAddress(addr)}
+                    className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${currentSelectedAddress && (currentSelectedAddress as ExtendedAddress).id === addr.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:bg-gray-50"
+                      }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold">{addr.label}</p>
+                        <p className="text-sm text-gray-600 mt-1">{addr.phone}</p>
+                        <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
+                      </div>
+                      <span className="text-blue-500 text-lg">📍</span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Pagination Controls for Search Results */}
+                {totalPages > 1 && (
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 p-4 border border-gray-200 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={goToPreviousPage}
+                        disabled={currentPage === 1}
+                        className={`px-3 py-1 border rounded ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+                      >
+                        ← Previous
+                      </button>
+
+                      <div className="flex gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <button
+                            key={page}
+                            onClick={() => goToPage(page)}
+                            className={`w-8 h-8 rounded-full ${currentPage === page ? 'bg-blue-600 text-white' : 'border hover:bg-gray-50'}`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={goToNextPage}
+                        disabled={currentPage === totalPages}
+                        className={`px-3 py-1 border rounded ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+                      >
+                        Next →
+                      </button>
+                    </div>
+
+                    <div className="text-sm text-gray-600">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add New Customer Button */}
+                <button
+                  onClick={handleAddNewCustomer}
+                  className="w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
+                >
+                  <span className="text-xl">+</span>
+                  Add New Customer
+                </button>
+              </div>
+            )}
+
+            {/* Show Add Customer button when not searching */}
+            {!searchQuery.trim() && (
+              <button
+                onClick={handleAddNewCustomer}
+                className="w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
+              >
+                <span className="text-xl">+</span>
+                Add New Customer
+              </button>
+            )}
+          </div>
         ) : null}
 
         {/* Regular Users: Add New Address Button / Form */}
@@ -837,8 +914,8 @@ const CombinedCheckoutPage = () => {
             key={method.name}
             onClick={() => handlePaymentMethodSelect(method.name)}
             className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow ${paymentMethod === method.name
-              ? "border-blue-500 bg-blue-50 shadow-lg"
-              : "border-gray-200 hover:shadow-md"
+                ? "border-blue-500 bg-blue-50 shadow-lg"
+                : "border-gray-200 hover:shadow-md"
               }`}
           >
             <div className="flex items-center gap-4">

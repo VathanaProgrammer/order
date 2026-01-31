@@ -12,6 +12,7 @@ import "./globals.css";
 import { LanguageProvider } from "./context/LanguageContext";
 import { Hanuman } from 'next/font/google';
 import { PointsProvider } from "./context/PointsContext";
+import { SalesAuthProvider } from "./context/SalesAuthContext";
 
 export const metadata: Metadata = {
   title: "SOB-Ecommerce",
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="km" className={`h-full ${hanuman.variable}`}>
       <body className="h-full m-0">
       <AuthProvider>
+        <SalesAuthProvider>
         <LanguageProvider>
         <GoogleMapsProvider>
             <CheckoutProvider>
@@ -52,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </CheckoutProvider>
         </GoogleMapsProvider>
         </LanguageProvider>
+        </SalesAuthProvider>
         </AuthProvider>
       </body>
     </html>
