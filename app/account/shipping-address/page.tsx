@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Header from "@/components/layouts/Header";
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import api from "@/api/api";
-import { useEffect } from "react";
-import { useAuth } from "@/context/AuthContext";
 import { toast } from "react-toastify";
+import { useAuth } from "@/context/AuthContext";
 import { useLoading } from "@/context/LoadingContext";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -20,6 +19,8 @@ export type Address = {
 };
 
 const containerStyle = { width: "100%", height: "400px" };
+const ITEMS_PER_PAGE_OPTIONS = [5, 10, 20, 50];
+const DEFAULT_ITEMS_PER_PAGE = 10;
 
 export default function ShippingAddressPage() {
   const { user } = useAuth();
@@ -32,6 +33,11 @@ export default function ShippingAddressPage() {
   const [showMapModal, setShowMapModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  
+  // Search and pagination states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
 
   const [newAddress, setNewAddress] = useState<Address>({
     label: "",
@@ -58,6 +64,34 @@ export default function ShippingAddressPage() {
   useEffect(() => {
     fetchAddress();
   }, [setLoading]);
+
+  // Filter addresses based on search query
+  const filteredAddresses = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return savedAddresses;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    return savedAddresses.filter(address => {
+      const labelMatch = address.label?.toLowerCase().includes(query) || false;
+      const phoneMatch = address.phone?.toLowerCase().includes(query) || false;
+      const detailsMatch = address.details?.toLowerCase().includes(query) || false;
+
+      return labelMatch || phoneMatch || detailsMatch;
+    });
+  }, [savedAddresses, searchQuery]);
+
+  // Calculate pagination
+  const totalItems = filteredAddresses.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedAddresses = filteredAddresses.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const handleSaveAddress = async () => {
     // Validation
@@ -238,20 +272,107 @@ export default function ShippingAddressPage() {
     return user?.phone || user?.mobile || "";
   };
 
+  // Pagination handlers
+  const goToPage = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = parseInt(e.target.value);
+    setItemsPerPage(value);
+    setCurrentPage(1); // Reset to first page
+  };
+
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchQuery("");
+  };
+
   return (
     <div className="flex flex-col h-full gap-6">
       <Header title={user?.role === "sale" ? "Customer Information" : t.shippingAddress} />
 
+      {/* Search Bar */}
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search by name, phone, or address..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        <div className="absolute left-3 top-3 text-gray-400">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        {searchQuery && (
+          <button
+            onClick={handleClearSearch}
+            className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+        <div className="text-sm text-gray-500 mt-2">
+          Showing {paginatedAddresses.length} of {totalItems} addresses
+          {searchQuery.trim() && ` (filtered from ${savedAddresses.length} total)`}
+        </div>
+      </div>
+
+      {/* Items per page selector */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">Items per page:</span>
+          <select
+            value={itemsPerPage}
+            onChange={handleItemsPerPageChange}
+            className="border border-gray-300 rounded px-2 py-1 text-sm"
+          >
+            {ITEMS_PER_PAGE_OPTIONS.map(option => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </div>
+        
+        {totalItems > 0 && (
+          <div className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages}
+          </div>
+        )}
+      </div>
+
       {/* Saved Addresses / Customers List */}
       <div className="flex flex-col gap-3">
-        {savedAddresses.length === 0 ? (
+        {paginatedAddresses.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
-            {user?.role === "sale" 
-              ? "No customers saved yet. Add your first customer below."
-              : t.noSavedAddressesYetAddYourFirstAddressBelow}
+            {searchQuery.trim() ? (
+              <div>
+                <p>No addresses found for "{searchQuery}"</p>
+                <p className="text-sm mt-1">Try a different search term</p>
+              </div>
+            ) : (
+              user?.role === "sale" 
+                ? "No customers saved yet. Add your first customer below."
+                : t.noSavedAddressesYetAddYourFirstAddressBelow
+            )}
           </div>
         ) : (
-          savedAddresses.map((addr) => (
+          paginatedAddresses.map((addr) => (
             <div
               key={addr.id}
               className={`p-4 rounded-xl border flex justify-between items-start gap-4 shadow hover:shadow-md transition cursor-pointer relative ${
@@ -266,11 +387,6 @@ export default function ShippingAddressPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-lg">{addr.label}</span>
-                      {user?.role === "sale" && (
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          Customer
-                        </span>
-                      )}
                     </div>
                     <p className="text-gray-600 text-sm mt-1">{addr.details}</p>
                     <p className="text-gray-600 text-sm mt-1">
@@ -309,6 +425,45 @@ export default function ShippingAddressPage() {
           ))
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 p-4 border border-gray-200 rounded-xl">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={goToPreviousPage}
+              disabled={currentPage === 1}
+              className={`px-3 py-1 border rounded ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+            >
+              ← Previous
+            </button>
+
+            <div className="flex gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => goToPage(page)}
+                  className={`w-8 h-8 rounded-full ${currentPage === page ? 'bg-blue-600 text-white' : 'border hover:bg-gray-50'}`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={goToNextPage}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1 border rounded ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+            >
+              Next →
+            </button>
+          </div>
+
+          <div className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages} • {totalItems} total items
+          </div>
+        </div>
+      )}
 
       {/* Add New Button */}
       <button
@@ -595,6 +750,7 @@ export default function ShippingAddressPage() {
                 onClick={() => {
                   if (newAddress.coordinates) {
                     setShowMapModal(false);
+                    toast.success("Location selected successfully!");
                   } else {
                     toast.error("Please select a location on the map");
                   }
