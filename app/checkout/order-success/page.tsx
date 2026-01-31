@@ -479,15 +479,14 @@ const generateInvoiceImage = (orderData: any) => {
                     <p className="font-semibold">
                       {formatCurrency(safeNumber(item.qty) * safeNumber(item.price_at_order))}
                     </p>
-                                  
-                    <div className="pt-3 border-t border-gray-200">
+                  </div>
+                ))}
+              </div>
+              <div className="pt-3 border-t border-gray-200">
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-gray-800">ទឹកប្រាក់សរុប</span>
                         <span className="text-xl font-bold text-blue-600">{formatCurrency(orderDetails.total)}</span>
                       </div>
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
           )}
