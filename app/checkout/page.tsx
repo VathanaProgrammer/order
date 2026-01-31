@@ -99,21 +99,6 @@ const CombinedCheckoutPage = () => {
     });
   }, [savedAddresses, searchQuery]);
 
-  // Check if we should auto-fill phone number when searching
-  useEffect(() => {
-    if (searchQuery.trim() && user?.role === "sale") {
-      // Check if search query looks like a phone number
-      const phoneRegex = /^[\d\s\-\+\(\)]{8,}$/;
-      if (phoneRegex.test(searchQuery.replace(/\s/g, ''))) {
-        // Auto-fill phone in temp address
-        setTempAddress(prev => ({
-          ...prev,
-          phone: searchQuery.trim()
-        }));
-      }
-    }
-  }, [searchQuery, user?.role]);
-
   // Calculate pagination data
   const paginatedAddresses = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -218,30 +203,44 @@ const CombinedCheckoutPage = () => {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
+  };
+
+  // Handle search submission (when user presses enter or we detect they're done typing)
+  const handleSearchSubmit = () => {
+    if (!searchQuery.trim()) return;
+
+    const hasResults = filteredAddresses.length > 0;
     
-    if (value.trim() && user?.role === "sale") {
-      // If it's a sales user and searching, show the form if no results found
-      const hasResults = savedAddresses.some(address => 
-        address.label?.toLowerCase().includes(value.toLowerCase()) ||
-        address.phone?.includes(value) ||
-        address.details?.toLowerCase().includes(value.toLowerCase())
-      );
+    if (!hasResults) {
+      // No results found - show form and auto-fill based on search query
+      setIsAdding(true);
       
-      if (!hasResults) {
-        setIsAdding(true);
-        // Auto-fill phone if it looks like a phone number
-        const phoneRegex = /^[\d\s\-\+\(\)]{8,}$/;
-        if (phoneRegex.test(value.replace(/\s/g, ''))) {
-          setTempAddress(prev => ({
-            ...prev,
-            phone: value.trim(),
-            label: "" // Clear label to let user enter name
-          }));
-        }
+      // Determine if search query looks like a phone number
+      const phoneRegex = /^[\d\s\-\+\(\)]{8,}$/;
+      const cleanedQuery = searchQuery.replace(/\s/g, '');
+      const isPhoneNumber = phoneRegex.test(cleanedQuery);
+      
+      if (isPhoneNumber) {
+        // If it looks like a phone number, fill phone field
+        setTempAddress(prev => ({
+          ...prev,
+          phone: searchQuery.trim(),
+          label: "" // Clear label so user can enter name
+        }));
       } else {
-        setIsAdding(false);
+        // If it doesn't look like a phone number, fill name/label field
+        setTempAddress(prev => ({
+          ...prev,
+          label: searchQuery.trim(),
+          phone: "" // Clear phone so user can enter phone
+        }));
       }
+    } else {
+      // Has results - don't show form
+      setIsAdding(false);
     }
+    
+    setShowSearchResults(true);
   };
 
   // Save new address - label is customer name for sales, address label for regular users
@@ -409,6 +408,13 @@ const CombinedCheckoutPage = () => {
     });
   };
 
+  // Handle key press for search input
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearchSubmit();
+    }
+  };
+
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar pb-24">
       <Header title={t.checkout} />
@@ -483,144 +489,17 @@ const CombinedCheckoutPage = () => {
           </div>
         )}
 
-        {/* Sales Mode: Always show customer form when adding */}
-        {user?.role === "sale" && isAdding ? (
-          <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
-            {/* Search Bar for Sales Users */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search customer by name, phone, or address..."
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <div className="absolute left-3 top-3 text-gray-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              {searchQuery && (
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setShowSearchResults(false);
-                  }}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
-
-            {/* Name / Label */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Customer Name *
-              </label>
-              <input
-                type="text"
-                placeholder="Enter customer name"
-                value={tempAddress.label || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.phone} *
-              </label>
-              <input
-                type="tel"
-                placeholder="Customer phone number"
-                value={tempAddress.phone || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Address Details */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.details || "Address Details"} *
-              </label>
-              <textarea
-                placeholder="Street, building, floor, notes..."
-                value={tempAddress.details || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                rows={3}
-              />
-            </div>
-
-            {/* Location Picker */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.clickToSelectLocation} *
-              </label>
-              <input
-                type="text"
-                readOnly
-                value={
-                  tempAddress.coordinates
-                    ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
-                    : ""
-                }
-                onClick={() => setShowMap(true)}
-                className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                placeholder={t.clickToSelectLocation}
-              />
-              {!tempAddress.coordinates && (
-                <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleSaveNewAddress}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={
-                  !tempAddress.details?.trim() ||
-                  !tempAddress.coordinates ||
-                  !tempAddress.label?.trim() ||
-                  !tempAddress.phone?.trim()
-                }
-              >
-                Save Customer
-              </button>
-              <button
-                onClick={() => {
-                  setIsAdding(false);
-                  setSearchQuery("");
-                  setShowSearchResults(false);
-                  setTempAddress({
-                    label: "",
-                    phone: "",
-                    details: "",
-                    coordinates: { lat: 11.567, lng: 104.928 },
-                    api_user_id: user?.id,
-                  });
-                }}
-                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-              >
-                {t.cancel}
-              </button>
-            </div>
-          </div>
-        ) : user?.role === "sale" ? (
+        {/* Sales Mode: Search and Customer Management */}
+        {user?.role === "sale" && (
           <div className="space-y-3">
-            {/* Search Bar for Sales Users */}
+            {/* Search Bar */}
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search customer by name, phone, or address..."
+                placeholder="Search customer by name or phone number..."
                 value={searchQuery}
                 onChange={handleSearchChange}
+                onKeyPress={handleKeyPress}
                 className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               <div className="absolute left-3 top-3 text-gray-400">
@@ -633,6 +512,7 @@ const CombinedCheckoutPage = () => {
                   onClick={() => {
                     setSearchQuery("");
                     setShowSearchResults(false);
+                    setIsAdding(false);
                   }}
                   className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                 >
@@ -641,18 +521,35 @@ const CombinedCheckoutPage = () => {
                   </svg>
                 </button>
               )}
+              <div className="mt-2">
+                <button
+                  onClick={handleSearchSubmit}
+                  className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                >
+                  Search Customer
+                </button>
+              </div>
             </div>
 
-            {/* Show search results only when searching */}
+            {/* Show search results when searching */}
             {showSearchResults && searchQuery.trim() && (
               <div className="space-y-3">
+                {/* Search Results Header */}
                 <div className="text-sm text-gray-500">
                   {filteredAddresses.length > 0 ? (
-                    <span>Found {filteredAddresses.length} customer(s)</span>
+                    <div className="flex justify-between items-center">
+                      <span>Found {filteredAddresses.length} customer(s)</span>
+                      <button
+                        onClick={handleAddNewCustomer}
+                        className="px-3 py-1 text-sm bg-gray-100 border border-gray-300 rounded hover:bg-gray-200"
+                      >
+                        + New Customer
+                      </button>
+                    </div>
                   ) : (
                     <div className="text-center p-4 border border-gray-200 rounded-lg bg-gray-50">
                       <p className="text-gray-700">No customer found with "{searchQuery}"</p>
-                      <p className="text-sm text-gray-500 mt-1">Fill the form below to create a new customer</p>
+                      <p className="text-sm text-gray-500 mt-1">The search query has been added to the form below</p>
                     </div>
                   )}
                 </div>
@@ -670,7 +567,7 @@ const CombinedCheckoutPage = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-semibold">{addr.label}</p>
-                        <p className="text-sm text-gray-600 mt-1">{addr.phone}</p>
+                        <p className="text-sm text-gray-600 mt-1">Phone: {addr.phone}</p>
                         <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
                       </div>
                       <span className="text-blue-500 text-lg">📍</span>
@@ -716,20 +613,119 @@ const CombinedCheckoutPage = () => {
                     </div>
                   </div>
                 )}
-
-                {/* Add New Customer Button */}
-                <button
-                  onClick={handleAddNewCustomer}
-                  className="w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
-                >
-                  <span className="text-xl">+</span>
-                  Add New Customer
-                </button>
               </div>
             )}
 
-            {/* Show Add Customer button when not searching */}
-            {!searchQuery.trim() && (
+            {/* Customer Form - Show when adding new customer OR when search returns no results */}
+            {(isAdding || (showSearchResults && searchQuery.trim() && filteredAddresses.length === 0)) && (
+              <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl mt-3">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {filteredAddresses.length === 0 && searchQuery.trim() 
+                    ? "Create New Customer" 
+                    : "Add New Customer"}
+                </h3>
+
+                {/* Name / Label */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Customer Name *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter customer name"
+                    value={tempAddress.label || ""}
+                    onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.phone} *
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="Customer phone number"
+                    value={tempAddress.phone || ""}
+                    onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Address Details */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.details || "Address Details"} *
+                  </label>
+                  <textarea
+                    placeholder="Street, building, floor, notes..."
+                    value={tempAddress.details || ""}
+                    onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={3}
+                  />
+                </div>
+
+                {/* Location Picker */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.clickToSelectLocation} *
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={
+                      tempAddress.coordinates
+                        ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
+                        : ""
+                    }
+                    onClick={() => setShowMap(true)}
+                    className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                    placeholder={t.clickToSelectLocation}
+                  />
+                  {!tempAddress.coordinates && (
+                    <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={handleSaveNewAddress}
+                    className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
+                    disabled={
+                      !tempAddress.details?.trim() ||
+                      !tempAddress.coordinates ||
+                      !tempAddress.label?.trim() ||
+                      !tempAddress.phone?.trim()
+                    }
+                  >
+                    Save Customer
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAdding(false);
+                      setSearchQuery("");
+                      setShowSearchResults(false);
+                      setTempAddress({
+                        label: "",
+                        phone: "",
+                        details: "",
+                        coordinates: { lat: 11.567, lng: 104.928 },
+                        api_user_id: user?.id,
+                      });
+                    }}
+                    className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+                  >
+                    {t.cancel}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Show Add Customer button when not searching and not in adding mode */}
+            {!searchQuery.trim() && !isAdding && !showSearchResults && (
               <button
                 onClick={handleAddNewCustomer}
                 className="w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
@@ -739,7 +735,7 @@ const CombinedCheckoutPage = () => {
               </button>
             )}
           </div>
-        ) : null}
+        )}
 
         {/* Regular Users: Add New Address Button / Form */}
         {user?.role !== "sale" && isAdding ? (
