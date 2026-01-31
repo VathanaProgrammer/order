@@ -101,9 +101,9 @@ const page = () => {
 
         // Total Box
         y += 10;
-        ctx.fillStyle = '#b2ccee'; // blue-50
+        ctx.fillStyle = '#eff6ff'; // blue-50
         ctx.fillRect(0, y, width, 70);
-        ctx.fillStyle = '#cbcbcc';
+        ctx.fillStyle = '#1e4ce4';
         ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'left';
         ctx.fillText('Total Amount', 20, y + 40);
@@ -214,7 +214,7 @@ const page = () => {
               </div>
             </div>
 
-            <div className="p-5 bg-blue-600 text-white">
+            <div className="p-5 bg-blue-300 text-white">
               <div className="flex justify-between items-center">
                 <span className="font-medium opacity-80">Total Amount</span>
                 <span className="text-2xl font-black">{formatCurrency(orderDetails.total)}</span>
@@ -240,7 +240,7 @@ const page = () => {
         </div>
       )}
 
-      <div className="p-4 bg-white/80 backdrop-blur-md border-t flex gap-3">
+      <div className="p-4 backdrop-blur-md border-t flex gap-3">
         <a href="/" className="flex-1 py-3 bg-gray-200 text-center rounded-xl font-bold text-gray-700">{t.home}</a>
         {telegramLink && (
           <a href={telegramLink} target="_blank" className="flex-1 py-3 bg-blue-600 text-white text-center rounded-xl font-bold flex items-center justify-center gap-2">
