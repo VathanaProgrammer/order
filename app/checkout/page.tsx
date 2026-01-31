@@ -677,7 +677,7 @@ const CombinedCheckoutPage = () => {
                       readOnly
                       value={t.clickToSelectLocation}
                       onClick={() => setShowMap(true)}
-                      className="p-1 border rounded-lg text-white cursor-pointer bg-blue-500 hover:bg-blue-600"
+                      className="p-2 border rounded-lg text-white cursor-pointer bg-blue-500 hover:bg-blue-600"
                       placeholder={t.clickToSelectLocation}
                     />
                   </div>
