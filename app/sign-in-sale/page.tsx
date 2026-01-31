@@ -34,7 +34,7 @@ const SalesLoginPage = () => {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sales Portal Login
+            Sales Login
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Use your system username and password
@@ -42,8 +42,8 @@ const SalesLoginPage = () => {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSalesLogin}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div className="mb-4">
+          <div className="-space-y-px">
+            <div className="mb-4 rounded-md shadow-sm ">
               <label htmlFor="username" className="sr-only">
                 Username
               </label>
@@ -59,7 +59,7 @@ const SalesLoginPage = () => {
                 placeholder="Username"
               />
             </div>
-            <div>
+            <div className="rounded-md shadow-sm ">
               <label htmlFor="password" className="sr-only">
                 Password
               </label>
