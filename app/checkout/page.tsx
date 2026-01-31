@@ -99,12 +99,12 @@ const CombinedCheckoutPage = () => {
     });
   }, [savedAddresses, searchQuery]);
 
-  // Determine if search query looks like a phone number
-  const isPhoneNumber = useMemo(() => {
+  // Determine if search query starts with a number (phone) or not (name)
+  const isLikelyPhoneNumber = useMemo(() => {
     if (!searchQuery.trim()) return false;
-    const phoneRegex = /^[\d\s\-\+\(\)]{8,}$/;
-    const cleanedQuery = searchQuery.replace(/\s/g, '');
-    return phoneRegex.test(cleanedQuery);
+    const firstChar = searchQuery.trim().charAt(0);
+    // Check if first character is a digit (0-9)
+    return /^\d/.test(firstChar);
   }, [searchQuery]);
 
   // Calculate pagination data
@@ -152,24 +152,25 @@ const CombinedCheckoutPage = () => {
   // Update form fields in real-time as user types in search
   useEffect(() => {
     if (searchQuery.trim() && user?.role === "sale") {
-      // Determine which field to update based on whether it looks like a phone number
-      if (isPhoneNumber) {
+      // If it starts with a number → phone number field
+      if (isLikelyPhoneNumber) {
         setTempAddress(prev => ({
           ...prev,
           phone: searchQuery.trim(),
-          // Only clear label if we're auto-filling phone
+          // Don't clear label if user already typed something there
           label: prev.label || ""
         }));
       } else {
+        // If it starts with letter or other character → name field
         setTempAddress(prev => ({
           ...prev,
           label: searchQuery.trim(),
-          // Only clear phone if we're auto-filling name
+          // Don't clear phone if user already typed something there
           phone: prev.phone || ""
         }));
       }
     }
-  }, [searchQuery, isPhoneNumber, user?.role]);
+  }, [searchQuery, isLikelyPhoneNumber, user?.role]);
 
   // Helper to extract phone from user object
   const getPhoneFromUser = (userData: any): string | null => {
@@ -612,8 +613,8 @@ const CombinedCheckoutPage = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Customer Name *
-                    {isPhoneNumber && searchQuery.trim() && (
-                      <span className="text-xs text-gray-500 ml-2">(Search looks like a phone number, please enter name)</span>
+                    {isLikelyPhoneNumber && searchQuery.trim() && (
+                      <span className="text-xs text-gray-500 ml-2">(Detected as phone number, please enter name)</span>
                     )}
                   </label>
                   <input
@@ -629,8 +630,8 @@ const CombinedCheckoutPage = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t.phone} *
-                    {!isPhoneNumber && searchQuery.trim() && (
-                      <span className="text-xs text-gray-500 ml-2">(Search looks like a name, please enter phone)</span>
+                    {!isLikelyPhoneNumber && searchQuery.trim() && (
+                      <span className="text-xs text-gray-500 ml-2">(Detected as name, please enter phone number)</span>
                     )}
                   </label>
                   <input
