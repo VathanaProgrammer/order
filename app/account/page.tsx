@@ -167,34 +167,54 @@ const Page: React.FC = () => {
     console.log('🖼️ Initial profileImage state:', profileImage);
   }, []);
 
-  const accountSections = [
-    {
-      icon: "mdi:account",
-      title: t.profileInformation,
-      desc: t.manageYourNameAndPhoneNumber,
-      action: t.editProfile,
-      route: '/account/edit-profile'
-    },
-    {
-      icon: "mdi:map-marker",
-      title: t.shippingAddresses,
-      desc: t.viewAndUpdateYourShippingAndBillingAddresses,
-      action: t.manageAddresses,
-      route: '/account/shipping-address'
-    },
-    // {
-    //   icon: "lucide:database",
-    //   title: t.rewards,
-    //   desc: t.checkAvailableCoupons,
-    //   action: t.viewRewards,
-    //   route: '/account/reward'
-    // },
-  ];
+  // Account sections - different for sales vs regular users
+  const accountSections = user?.role === "sale" 
+    ? [
+        // Sales Role Sections
+        {
+          icon: "mdi:account",
+          title: "Sales Profile",
+          desc: "Manage your sales profile information",
+          action: "Edit Profile",
+          route: '/account/edit-profile'
+        },
+        {
+          icon: "mdi:account-group",
+          title: "Customer List",
+          desc: "View and manage your customer database",
+          action: "Manage Customers",
+          route: '/account/shipping-address' // Same route but different UI
+        },
+      ]
+    : [
+        // Regular User Sections
+        {
+          icon: "mdi:account",
+          title: t.profileInformation || "Profile Information",
+          desc: t.manageYourNameAndPhoneNumber || "Manage your name and phone number",
+          action: t.editProfile || "Edit Profile",
+          route: '/account/edit-profile'
+        },
+        {
+          icon: "mdi:map-marker",
+          title: t.shippingAddresses || "Shipping Addresses",
+          desc: t.viewAndUpdateYourShippingAndBillingAddresses || "View and update your shipping and billing addresses",
+          action: t.manageAddresses || "Manage Addresses",
+          route: '/account/shipping-address'
+        },
+        // {
+        //   icon: "lucide:database",
+        //   title: t.rewards || "Rewards",
+        //   desc: t.checkAvailableCoupons || "Check available coupons",
+        //   action: t.viewRewards || "View Rewards",
+        //   route: '/account/reward'
+        // },
+      ];
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-500">{t.loadingAccount}</p>
+        <p className="text-gray-500">{t.loadingAccount || "Loading account..."}</p>
       </div>
     );
   }
@@ -202,7 +222,7 @@ const Page: React.FC = () => {
   return (
     <div className="flex flex-col items-center min-h-screen">
       <div className="w-full max-w-[440px] min-h-screen">
-        <Header title={t.myAccount} />
+        <Header title={user?.role === "sale" ? "Sales Account" : t.myAccount || "My Account"} />
 
         {/* Profile Section */}
         <div className="w-full mt-10 flex flex-col items-center justify-center">
@@ -255,6 +275,11 @@ const Page: React.FC = () => {
             <p className="font-semibold text-lg text-gray-900">
               {user?.name}
             </p>
+            {user?.role === "sale" && (
+              <span className="inline-block mt-1 px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                Sales Representative
+              </span>
+            )}
           </div>
         </div>
 
@@ -291,7 +316,7 @@ const Page: React.FC = () => {
             onClick={logout} 
             className="w-full bg-red-500 text-white py-2 rounded-[5px] font-semibold hover:bg-red-600 transition"
           >
-            {t.logout}
+            {t.logout || "Logout"}
           </button>
         </div>
       </div>
