@@ -172,6 +172,19 @@ const CombinedCheckoutPage = () => {
     }
   }, [searchQuery, isLikelyPhoneNumber, user?.role]);
 
+  // Clear form fields when form disappears
+  useEffect(() => {
+    if (!isAdding && !searchQuery.trim() && user?.role === "sale") {
+      setTempAddress({
+        label: "",
+        phone: user?.role === "sale" ? "" : getPhoneFromUser(user) || "",
+        details: "",
+        coordinates: { lat: 11.567, lng: 104.928 },
+        api_user_id: user?.id,
+      });
+    }
+  }, [isAdding, searchQuery, user]);
+
   // Helper to extract phone from user object
   const getPhoneFromUser = (userData: any): string | null => {
     if (!userData) return null;
@@ -328,7 +341,7 @@ const CombinedCheckoutPage = () => {
       setShowSearchResults(false);
       setCurrentPage(1);
 
-      // Reset form fields
+      // Reset form fields after successful save
       setTempAddress({
         label: "",
         phone: user?.role === "sale" ? "" : userPhone || "",
@@ -398,6 +411,20 @@ const CombinedCheckoutPage = () => {
     setTempAddress({
       label: "",
       phone: "",
+      details: "",
+      coordinates: { lat: 11.567, lng: 104.928 },
+      api_user_id: user?.id,
+    });
+  };
+
+  // Clear search and reset form
+  const handleClearSearch = () => {
+    setSearchQuery("");
+    setShowSearchResults(false);
+    setIsAdding(false);
+    setTempAddress({
+      label: "",
+      phone: user?.role === "sale" ? "" : userPhone || "",
       details: "",
       coordinates: { lat: 11.567, lng: 104.928 },
       api_user_id: user?.id,
@@ -497,18 +524,7 @@ const CombinedCheckoutPage = () => {
               </div>
               {searchQuery && (
                 <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setShowSearchResults(false);
-                    setIsAdding(false);
-                    setTempAddress({
-                      label: "",
-                      phone: "",
-                      details: "",
-                      coordinates: { lat: 11.567, lng: 104.928 },
-                      api_user_id: user?.id,
-                    });
-                  }}
+                  onClick={handleClearSearch}
                   className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
