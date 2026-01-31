@@ -28,8 +28,8 @@ export default function ShippingAddressPage() {
 
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<number | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
-  const [showMap, setShowMap] = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -133,8 +133,9 @@ export default function ShippingAddressPage() {
         fetchAddress();
       }
 
-      // Reset form
+      // Reset form and close modal
       resetForm();
+      setShowFormModal(false);
     } catch (err: any) {
       console.error("Save/Edit error:", err);
       console.error("Error response:", err.response?.data);
@@ -161,8 +162,13 @@ export default function ShippingAddressPage() {
     });
     setEditingId(address.id || null);
     setIsEditing(true);
-    setIsAdding(true);
+    setShowFormModal(true);
     setSelectedAddress(address.id || null);
+  };
+
+  const handleAddNew = () => {
+    resetForm();
+    setShowFormModal(true);
   };
 
   const handleDeleteAddress = async (id: number) => {
@@ -217,14 +223,14 @@ export default function ShippingAddressPage() {
       coordinates: undefined,
       api_user_id: user?.id || undefined
     });
-    setIsAdding(false);
     setIsEditing(false);
     setEditingId(null);
-    setShowMap(false);
+    setShowMapModal(false);
   };
 
   const handleCancel = () => {
     resetForm();
+    setShowFormModal(false);
   };
 
   // Function to get user phone for display
@@ -304,154 +310,200 @@ export default function ShippingAddressPage() {
         )}
       </div>
 
-      {/* Add / Edit Address/Customer Form */}
-      {isAdding ? (
-        <div className="border rounded-xl p-4 flex flex-col gap-3 bg-white shadow-md mt-4">
-          <h3 className="text-lg font-semibold mb-2">
-            {isEditing 
-              ? (user?.role === "sale" ? "Edit Customer" : t.editAddress)
-              : (user?.role === "sale" ? "Add New Customer" : t.addNewAddress)
-            }
-          </h3>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {user?.role === "sale" ? "Customer Name *" : t.label + " *"}
-            </label>
-            <input
-              type="text"
-              placeholder={user?.role === "sale" ? "Enter customer name" : t.labelHomeWork}
-              className="bg-gray-50 border border-gray-300 rounded-lg p-3 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={newAddress.label}
-              onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
-            />
-          </div>
+      {/* Add New Button */}
+      <button
+        onClick={handleAddNew}
+        className="mt-4 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 w-full font-semibold flex items-center justify-center gap-2"
+      >
+        <span className="text-xl">+</span>
+        {user?.role === "sale" ? "Add New Customer" : t.addNewAddress}
+      </button>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.phone} {user?.role === "sale" ? "*" : ""}
-            </label>
-            {user?.role !== "sale" && getUserPhone() ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    id="profile-phone"
-                    name="phone-source"
-                    checked={!newAddress.phone}
-                    onChange={() => setNewAddress({ ...newAddress, phone: "" })}
-                  />
-                  <label htmlFor="profile-phone" className="text-sm">
-                    Use profile phone: {getUserPhone()}
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    id="custom-phone"
-                    name="phone-source"
-                    checked={!!newAddress.phone}
-                    onChange={() => setNewAddress({ ...newAddress, phone: "" })}
-                  />
-                  <label htmlFor="custom-phone" className="text-sm">
-                    Use different phone:
-                  </label>
-                </div>
+      {/* Form Modal */}
+      {showFormModal && (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-800">
+                {isEditing 
+                  ? (user?.role === "sale" ? "Edit Customer" : "Edit Address")
+                  : (user?.role === "sale" ? "Add New Customer" : "Add New Address")
+                }
+              </h3>
+              <button
+                onClick={handleCancel}
+                className="text-gray-400 hover:text-gray-600 text-2xl p-1"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* Name/Label Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {user?.role === "sale" ? "Customer Name *" : "Address Label *"}
+                </label>
+                <input
+                  type="text"
+                  placeholder={user?.role === "sale" ? "Enter customer name" : "Home, Work, etc."}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={newAddress.label}
+                  onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
+                />
               </div>
-            ) : null}
-            
-            <input
-              type="text"
-              placeholder={user?.role === "sale" ? "Customer phone number" : t.phone}
-              className="bg-gray-50 border border-gray-300 rounded-lg p-3 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mt-2"
-              value={newAddress.phone || ""}
-              onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
-              disabled={user?.role !== "sale" && !newAddress.phone && !!getUserPhone()}
-            />
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {user?.role === "sale" ? "Delivery Address *" : t.details + " *"}
-            </label>
-            <textarea
-              placeholder={user?.role === "sale" ? "Street, building, floor, delivery notes..." : t.details}
-              className="bg-gray-50 border border-gray-300 rounded-lg p-3 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={newAddress.details}
-              onChange={(e) => setNewAddress({ ...newAddress, details: e.target.value })}
-              rows={3}
-            />
-          </div>
+              {/* Phone Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone {user?.role === "sale" ? "*" : ""}
+                </label>
+                {user?.role !== "sale" && getUserPhone() ? (
+                  <div className="space-y-3 mb-3">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        id="profile-phone"
+                        name="phone-source"
+                        checked={!newAddress.phone}
+                        onChange={() => setNewAddress({ ...newAddress, phone: "" })}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <label htmlFor="profile-phone" className="text-sm">
+                        Use my phone: <span className="font-medium">{getUserPhone()}</span>
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        id="custom-phone"
+                        name="phone-source"
+                        checked={!!newAddress.phone}
+                        onChange={() => setNewAddress({ ...newAddress, phone: "" })}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <label htmlFor="custom-phone" className="text-sm">
+                        Use different phone number
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
+                
+                <input
+                  type="tel"
+                  placeholder={user?.role === "sale" ? "Customer phone number" : "Phone number"}
+                  className={`w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    user?.role !== "sale" && !newAddress.phone && !!getUserPhone() 
+                      ? "bg-gray-100 cursor-not-allowed" 
+                      : ""
+                  }`}
+                  value={newAddress.phone || ""}
+                  onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
+                  disabled={user?.role !== "sale" && !newAddress.phone && !!getUserPhone()}
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.clickToSelectLocation} *
-            </label>
-            <input
-              type="text"
-              placeholder={t.clickToSelectLocation}
-              className="bg-gray-50 border border-gray-300 rounded-lg p-3 w-full cursor-pointer focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              readOnly
-              value={
-                newAddress.coordinates
-                  ? `Lat: ${newAddress.coordinates.lat.toFixed(5)}, Lng: ${newAddress.coordinates.lng.toFixed(5)}`
-                  : ""
-              }
-              onClick={() => setShowMap(true)}
-            />
-            {!newAddress.coordinates && (
-              <p className="text-sm text-red-500 mt-1">
-                {t.pleaseSelectALocationOnTheMap}
-              </p>
-            )}
-          </div>
+              {/* Address Details */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {user?.role === "sale" ? "Delivery Address *" : "Address Details *"}
+                </label>
+                <textarea
+                  placeholder={user?.role === "sale" 
+                    ? "Street, building, floor, delivery notes..." 
+                    : "Full address details..."
+                  }
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={newAddress.details}
+                  onChange={(e) => setNewAddress({ ...newAddress, details: e.target.value })}
+                  rows={3}
+                />
+              </div>
 
-          <div className="flex justify-end gap-2 mt-2">
-            <button
-              onClick={handleCancel}
-              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-            >
-              {t.cancel}
-            </button>
-            <button
-              onClick={handleSaveAddress}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
-              disabled={
-                !newAddress.label || 
-                !newAddress.details || 
-                !newAddress.coordinates ||
-                (user?.role === "sale" && !newAddress.phone) ||
-                (user?.role !== "sale" && !newAddress.phone && !getUserPhone())
-              }
-            >
-              {isEditing 
-                ? (user?.role === "sale" ? "Update Customer" : t.saveChanges || "Save Changes")
-                : (user?.role === "sale" ? "Save Customer" : t.saveAddress)
-              }
-            </button>
+              {/* Location Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Location on Map *
+                </label>
+                <div 
+                  onClick={() => setShowMapModal(true)}
+                  className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors flex flex-col items-center justify-center text-center"
+                >
+                  {newAddress.coordinates ? (
+                    <div className="text-center">
+                      <div className="text-green-600 text-lg mb-1">✓ Location Selected</div>
+                      <p className="text-sm text-gray-600">
+                        Lat: {newAddress.coordinates.lat.toFixed(6)}
+                        <br />
+                        Lng: {newAddress.coordinates.lng.toFixed(6)}
+                      </p>
+                      <p className="text-xs text-blue-600 mt-2">Click to change location</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-gray-400 text-2xl mb-2">📍</div>
+                      <p className="text-gray-600 font-medium">Click to select location on map</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Select your location by clicking on the map
+                      </p>
+                    </>
+                  )}
+                </div>
+                {!newAddress.coordinates && (
+                  <p className="text-sm text-red-500 mt-2">
+                    Please select a location on the map
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4">
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveAddress}
+                  disabled={
+                    !newAddress.label || 
+                    !newAddress.details || 
+                    !newAddress.coordinates ||
+                    (user?.role === "sale" && !newAddress.phone) ||
+                    (user?.role !== "sale" && !newAddress.phone && !getUserPhone())
+                  }
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
+                >
+                  {isEditing 
+                    ? (user?.role === "sale" ? "Update Customer" : "Save Changes")
+                    : (user?.role === "sale" ? "Save Customer" : "Save Address")
+                  }
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      ) : (
-        <button
-          onClick={() => setIsAdding(true)}
-          className="mt-4 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 w-full font-semibold flex items-center justify-center gap-2"
-        >
-          <span className="text-xl">+</span>
-          {user?.role === "sale" ? "Add New Customer" : t.addNewAddress}
-        </button>
       )}
 
       {/* Map Modal */}
-      {showMap && (
-        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg max-h-[90vh] overflow-auto">
+      {showMapModal && (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60] p-4">
+          <div className="bg-white rounded-lg p-4 w-[90%] max-w-2xl max-h-[90vh] overflow-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">{t.selectLocation}</h3>
+              <div>
+                <h3 className="text-lg font-semibold">Select Location</h3>
+                <p className="text-sm text-gray-500">Click on the map to select a location</p>
+              </div>
               <button
-                onClick={() => setShowMap(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl p-1"
+                onClick={() => setShowMapModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl p-1"
               >
-                ✕
+                ×
               </button>
             </div>
             
@@ -460,64 +512,96 @@ export default function ShippingAddressPage() {
               center={newAddress.coordinates || { lat: 11.567, lng: 104.928 }}
               zoom={15}
               onClick={(e) => {
-                if (e.latLng)
+                if (e.latLng) {
                   setNewAddress({
                     ...newAddress,
                     coordinates: { lat: e.latLng.lat(), lng: e.latLng.lng() },
                   });
+                }
               }}
             >
               {newAddress.coordinates && (
                 <Marker
                   position={newAddress.coordinates}
                   draggable
-                  onDragEnd={(e) =>
-                    setNewAddress({
-                      ...newAddress,
-                      coordinates: { 
-                        lat: e.latLng!.lat(), 
-                        lng: e.latLng!.lng() 
-                      },
-                    })
-                  }
+                  onDragEnd={(e) => {
+                    if (e.latLng) {
+                      setNewAddress({
+                        ...newAddress,
+                        coordinates: { 
+                          lat: e.latLng.lat(), 
+                          lng: e.latLng.lng() 
+                        },
+                      });
+                    }
+                  }}
                 />
               )}
             </GoogleMap>
 
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700">
-                {t.selectedCoordinates}:
-              </p>
-              {newAddress.coordinates ? (
-                <p className="text-sm text-gray-600 mt-1">
-                  {t.latitude}: {newAddress.coordinates.lat.toFixed(6)}
-                  <br />
-                  {t.longtitude}: {newAddress.coordinates.lng.toFixed(6)}
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-sm font-medium text-gray-700">
+                  Selected Coordinates:
                 </p>
+                <button
+                  onClick={() => {
+                    setNewAddress({
+                      ...newAddress,
+                      coordinates: undefined,
+                    });
+                  }}
+                  className="text-sm text-red-600 hover:text-red-800"
+                >
+                  Clear Selection
+                </button>
+              </div>
+              
+              {newAddress.coordinates ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500">Latitude</p>
+                      <p className="text-sm font-medium">
+                        {newAddress.coordinates.lat.toFixed(6)}
+                      </p>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500">Longitude</p>
+                      <p className="text-sm font-medium">
+                        {newAddress.coordinates.lng.toFixed(6)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-green-600 mt-2">
+                    ✓ Location selected. You can also drag the marker to adjust.
+                  </p>
+                </div>
               ) : (
-                <p className="text-sm text-gray-500 mt-1">
-                  {t.clickToSelectLocation}
+                <p className="text-sm text-gray-500">
+                  Click on the map to select a location
                 </p>
               )}
             </div>
 
             <div className="flex justify-end gap-2 mt-4">
               <button
-                onClick={() => {
-                  setNewAddress({
-                    ...newAddress,
-                    coordinates: undefined,
-                  });
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                onClick={() => setShowMapModal(false)}
+                className="px-6 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
               >
-                {t.clear}
+                Cancel
               </button>
               <button
-                onClick={() => setShowMap(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={() => {
+                  if (newAddress.coordinates) {
+                    setShowMapModal(false);
+                  } else {
+                    toast.error("Please select a location on the map");
+                  }
+                }}
+                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
-                {t.select}
+                Confirm Location
               </button>
             </div>
           </div>
