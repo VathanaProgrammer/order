@@ -171,13 +171,13 @@ const Page: React.FC = () => {
   const accountSections = user?.role === "sale" 
     ? [
         // Sales Role Sections
-        {
-          icon: "mdi:account",
-          title: "Sales Profile",
-          desc: "Manage your sales profile information",
-          action: "Edit Profile",
-          route: '/account/edit-profile'
-        },
+        // {
+        //   icon: "mdi:account",
+        //   title: "Sales Profile",
+        //   desc: "Manage your sales profile information",
+        //   action: "Edit Profile",
+        //   route: '/account/edit-profile'
+        // },
         {
           icon: "mdi:account-group",
           title: "Customer List",
@@ -226,7 +226,7 @@ const Page: React.FC = () => {
 
         {/* Profile Section */}
         <div className="w-full mt-10 flex flex-col items-center justify-center">
-          <div className="relative w-[120px] h-[120px]">
+          {user?.role === "sale" && <div className="relative w-[120px] h-[120px]">
             <Image
               id="profileImage"
               src={profileImage}
@@ -269,7 +269,7 @@ const Page: React.FC = () => {
                 className="text-gray-800 hover:text-white"
               />
             </button>
-          </div>
+          </div>}
 
           <div className="mt-3 text-center">
             <p className="font-semibold text-lg text-gray-900">
