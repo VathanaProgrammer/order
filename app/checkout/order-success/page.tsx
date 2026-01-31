@@ -214,7 +214,7 @@ const page = () => {
               </div>
             </div>
 
-            <div className="p-5 bg-blue-300 text-white">
+            <div className="p-5 bg-gray-200 text-white">
               <div className="flex justify-between items-center">
                 <span className="font-medium opacity-80">Total Amount</span>
                 <span className="text-2xl font-black">{formatCurrency(orderDetails.total)}</span>
