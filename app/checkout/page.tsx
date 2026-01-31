@@ -731,7 +731,7 @@ const CombinedCheckoutPage = () => {
             )}
 
             {/* Show Add Customer button when not searching */}
-            {!searchQuery.trim() && !isAdding && (
+            {/* {!searchQuery.trim() && !isAdding && (
               <button
                 onClick={handleAddNewCustomer}
                 className="w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
@@ -739,7 +739,7 @@ const CombinedCheckoutPage = () => {
                 <span className="text-xl">+</span>
                 Add New Customer
               </button>
-            )}
+            )} */}
           </div>
         )}
 
