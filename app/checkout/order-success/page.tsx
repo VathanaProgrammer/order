@@ -422,68 +422,6 @@ const generateInvoiceImage = (orderData: any) => {
       {/* Main Content */}
       {!isLoading && orderDetails && (
         <div className="p-4">
-          {/* Receipt Preview Card */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-4">
-            {isGeneratingInvoice ? (
-              <div className="py-12 text-center">
-                <div className="inline-flex flex-col items-center">
-                  <div className="animate-spin rounded-full h-10 w-10 border-3 border-blue-500 border-t-transparent mb-3"></div>
-                  <p className="text-sm text-gray-600">កំពុងបង្កើតបង្កាន់ដៃ...</p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    {orderDetails.items?.length || 0} ទំនិញ
-                  </p>
-                </div>
-              </div>
-            ) : invoiceImage ? (
-              <>
-                <div className="p-4">
-                  <div 
-                    className="border border-gray-300 rounded bg-white overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => setShowFullInvoice(true)}
-                  >
-                    <img 
-                      src={invoiceImage} 
-                      alt="បង្កាន់ដៃ SOB" 
-                      className="w-full h-auto"
-                    />
-                    <div className="p-3 bg-gray-50 text-center border-t border-gray-200">
-                      <p className="text-sm text-gray-600">ចុចដើម្បីមើលបង្កាន់ដៃពេញ</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {orderDetails.items?.length || 0} ទំនិញ • {formatCurrency(orderDetails.total)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Action Buttons */}
-                <div className="p-4 border-t border-gray-200 bg-gray-50">
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={downloadInvoice}
-                      className="flex items-center justify-center py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors active:scale-95"
-                    >
-                      <Icon icon="mdi:download" width={18} height={18} className="mr-2" />
-                      ទាញយក
-                    </button>
-                    <button
-                      onClick={printInvoice}
-                      className="flex items-center justify-center py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors active:scale-95"
-                    >
-                      <Icon icon="mdi:printer" width={18} height={18} className="mr-2" />
-                      បោះពុម្ព
-                    </button>
-                  </div>
-                  <button
-                    onClick={shareInvoice}
-                    className="w-full mt-3 flex items-center justify-center py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors active:scale-95"
-                  >
-                    <Icon icon="mdi:share-variant" width={18} height={18} className="mr-2" />
-                    ចែករំលែក
-                  </button>
-                </div>
-              </>
-            ) : null}
-          </div>
 
           {/* Transaction Summary */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
@@ -521,13 +459,6 @@ const generateInvoiceImage = (orderData: any) => {
                   {orderDetails.payment_method === 'Cash' ? 'សាច់ប្រាក់' : orderDetails.payment_method || 'សាច់ប្រាក់'}
                 </span>
               </div>
-              
-              <div className="pt-3 border-t border-gray-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-bold text-gray-800">ទឹកប្រាក់សរុប</span>
-                  <span className="text-xl font-bold text-blue-600">{formatCurrency(orderDetails.total)}</span>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -548,6 +479,13 @@ const generateInvoiceImage = (orderData: any) => {
                     <p className="font-semibold">
                       {formatCurrency(safeNumber(item.qty) * safeNumber(item.price_at_order))}
                     </p>
+                                  
+                    <div className="pt-3 border-t border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-bold text-gray-800">ទឹកប្រាក់សរុប</span>
+                        <span className="text-xl font-bold text-blue-600">{formatCurrency(orderDetails.total)}</span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
