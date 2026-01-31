@@ -52,19 +52,19 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
     const initializeAuth = () => {
       try {
         const storedSalesUser = localStorage.getItem("sales_user");
-        const storedToken = localStorage.getItem("sales_token");
         
-        if (storedSalesUser && storedToken) {
+        if (storedSalesUser) {
           const parsedUser = JSON.parse(storedSalesUser);
           setSalesUser(parsedUser);
           
           // Set axios default header with Bearer token
-          axios.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
+          if (parsedUser.token) {
+            axios.defaults.headers.common["Authorization"] = `Bearer ${parsedUser.token}`;
+          }
         }
       } catch (error) {
         console.error("Error initializing sales auth:", error);
         localStorage.removeItem("sales_user");
-        localStorage.removeItem("sales_token");
       } finally {
         setSalesLoading(false);
       }
@@ -81,24 +81,45 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
         { 
           email, 
           password,
-          role: 'sales'
+          // Don't send role parameter - let Laravel handle role checking internally
+        },
+        {
+          withCredentials: true, // Important for cookies
         }
       );
 
+      console.log("Sales login response:", response.data);
+
       if (response.data.success) {
         const userData = response.data.user;
-        const token = response.data.token || response.headers['set-cookie']?.[0]?.split('=')[1]?.split(';')[0];
         
+        // Check if user has sales role
+        const userRoles = response.data.roles || [];
+        const hasSalesRole = userRoles.some((role: string) => 
+          role.toLowerCase().includes('sales') || 
+          role.toLowerCase().includes('admin') ||
+          role.toLowerCase().includes('manager')
+        );
+        
+        if (!hasSalesRole) {
+          throw new Error("User does not have sales access permissions");
+        }
+
+        // Extract token from cookie or response
+        const token = response.data.token || 
+                      response.headers['set-cookie']?.[0]?.split(';')[0]?.split('=')[1] ||
+                      response.data.access_token;
+
         const salesUserData: SalesUser = {
           id: userData.id,
-          email: userData.email || userData.username,
-          username: userData.username,
-          name: getUserName(userData),
+          email: userData.email || userData.username || email,
+          username: userData.username || email,
+          name: getUserName(userData) || userData.name || email,
           phone: userData.contact_number || userData.phone || '',
           role: 'sales',
-          business_id: userData.business_id,
+          business_id: userData.business_id || 1,
           profile_url: getProfileUrl(userData),
-          roles: response.data.roles || ['sales'],
+          roles: userRoles,
           token: token
         };
 
@@ -118,7 +139,8 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
 
         toast.success("Sales login successful!");
         
-        router.push("/");
+        // Redirect to sales dashboard
+        router.push("/sales/dashboard");
       } else {
         throw new Error(response.data.msg || "Login failed");
       }
@@ -128,10 +150,13 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
       let errorMessage = "Login failed. Please try again.";
       
       if (error.response) {
+        console.error("Error response data:", error.response.data);
+        
         if (error.response.status === 401) {
           errorMessage = error.response.data?.msg || "Invalid email or password";
         } else if (error.response.status === 403) {
-          errorMessage = error.response.data?.msg || "Access denied. Sales account required.";
+          errorMessage = error.response.data?.msg || 
+                        "Access denied. This account does not have sales permissions.";
         } else if (error.response.data?.msg) {
           errorMessage = error.response.data.msg;
         } else if (error.response.data?.message) {
@@ -139,6 +164,8 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
         }
       } else if (error.request) {
         errorMessage = "Network error. Please check your connection.";
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
       toast.error(errorMessage);
@@ -150,28 +177,29 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
 
   const refreshSalesUser = async () => {
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/delivery/profile`);
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/delivery/profile`,
+        { withCredentials: true }
+      );
       
       if (response.data.success) {
         const userData = response.data.user;
         
         const updatedUser: SalesUser = {
           id: userData.id,
-          email: userData.email || userData.username,
-          username: userData.username,
-          name: getUserName(userData),
-          phone: userData.contact_number || userData.phone || '',
+          email: userData.email || userData.username || salesUser?.email || '',
+          username: userData.username || salesUser?.username || '',
+          name: getUserName(userData) || salesUser?.name || '',
+          phone: userData.contact_number || userData.phone || salesUser?.phone || '',
           role: 'sales',
-          business_id: userData.business_id,
-          profile_url: getProfileUrl(userData),
-          roles: response.data.roles || ['sales'],
+          business_id: userData.business_id || salesUser?.business_id || 1,
+          profile_url: getProfileUrl(userData) || salesUser?.profile_url,
+          roles: response.data.roles || salesUser?.roles || [],
           token: salesUser?.token // Keep existing token
         };
 
         setSalesUser(updatedUser);
         localStorage.setItem("sales_user", JSON.stringify(updatedUser));
-        
-        toast.success("Profile updated!");
       }
     } catch (error) {
       console.error("Error refreshing sales user:", error);
@@ -183,7 +211,11 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
   const salesLogout = async () => {
     try {
       // Call logout API
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/delivery/logout`);
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/delivery/logout`,
+        {},
+        { withCredentials: true }
+      );
     } catch (err) {
       console.error("Logout API error:", err);
     } finally {
@@ -212,11 +244,13 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
     }
   };
 
-  const isSalesAuthenticated = !!salesUser && !!salesUser.token;
+  const isSalesAuthenticated = !!salesUser;
 
   // Helper function to get user name
   const getUserName = (userData: any): string => {
-    if (userData.first_name && userData.surname) {
+    if (!userData) return "Sales User";
+    
+    if (userData.surname && userData.first_name) {
       return `${userData.surname} ${userData.first_name}`;
     } else if (userData.first_name) {
       return userData.first_name;
@@ -230,10 +264,14 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
 
   // Helper function to get profile URL
   const getProfileUrl = (userData: any): string | undefined => {
+    if (!userData) return undefined;
+    
     if (userData.profile_url) {
       return userData.profile_url;
     } else if (userData.image_url) {
       return userData.image_url;
+    } else if (userData.avatar_url) {
+      return userData.avatar_url;
     }
     return undefined;
   };
