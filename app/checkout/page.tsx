@@ -99,6 +99,14 @@ const CombinedCheckoutPage = () => {
     });
   }, [savedAddresses, searchQuery]);
 
+  // Determine if search query looks like a phone number
+  const isPhoneNumber = useMemo(() => {
+    if (!searchQuery.trim()) return false;
+    const phoneRegex = /^[\d\s\-\+\(\)]{8,}$/;
+    const cleanedQuery = searchQuery.replace(/\s/g, '');
+    return phoneRegex.test(cleanedQuery);
+  }, [searchQuery]);
+
   // Calculate pagination data
   const paginatedAddresses = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -130,12 +138,6 @@ const CombinedCheckoutPage = () => {
     }
   }, [setLoading, user]);
 
-  // Reset to page 1 when search changes
-  useEffect(() => {
-    setCurrentPage(1);
-    setShowSearchResults(!!searchQuery.trim());
-  }, [searchQuery, savedAddresses]);
-
   // Update tempAddress when user changes
   useEffect(() => {
     if (user && !tempAddress.api_user_id) {
@@ -146,6 +148,28 @@ const CombinedCheckoutPage = () => {
       }));
     }
   }, [user]);
+
+  // Update form fields in real-time as user types in search
+  useEffect(() => {
+    if (searchQuery.trim() && user?.role === "sale") {
+      // Determine which field to update based on whether it looks like a phone number
+      if (isPhoneNumber) {
+        setTempAddress(prev => ({
+          ...prev,
+          phone: searchQuery.trim(),
+          // Only clear label if we're auto-filling phone
+          label: prev.label || ""
+        }));
+      } else {
+        setTempAddress(prev => ({
+          ...prev,
+          label: searchQuery.trim(),
+          // Only clear phone if we're auto-filling name
+          phone: prev.phone || ""
+        }));
+      }
+    }
+  }, [searchQuery, isPhoneNumber, user?.role]);
 
   // Helper to extract phone from user object
   const getPhoneFromUser = (userData: any): string | null => {
@@ -203,44 +227,15 @@ const CombinedCheckoutPage = () => {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
-  };
-
-  // Handle search submission (when user presses enter or we detect they're done typing)
-  const handleSearchSubmit = () => {
-    if (!searchQuery.trim()) return;
-
-    const hasResults = filteredAddresses.length > 0;
     
-    if (!hasResults) {
-      // No results found - show form and auto-fill based on search query
-      setIsAdding(true);
-      
-      // Determine if search query looks like a phone number
-      const phoneRegex = /^[\d\s\-\+\(\)]{8,}$/;
-      const cleanedQuery = searchQuery.replace(/\s/g, '');
-      const isPhoneNumber = phoneRegex.test(cleanedQuery);
-      
-      if (isPhoneNumber) {
-        // If it looks like a phone number, fill phone field
-        setTempAddress(prev => ({
-          ...prev,
-          phone: searchQuery.trim(),
-          label: "" // Clear label so user can enter name
-        }));
-      } else {
-        // If it doesn't look like a phone number, fill name/label field
-        setTempAddress(prev => ({
-          ...prev,
-          label: searchQuery.trim(),
-          phone: "" // Clear phone so user can enter phone
-        }));
-      }
+    // Show search results when user starts typing
+    if (value.trim()) {
+      setShowSearchResults(true);
+      setIsAdding(true); // Always show form when searching
     } else {
-      // Has results - don't show form
+      setShowSearchResults(false);
       setIsAdding(false);
     }
-    
-    setShowSearchResults(true);
   };
 
   // Save new address - label is customer name for sales, address label for regular users
@@ -408,13 +403,6 @@ const CombinedCheckoutPage = () => {
     });
   };
 
-  // Handle key press for search input
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearchSubmit();
-    }
-  };
-
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar pb-24">
       <Header title={t.checkout} />
@@ -499,7 +487,6 @@ const CombinedCheckoutPage = () => {
                 placeholder="Search customer by name or phone number..."
                 value={searchQuery}
                 onChange={handleSearchChange}
-                onKeyPress={handleKeyPress}
                 className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               <div className="absolute left-3 top-3 text-gray-400">
@@ -513,6 +500,13 @@ const CombinedCheckoutPage = () => {
                     setSearchQuery("");
                     setShowSearchResults(false);
                     setIsAdding(false);
+                    setTempAddress({
+                      label: "",
+                      phone: "",
+                      details: "",
+                      coordinates: { lat: 11.567, lng: 104.928 },
+                      api_user_id: user?.id,
+                    });
                   }}
                   className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                 >
@@ -521,14 +515,6 @@ const CombinedCheckoutPage = () => {
                   </svg>
                 </button>
               )}
-              <div className="mt-2">
-                <button
-                  onClick={handleSearchSubmit}
-                  className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-                >
-                  Search Customer
-                </button>
-              </div>
             </div>
 
             {/* Show search results when searching */}
@@ -537,19 +523,16 @@ const CombinedCheckoutPage = () => {
                 {/* Search Results Header */}
                 <div className="text-sm text-gray-500">
                   {filteredAddresses.length > 0 ? (
+                    <span>Found {filteredAddresses.length} customer(s)</span>
+                  ) : (
                     <div className="flex justify-between items-center">
-                      <span>Found {filteredAddresses.length} customer(s)</span>
+                      <span>No customer found with "{searchQuery}"</span>
                       <button
                         onClick={handleAddNewCustomer}
-                        className="px-3 py-1 text-sm bg-gray-100 border border-gray-300 rounded hover:bg-gray-200"
+                        className="px-3 py-1 text-sm bg-blue-100 text-blue-700 border border-blue-300 rounded hover:bg-blue-200"
                       >
                         + New Customer
                       </button>
-                    </div>
-                  ) : (
-                    <div className="text-center p-4 border border-gray-200 rounded-lg bg-gray-50">
-                      <p className="text-gray-700">No customer found with "{searchQuery}"</p>
-                      <p className="text-sm text-gray-500 mt-1">The search query has been added to the form below</p>
                     </div>
                   )}
                 </div>
@@ -616,8 +599,8 @@ const CombinedCheckoutPage = () => {
               </div>
             )}
 
-            {/* Customer Form - Show when adding new customer OR when search returns no results */}
-            {(isAdding || (showSearchResults && searchQuery.trim() && filteredAddresses.length === 0)) && (
+            {/* Customer Form - Show when searching (for real-time updates) OR when manually adding */}
+            {(isAdding || (searchQuery.trim() && filteredAddresses.length === 0)) && (
               <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl mt-3">
                 <h3 className="text-lg font-semibold text-gray-800">
                   {filteredAddresses.length === 0 && searchQuery.trim() 
@@ -629,6 +612,9 @@ const CombinedCheckoutPage = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Customer Name *
+                    {isPhoneNumber && searchQuery.trim() && (
+                      <span className="text-xs text-gray-500 ml-2">(Search looks like a phone number, please enter name)</span>
+                    )}
                   </label>
                   <input
                     type="text"
@@ -643,6 +629,9 @@ const CombinedCheckoutPage = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t.phone} *
+                    {!isPhoneNumber && searchQuery.trim() && (
+                      <span className="text-xs text-gray-500 ml-2">(Search looks like a name, please enter phone)</span>
+                    )}
                   </label>
                   <input
                     type="tel"
@@ -724,8 +713,8 @@ const CombinedCheckoutPage = () => {
               </div>
             )}
 
-            {/* Show Add Customer button when not searching and not in adding mode */}
-            {!searchQuery.trim() && !isAdding && !showSearchResults && (
+            {/* Show Add Customer button when not searching */}
+            {!searchQuery.trim() && !isAdding && (
               <button
                 onClick={handleAddNewCustomer}
                 className="w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
