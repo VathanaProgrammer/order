@@ -34,15 +34,15 @@ const getFullImageUrl = (url: string | null | undefined): string => {
 const Page: React.FC = () => {
   // ✅ Use both auth contexts
   const { user: regularUser, logout: regularLogout, loading: regularLoading, updateUser, refreshUser } = useAuth();
-  const { salesUser, salesLogout, salesLoading, updateSalesUser } = useSalesAuth();
+  const { salesUser, salesLogout, salesLoading, updateSalesUser, isSalesAuthenticated } = useSalesAuth();
   
   const router = useRouter();
   const { setLoading } = useLoading();
   
-  // ✅ Determine which user is active based on role
-  const isSalesRole = regularUser?.role === "sale" || salesUser?.role === "sales" || salesUser?.role === "admin";
-  const activeUser = isSalesRole ? salesUser : regularUser;
-  const activeLoading = isSalesRole ? salesLoading : regularLoading;
+  // ✅ Check which user is actually logged in
+  const isSalesUser = isSalesAuthenticated;
+  const activeUser = isSalesUser ? salesUser : regularUser;
+  const activeLoading = isSalesUser ? salesLoading : regularLoading;
   
   // ✅ FIXED: Use profile_url
   const [profileImage, setProfileImage] = useState<string>(
@@ -53,7 +53,7 @@ const Page: React.FC = () => {
 
   // ✅ Upload profile picture (only for regular users)
   const uploadProfilePicture = async (file: File) => {
-    if (isSalesRole) {
+    if (isSalesUser) {
       toast.error("Sales users cannot upload profile pictures");
       return;
     }
@@ -136,7 +136,7 @@ const Page: React.FC = () => {
   };
 
   const handleButtonClick = () => {
-    if (isSalesRole) {
+    if (isSalesUser) {
       toast.error("Sales users cannot change profile picture");
       return;
     }
@@ -150,7 +150,7 @@ const Page: React.FC = () => {
   // ✅ CRITICAL: Update profileImage whenever user's profile_url changes
   useEffect(() => {
     console.log('👤 Active user changed:', activeUser);
-    console.log('🎭 Is sales role:', isSalesRole);
+    console.log('🎭 Is sales user:', isSalesUser);
     console.log('🖼️ Active user profile_url:', activeUser?.profile_url);
     
     if (activeUser?.profile_url) {
@@ -161,11 +161,11 @@ const Page: React.FC = () => {
       console.log('⚠️ No profile_url, setting default image');
       setProfileImage("https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg");
     }
-  }, [activeUser, isSalesRole]);
+  }, [activeUser, isSalesUser]);
 
   // ✅ Logout function that handles both user types
   const handleLogout = async () => {
-    if (isSalesRole) {
+    if (isSalesUser) {
       await salesLogout();
     } else {
       await regularLogout();
@@ -177,12 +177,12 @@ const Page: React.FC = () => {
     console.log('🚀 Profile page mounted');
     console.log('👤 Regular user:', regularUser);
     console.log('👔 Sales user:', salesUser);
-    console.log('🎭 Is sales role:', isSalesRole);
+    console.log('🎭 Is sales authenticated:', isSalesAuthenticated);
     console.log('👤 Active user:', activeUser);
   }, []);
 
   // Account sections - different for sales vs regular users
-  const accountSections = isSalesRole 
+  const accountSections = isSalesUser 
     ? [
         // Sales Role Sections
         {
@@ -225,12 +225,12 @@ const Page: React.FC = () => {
   return (
     <div className="flex flex-col items-center min-h-screen">
       <div className="w-full max-w-[440px] min-h-screen">
-        <Header title={isSalesRole ? "Sales Account" : t.myAccount || "My Account"} />
+        <Header title={isSalesUser ? "Sales Account" : t.myAccount || "My Account"} />
 
         {/* Profile Section */}
         <div className="w-full mt-10 flex flex-col items-center justify-center">
           {/* Only show profile image upload for regular users */}
-          {!isSalesRole && (
+          {!isSalesUser && (
             <div className="relative w-[120px] h-[120px]">
               <Image
                 id="profileImage"
@@ -277,7 +277,7 @@ const Page: React.FC = () => {
           )}
 
           {/* Show different profile image for sales users */}
-          {isSalesRole && (
+          {isSalesUser && (
             <div className="relative w-[120px] h-[120px]">
               <Image
                 id="profileImage"
@@ -300,7 +300,7 @@ const Page: React.FC = () => {
             <p className="font-semibold text-lg text-gray-900">
               {displayName}
             </p>
-            {isSalesRole && (
+            {isSalesUser && (
               <div className="flex flex-col items-center gap-1 mt-1">
                 <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
                   {activeUser?.role === 'admin' ? 'Admin' : 'Sales Representative'}
