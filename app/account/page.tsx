@@ -1,200 +1,132 @@
 "use client";
 
-import React, { useState, useEffect, ChangeEvent } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "@/components/layouts/Header";
 import Image from "next/image";
 import Icon from "@/components/Icon";
-import { useAuth } from "@/context/AuthContext"; // Regular users
-import { useSalesAuth } from "@/context/SalesAuthContext"; // Sales users
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
-import api from "@/api/api";
 import { toast } from "react-toastify";
-import { useLoading } from "@/context/LoadingContext";
+import axios from "axios";
 
-// ✅ UTILITY FUNCTION: Convert any URL to full URL
-const getFullImageUrl = (url: string | null | undefined): string => {
-  if (!url || url === "null" || url === "undefined" || url === "") {
-    return "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg";
-  }
+// Check localStorage for user type
+const getUserType = (): 'sales' | 'regular' | null => {
+  if (typeof window === 'undefined') return null;
   
-  if (url.startsWith('http')) {
-    return url;
-  }
+  const salesToken = localStorage.getItem("sales_token");
+  const regularToken = localStorage.getItem("auth_token"); // or whatever your regular token is called
   
-  if (url.startsWith('/')) {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://syspro.asia';
-    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-    return `${cleanBaseUrl}${url}`;
-  }
-  
-  return url;
+  if (salesToken) return 'sales';
+  if (regularToken) return 'regular';
+  return null;
 };
 
 const Page: React.FC = () => {
-  // ✅ Use both auth contexts
-  const { user: regularUser, logout: regularLogout, loading: regularLoading, updateUser, refreshUser } = useAuth();
-  const { salesUser, salesLogout, salesLoading, updateSalesUser, isSalesAuthenticated } = useSalesAuth();
-  
   const router = useRouter();
-  const { setLoading } = useLoading();
-  
-  // ✅ Check which user is actually logged in
-  const isSalesUser = isSalesAuthenticated;
-  const activeUser = isSalesUser ? salesUser : regularUser;
-  const activeLoading = isSalesUser ? salesLoading : regularLoading;
-  
-  // ✅ FIXED: Use profile_url
-  const [profileImage, setProfileImage] = useState<string>(
-    getFullImageUrl(activeUser?.profile_url)
-  );
-  
   const { t } = useLanguage();
-
-  // ✅ Upload profile picture (only for regular users)
-  const uploadProfilePicture = async (file: File) => {
-    if (isSalesUser) {
-      toast.error("Sales users cannot upload profile pictures");
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('profile_picture', file);
-      
-      console.log('📤 Uploading profile picture...');
-      const res = await api.post('/profile/picture', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
   
-      console.log('📥 Upload response:', res.data);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [userType, setUserType] = useState<'sales' | 'regular' | null>(null);
   
-      if (res.data.success) {
-        const newProfileUrl = res.data.data?.profile_url || 
-                             res.data.data?.full_url || 
-                             res.data.data?.image_url;
+  // Fetch user data based on type
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const type = getUserType();
+        setUserType(type);
         
-        console.log('🖼️ New profile_url from API:', newProfileUrl);
-        
-        if (!newProfileUrl) {
-          throw new Error('No profile_url returned from server');
+        if (!type) {
+          router.push("/sign-in");
+          return;
         }
         
-        const fullImageUrl = getFullImageUrl(newProfileUrl);
-        console.log('🔗 Full image URL for display:', fullImageUrl);
+        let response;
         
-        setProfileImage(fullImageUrl);
-        
-        if (regularUser) {
-          updateUser({ 
-            ...regularUser,
-            profile_url: newProfileUrl
-          });
+        if (type === 'sales') {
+          // Fetch sales user profile
+          const token = localStorage.getItem("sales_token");
+          if (!token) throw new Error("No sales token found");
+          
+          axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+          response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/sales/profile`);
+          
+          if (response.data.success) {
+            setUser(response.data.user);
+          }
+        } else {
+          // Fetch regular user profile
+          const token = localStorage.getItem("auth_token"); // adjust this
+          if (!token) throw new Error("No auth token found");
+          
+          axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+          response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/user`);
+          
+          if (response.data) {
+            setUser(response.data.user || response.data);
+          }
         }
-        
-        setTimeout(async () => {
-          console.log('🔄 Forcing server refresh after upload...');
-          await refreshUser();
-        }, 500);
-        
-        toast.success(res.data.message || "Profile picture updated!");
+      } catch (error) {
+        console.error("Failed to fetch user:", error);
+        toast.error("Failed to load profile");
+        router.push("/sign-in");
+      } finally {
+        setLoading(false);
       }
-    } catch (err: any) {
-      console.error("❌ Upload error:", err);
-      toast.error(err.response?.data?.message || "Failed to upload image");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size must be less than 5MB");
-      return;
-    }
-
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      toast.error("Only JPEG, PNG, JPG, GIF, and WebP images are allowed");
-      return;
-    }
-
-    // Show preview immediately
-    const previewUrl = URL.createObjectURL(file);
-    setProfileImage(previewUrl);
-
-    // Upload to backend
-    await uploadProfilePicture(file);
-  };
-
-  const handleButtonClick = () => {
-    if (isSalesUser) {
-      toast.error("Sales users cannot change profile picture");
-      return;
-    }
+    };
     
-    const input = document.getElementById(
-      "profile_picture"
-    ) as HTMLInputElement | null;
-    input?.click();
-  };
-
-  // ✅ CRITICAL: Update profileImage whenever user's profile_url changes
-  useEffect(() => {
-    console.log('👤 Active user changed:', activeUser);
-    console.log('🎭 Is sales user:', isSalesUser);
-    console.log('🖼️ Active user profile_url:', activeUser?.profile_url);
-    
-    if (activeUser?.profile_url) {
-      const fullImageUrl = getFullImageUrl(activeUser.profile_url);
-      console.log('🎯 Setting profile image to:', fullImageUrl);
-      setProfileImage(fullImageUrl);
-    } else {
-      console.log('⚠️ No profile_url, setting default image');
-      setProfileImage("https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg");
-    }
-  }, [activeUser, isSalesUser]);
-
-  // ✅ Logout function that handles both user types
+    fetchUserData();
+  }, [router]);
+  
   const handleLogout = async () => {
-    if (isSalesUser) {
-      await salesLogout();
-    } else {
-      await regularLogout();
+    try {
+      if (userType === 'sales') {
+        await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/sales/logout`);
+        localStorage.removeItem("sales_token");
+        localStorage.removeItem("sales_user");
+      } else {
+        await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/logout`);
+        localStorage.removeItem("auth_token"); // adjust this
+        localStorage.removeItem("user");
+      }
+      
+      delete axios.defaults.headers.common["Authorization"];
+      toast.success("Logged out successfully!");
+      router.push("/sign-in");
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.success("Logged out!");
+      router.push("/sign-in");
     }
   };
-
-  // ✅ Debug: Log initial state
-  useEffect(() => {
-    console.log('🚀 Profile page mounted');
-    console.log('👤 Regular user:', regularUser);
-    console.log('👔 Sales user:', salesUser);
-    console.log('🎭 Is sales authenticated:', isSalesAuthenticated);
-    console.log('👤 Active user:', activeUser);
-  }, []);
-
-  // Account sections - different for sales vs regular users
-  const accountSections = isSalesUser 
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-500">Loading account...</p>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return null; // Will redirect
+  }
+  
+  // Display name - will show real sales user name from users table
+  const displayName = user?.name || "User";
+  
+  // Account sections
+  const accountSections = userType === 'sales' 
     ? [
-        // Sales Role Sections
         {
           icon: "mdi:account-group",
           title: "Customer List",
           desc: "View and manage your customer database",
           action: "Manage Customers",
-          route: '/account/shipping-address' // Same route but different UI
+          route: '/account/shipping-address'
         },
       ]
     : [
-        // Regular User Sections
         {
           icon: "mdi:account",
           title: t.profileInformation || "Profile Information",
@@ -211,118 +143,60 @@ const Page: React.FC = () => {
         },
       ];
 
-  // Display name - will show real sales user name from users table
-  const displayName = activeUser?.name || "User";
-
-  if (activeLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-500">{t.loadingAccount || "Loading account..."}</p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col items-center min-h-screen">
       <div className="w-full max-w-[440px] min-h-screen">
-        <Header title={isSalesUser ? "Sales Account" : t.myAccount || "My Account"} />
-
+        <Header title={userType === 'sales' ? "Sales Account" : t.myAccount || "My Account"} />
+        
         {/* Profile Section */}
         <div className="w-full mt-10 flex flex-col items-center justify-center">
-          {/* Only show profile image upload for regular users */}
-          {!isSalesUser && (
+          {/* Only show for regular users */}
+          {userType !== 'sales' && (
             <div className="relative w-[120px] h-[120px]">
               <Image
-                id="profileImage"
-                src={profileImage}
-                alt="Profile image"
+                src={user?.profile_url || "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg"}
+                alt="Profile"
                 fill
                 className="object-cover rounded-full border-4 border-gray-700"
                 sizes="120px"
-                priority
-                onError={(e) => {
-                  console.error('❌ Image failed to load:', profileImage);
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = "https://www.shutterstock.com/image-vector/avatar-gender-neutral-silhouette-vector-600nw-2470054311.jpg";
-                }}
-                onLoad={() => {
-                  console.log('✅ Image loaded successfully:', profileImage);
-                }}
                 unoptimized={true}
               />
-
-              <input
-                type="file"
-                id="profile_picture"
-                name="profile_picture"
-                accept="image/*"
-                className="hidden"
-                onChange={handleImageChange}
-              />
-
-              <button
-                type="button"
-                id="editImageBtn"
-                onClick={handleButtonClick}
-                className="absolute bottom-2 right-2 bg-white p-2 rounded-full shadow-md hover:bg-[#6a00b0] transition"
-              >
-                <Icon
-                  icon="iconamoon:edit-light"
-                  width={18}
-                  height={18}
-                  className="text-gray-800 hover:text-white"
-                />
-              </button>
             </div>
           )}
-
-          {/* Show different profile image for sales users */}
-          {isSalesUser && (
+          
+          {/* Show for sales users */}
+          {userType === 'sales' && (
             <div className="relative w-[120px] h-[120px]">
               <Image
-                id="profileImage"
-                src={profileImage}
+                src={user?.profile_url || "https://www.shutterstock.com/image-vector/businessman-avatar-icon-vector-design-600nw-2314147627.jpg"}
                 alt="Sales profile"
                 fill
                 className="object-cover rounded-full border-4 border-blue-500"
                 sizes="120px"
-                priority
-                onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = "https://www.shutterstock.com/image-vector/businessman-avatar-icon-vector-design-600nw-2314147627.jpg";
-                }}
                 unoptimized={true}
               />
             </div>
           )}
-
+          
           <div className="mt-3 text-center">
             <p className="font-semibold text-lg text-gray-900">
               {displayName}
             </p>
-            {isSalesUser && (
-              <div className="flex flex-col items-center gap-1 mt-1">
-                <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                  {activeUser?.role === 'admin' ? 'Admin' : 'Sales Representative'}
-                </span>
-                {/* Show additional info for sales users */}
-                {/* {activeUser?.email && (
-                  <p className="text-xs text-gray-500">{activeUser.email}</p>
-                )}
-                {activeUser?.username && (
-                  <p className="text-xs text-gray-500">Username: {activeUser.username}</p>
-                )} */}
-              </div>
+            {userType === 'sales' && (
+              <span className="inline-block mt-1 px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                Sales Representative
+              </span>
             )}
           </div>
         </div>
-
+        
         {/* Account Options */}
         <div className="mt-8 space-y-4 pb-20">
           {accountSections.map((item, i) => (
             <div
               key={i}
               className="bg-gray-300 p-4 rounded-2xl shadow-sm flex flex-col gap-1 hover:shadow-md transition"
+              onClick={() => router.push(item.route)}
             >
               <div className="flex items-center gap-2">
                 <Icon
@@ -334,16 +208,13 @@ const Page: React.FC = () => {
                 <h3 className="font-medium text-gray-800">{item.title}</h3>
               </div>
               <p className="text-sm text-gray-500">{item.desc}</p>
-              <button 
-                onClick={() => router.push(item.route ? item.route : '')} 
-                className="mt-2 text-sm font-medium text-blue-600 hover:underline self-start"
-              >
+              <button className="mt-2 text-sm font-medium text-blue-600 hover:underline self-start">
                 {item.action}
               </button>
             </div>
           ))}
         </div>
-
+        
         {/* Logout */}
         <div className="pb-10">
           <button 
