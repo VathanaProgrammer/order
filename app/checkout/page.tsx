@@ -215,8 +215,8 @@ const CombinedCheckoutPage = () => {
   const handleSelectSavedAddress = (addr: ExtendedAddress) => {
     setSelectedAddress(addr);
     setIsAdding(false);
-    setSearchQuery("");
-    setShowSearchResults(false);
+    // Keep search query to show selected customer
+    setShowSearchResults(true);
   };
 
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
@@ -337,8 +337,8 @@ const CombinedCheckoutPage = () => {
       setSavedAddresses((prev) => [...prev, newAddress]);
       setSelectedAddress(newAddress);
       setIsAdding(false);
-      setSearchQuery("");
-      setShowSearchResults(false);
+      setSearchQuery(newAddress.label || ""); // Set search query to the new customer name
+      setShowSearchResults(true);
       setCurrentPage(1);
 
       // Reset form fields after successful save
@@ -422,6 +422,7 @@ const CombinedCheckoutPage = () => {
     setSearchQuery("");
     setShowSearchResults(false);
     setIsAdding(false);
+    setSelectedAddress('current');
     setTempAddress({
       label: "",
       phone: user?.role === "sale" ? "" : userPhone || "",
@@ -534,22 +535,50 @@ const CombinedCheckoutPage = () => {
               )}
             </div>
 
-            {/* Show search results when searching */}
-            {showSearchResults && searchQuery.trim() && (
+            {/* Selected Customer Display */}
+            {selectedAddress && typeof selectedAddress !== 'string' && (
+              <div className="p-4 border border-green-300 bg-green-50 rounded-xl">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold text-gray-800 mb-2">Selected Customer:</h3>
+                    <div className="space-y-1">
+                      <p className="font-medium text-gray-900">{(selectedAddress as ExtendedAddress).label}</p>
+                      <p className="text-sm text-gray-600">Phone: {(selectedAddress as ExtendedAddress).phone}</p>
+                      <p className="text-sm text-gray-600">Address: {(selectedAddress as ExtendedAddress).details}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedAddress('current');
+                      setSearchQuery("");
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Show search results when searching OR when a customer is selected */}
+            {(showSearchResults || (selectedAddress && typeof selectedAddress !== 'string')) && searchQuery.trim() && (
               <div className="space-y-3">
                 {/* Search Results Header */}
                 <div className="text-sm text-gray-500">
                   {filteredAddresses.length > 0 ? (
-                    <span>Found {filteredAddresses.length} customer(s)</span>
+                    <div className="flex justify-between items-center">
+                      <span>Found {filteredAddresses.length} customer(s)</span>
+                      {selectedAddress && typeof selectedAddress !== 'string' && (
+                        <span className="text-blue-600 font-medium">
+                          ✓ Selected
+                        </span>
+                      )}
+                    </div>
                   ) : (
                     <div className="flex justify-between items-center">
                       <span>No customer found with "{searchQuery}"</span>
-                      {/* <button
-                        onClick={handleAddNewCustomer}
-                        className="px-3 py-1 text-sm bg-blue-100 text-blue-700 border border-blue-300 rounded hover:bg-blue-200"
-                      >
-                        + New Customer
-                      </button> */}
                     </div>
                   )}
                 </div>
@@ -559,14 +588,25 @@ const CombinedCheckoutPage = () => {
                   <div
                     key={addr.id}
                     onClick={() => handleSelectSavedAddress(addr)}
-                    className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${currentSelectedAddress && (currentSelectedAddress as ExtendedAddress).id === addr.id
-                        ? "border-blue-500 bg-blue-50"
+                    className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${selectedAddress && 
+                      typeof selectedAddress !== 'string' && 
+                      (selectedAddress as ExtendedAddress).id === addr.id
+                        ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
                         : "border-gray-200 hover:bg-gray-50"
                       }`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-semibold">{addr.label}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold">{addr.label}</p>
+                          {selectedAddress && 
+                           typeof selectedAddress !== 'string' && 
+                           (selectedAddress as ExtendedAddress).id === addr.id && (
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                              Selected
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-600 mt-1">Phone: {addr.phone}</p>
                         <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
                       </div>
@@ -616,13 +656,15 @@ const CombinedCheckoutPage = () => {
               </div>
             )}
 
-            {/* Customer Form - Show when searching (for real-time updates) OR when manually adding */}
+            {/* Customer Form - Show when actively adding OR when searching with no results */}
             {(isAdding || (searchQuery.trim() && filteredAddresses.length === 0)) && (
               <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl mt-3">
                 <h3 className="text-lg font-semibold text-gray-800">
-                  {filteredAddresses.length === 0 && searchQuery.trim() 
-                    ? "Create New Customer" 
-                    : "Add New Customer"}
+                  {selectedAddress && typeof selectedAddress !== 'string'
+                    ? "Update Customer Details"
+                    : filteredAddresses.length === 0 && searchQuery.trim() 
+                      ? "Create New Customer" 
+                      : "Add New Customer"}
                 </h3>
 
                 {/* Name / Label */}
@@ -685,9 +727,6 @@ const CombinedCheckoutPage = () => {
 
                 {/* Location Picker */}
                 <div>
-                  {/* <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.clickToSelectLocation} *
-                  </label> */}
                   {!tempAddress.coordinates && (
                     <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
                   )}
@@ -705,7 +744,7 @@ const CombinedCheckoutPage = () => {
                       !tempAddress.phone?.trim()
                     }
                   >
-                    Save Customer
+                    {selectedAddress && typeof selectedAddress !== 'string' ? "Update Customer" : "Save Customer"}
                   </button>
                   <button
                     onClick={() => {
@@ -727,17 +766,6 @@ const CombinedCheckoutPage = () => {
                 </div>
               </div>
             )}
-
-            {/* Show Add Customer button when not searching */}
-            {/* {!searchQuery.trim() && !isAdding && (
-              <button
-                onClick={handleAddNewCustomer}
-                className="w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
-              >
-                <span className="text-xl">+</span>
-                Add New Customer
-              </button>
-            )} */}
           </div>
         )}
 
@@ -901,6 +929,7 @@ const CombinedCheckoutPage = () => {
                   toast.success("Location selected successfully!");
                 }}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                disabled={!tempAddress.coordinates}
               >
                 {t.select}
               </button>
@@ -937,6 +966,49 @@ const CombinedCheckoutPage = () => {
             )}
           </div>
         ))}
+      </section>
+
+      {/* Order Total and Place Order Button */}
+      <section className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+        <div className="flex justify-between items-center mb-4">
+          <p className="text-lg font-semibold text-gray-800">{t.total}</p>
+          <p className="text-2xl font-bold text-blue-600">${total.toFixed(2)}</p>
+        </div>
+        
+        <button
+          onClick={async () => {
+            if (!selectedAddress) {
+              toast.error("Please select a shipping address");
+              return;
+            }
+            if (!paymentMethod) {
+              toast.error("Please select a payment method");
+              return;
+            }
+            
+            setIsSubmittingOrder(true);
+            try {
+              await placeOrder();
+              toast.success("Order placed successfully!");
+              router.push("/orders");
+            } catch (err: any) {
+              toast.error(err.message || "Failed to place order");
+            } finally {
+              setIsSubmittingOrder(false);
+            }
+          }}
+          disabled={isSubmittingOrder || !selectedAddress || !paymentMethod}
+          className="w-full py-4 bg-blue-600 text-white rounded-xl font-semibold text-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+        >
+          {isSubmittingOrder ? (
+            <div className="flex items-center justify-center gap-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              Processing...
+            </div>
+          ) : (
+            t.placeOrder
+          )}
+        </button>
       </section>
 
       {/* QR Popup */}
