@@ -103,7 +103,7 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
       if (response.data.success) {
         const userData = response.data.user;
         const token = response.data.token;
-        const roles = response.data.roles || [];
+        const roles = response.data.roles || 'sale';
 
         const salesUserData: SalesUser = {
           id: userData.id,

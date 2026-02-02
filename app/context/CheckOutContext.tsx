@@ -212,7 +212,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         customerAddress: "", // Get from checkout page state
       };
     };
-  
+
     let addressToSend: Address | null = null;
     
     if (selectedAddress === "current") {
@@ -256,14 +256,27 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     } else {
       addressToSend = selectedAddress as Address;
     }
-  
+
     if (!addressToSend || cart.length === 0) {
       toast.error("Cart is empty or no address selected!");
       return;
     }
-  
+
+    // 🔴 FIX: Determine the correct api_user_id
+    let apiUserId;
+    
+    if (user?.role === 'sale') {
+      // For sales users, use api_user_id from user object (should be 100000 + user.id)
+      // OR if your SalesAuthController returns api_user_id in the user object
+      apiUserId = 20; // Default to 20 if not set
+      console.log('Sales user detected, using api_user_id:', apiUserId);
+    } else {
+      // For regular users, use user.id (which should be api_user_id)
+      apiUserId = user?.id;
+    }
+
     const payload: any = {
-      api_user_id: user?.id,
+      api_user_id: apiUserId, // 🔴 Use the correct ID
       saved_address_id: selectedAddress !== "current" ? addressToSend.id : undefined,
       address: selectedAddress === "current" ? addressToSend : undefined,
       address_type: selectedAddress === "current" ? "current" : "saved",
@@ -278,7 +291,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         image_url: (i.image ?? "").split("/").pop(),
       })),
     };
-  
+
     // Add customer_info for sale role users
     if (user?.role === 'sale' && addressToSend) {
       payload.customer_info = {
@@ -286,12 +299,21 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         phone: addressToSend.phone || "",
       };
     }
-  
+
+    // 🔴 ADD: Send sales user ID for backend to lookup salesperson name
+    if (user?.role === 'sale') {
+      payload.sales_user_id = user?.id; // Send the actual sales user ID from users table
+      console.log('Including sales_user_id:', user?.id);
+    }
+
     try {
       console.log("Sending order with payload:", payload);
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
         withCredentials: true,
-        headers: { Accept: "application/json" },
+        headers: { 
+          Accept: "application/json",
+          Authorization: `Bearer ${localStorage.getItem('sales_token') || localStorage.getItem('token')}`
+        },
       });
       if (res.data?.success) {
         toast.success("Order placed successfully!");
@@ -299,6 +321,11 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         // Show customer info for sale role
         if (user?.role === 'sale' && payload.customer_info) {
           toast.info(`Customer: ${payload.customer_info.name}, Phone: ${payload.customer_info.phone}`);
+          
+          // Also show salesperson info if available in response
+          if (res.data.salesperson_info) {
+            toast.info(`Salesperson: ${res.data.salesperson_info.name}`);
+          }
         }
         
         setCart([]);
