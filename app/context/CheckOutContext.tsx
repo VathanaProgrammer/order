@@ -2,6 +2,7 @@
 import { createContext, useContext, ReactNode, useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "./AuthContext";
+import { useSalesAuth } from "./SalesAuthContext";
 import { toast } from "react-toastify";
 import { getShortAddress } from "./utils/geocode";
 import { useRouter } from "next/navigation";
@@ -29,7 +30,6 @@ export type Address = {
   phone?: string;
   coordinates?: { lat: number; lng: number };
   short_address?: string;
-
   customer_name?: string;
   customer_email?: string;
   customer_company?: string;
@@ -59,13 +59,36 @@ type CheckoutContextType = {
 
   placeOrder: () => void;
   placeRewardOrder: () => void;
+  
+  // New properties for sales mode
+  isSalesMode: boolean;
+  salespersonName: string;
+  customerInfo: {
+    name: string;
+    phone: string;
+    email: string;
+  };
+  setCustomerInfo: (info: { name: string; phone: string; email: string }) => void;
 };
 
 const CheckoutContext = createContext<CheckoutContextType | undefined>(undefined);
 
 export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const { user: regularUser } = useAuth();
+  const { salesUser, isSalesAuthenticated } = useSalesAuth();
   const router = useRouter();
+
+  // Determine active user and mode
+  const activeUser = isSalesAuthenticated ? salesUser : regularUser;
+  const isSalesMode = isSalesAuthenticated;
+  const salespersonName = salesUser?.name || "Sales Staff";
+
+  // Customer info state for sales mode
+  const [customerInfo, setCustomerInfo] = useState({
+    name: "",
+    phone: "",
+    email: ""
+  });
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -77,17 +100,17 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   const [currentAddress, setCurrentAddress] = useState<Address>({
     label: "Current Location",
     details: "",
-    phone: user?.phone || user?.mobile || "", // Initialize with user's phone
+    phone: activeUser?.phone || "",
     coordinates: { lat: 0, lng: 0 },
   });
 
   const [paymentMethod, setPaymentMethod] = useState("QR");
-  const userPoints = user?.reward_points?.available || 0;
+  const userPoints = regularUser?.reward_points?.available || 0;
 
-  // Update currentAddress phone when user changes
+  // Update currentAddress phone when active user changes
   useEffect(() => {
-    if (user) {
-      const userPhone = user.phone || user.mobile;
+    if (activeUser) {
+      const userPhone = activeUser.phone;
       if (userPhone && userPhone !== currentAddress.phone) {
         setCurrentAddress(prev => ({
           ...prev,
@@ -95,7 +118,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         }));
       }
     }
-  }, [user]);
+  }, [activeUser]);
 
   const recalcTotal = (items: CartItem[]) => items.reduce((sum, i) => sum + i.price * i.qty, 0);
   const recalcTotalPoints = (items: RewardItem[]) => items.reduce((sum, i) => sum + i.points_at_reward * i.qty, 0);
@@ -162,7 +185,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       }, 0) + (idx === -1 ? deltaQty * reward.points_at_reward : 0);
 
       if (newTotalPoints > userPoints) {
-        // ⚠️ block increment, toast after
         setTimeout(() => {
           toast.error("You don't have enough reward points!", { autoClose: 2000 });
         }, 0);
@@ -203,16 +225,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
 
   // --- PLACE ORDER ---
   const placeOrder = async () => {
-    // Add this to get customer info from parent component
-    const getCustomerInfo = () => {
-      // This should be passed from the checkout page component
-      return {
-        customerName: "", // Get from checkout page state
-        customerPhone: "", // Get from checkout page state
-        customerAddress: "", // Get from checkout page state
-      };
-    };
-
     let addressToSend: Address | null = null;
     
     if (selectedAddress === "current") {
@@ -221,11 +233,9 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
-      // For sale role, get customer info
-      if (user?.role === 'sale') {
-        const customerInfo = getCustomerInfo(); // You need to implement this
-        
-        if (!customerInfo.customerName || !customerInfo.customerPhone) {
+      // For sales mode, validate customer info
+      if (isSalesMode) {
+        if (!customerInfo.name || !customerInfo.phone) {
           toast.error("Please enter customer name and phone number");
           return;
         }
@@ -234,13 +244,13 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         addressToSend = { 
           ...currentAddress, 
           short_address,
-          phone: customerInfo.customerPhone,
-          label: customerInfo.customerName,
-          details: customerInfo.customerAddress || `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
+          phone: customerInfo.phone,
+          label: customerInfo.name,
+          details: `Customer address: ${short_address}`,
         };
       } else {
         // Regular user
-        const userPhone = user?.phone || user?.mobile || "";
+        const userPhone = regularUser?.phone || regularUser?.mobile || "";
         if (!userPhone) {
           toast.error("Please add your phone number in your account settings");
           return;
@@ -251,6 +261,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           ...currentAddress, 
           short_address,
           phone: userPhone,
+          label: regularUser?.name || "Customer",
         };
       }
     } else {
@@ -262,21 +273,47 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // 🔴 FIX: Determine the correct api_user_id
-    let apiUserId;
+    // 🔴 FIXED: Determine correct IDs
+    let apiUserId: number;
+    let salesUserId: number | undefined;
+    let isSalesOrder = false;
     
-    if (user?.role === 'sale') {
-      // For sales users, use api_user_id from user object (should be 100000 + user.id)
-      // OR if your SalesAuthController returns api_user_id in the user object
-      apiUserId = 20; // Default to 20 if not set
-      console.log('Sales user detected, using api_user_id:', apiUserId);
+    if (isSalesMode && salesUser) {
+      // Salesperson is logged in via SalesAuth
+      // salesUser comes from users table (e.g., ID = 6)
+      // We need to find/create corresponding ApiUser
+      
+      isSalesOrder = true;
+      salesUserId = salesUser.id; // This is from users table (e.g., 6)
+      
+      // For sales orders, api_user_id should point to a special ApiUser
+      // that represents the salesperson in the api_users table
+      // Based on your backend, this should be 100000 + salesUserId OR fixed ID 20
+      apiUserId = 100000 + salesUserId; // Or use fixed 20 if that's what your backend expects
+      
+      console.log('Sales order detected:', {
+        sales_user_id: salesUserId, // From users table (e.g., 6)
+        salesperson_name: salespersonName,
+        api_user_id: apiUserId, // Special ApiUser ID for sales
+        auth_type: 'SalesAuth'
+      });
+    } else if (regularUser) {
+      // Regular customer logged in
+      apiUserId = regularUser.id; // From api_users table
+      salesUserId = undefined;
+      isSalesOrder = false;
+      
+      console.log('Regular customer order:', {
+        api_user_id: apiUserId,
+        auth_type: 'Regular Auth'
+      });
     } else {
-      // For regular users, use user.id (which should be api_user_id)
-      apiUserId = user?.id;
+      toast.error("You must be logged in to place an order!");
+      return;
     }
 
     const payload: any = {
-      api_user_id: apiUserId, // 🔴 Use the correct ID
+      api_user_id: apiUserId,
       saved_address_id: selectedAddress !== "current" ? addressToSend.id : undefined,
       address: selectedAddress === "current" ? addressToSend : undefined,
       address_type: selectedAddress === "current" ? "current" : "saved",
@@ -292,49 +329,78 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       })),
     };
 
-    // Add customer_info for sale role users
-    if (user?.role === 'sale' && addressToSend) {
+    // 🔴 FIXED: Add customer_info for sales orders
+    if (isSalesOrder) {
+      // For sales orders, use the customer info from state
+      if (!customerInfo.name || !customerInfo.phone) {
+        toast.error("For sales orders, please enter customer name and phone");
+        return;
+      }
+      
       payload.customer_info = {
-        name: addressToSend.label || "Customer",
-        phone: addressToSend.phone || "",
+        name: customerInfo.name,
+        phone: customerInfo.phone,
+        email: customerInfo.email || undefined,
       };
-    }
-
-    // 🔴 ADD: Send sales user ID for backend to lookup salesperson name
-    if (user?.role === 'sale') {
-      payload.sales_user_id = user?.id; // Send the actual sales user ID from users table
-      console.log('Including sales_user_id:', user?.id);
+      
+      // Send salesperson info
+      payload.sales_user_id = salesUserId; // Salesperson's ID from users table
+      payload.sales_person_name = salespersonName; // Salesperson's real name
+      payload.is_sales_order = true;
+      
+      console.log('Sending sales order info:', {
+        sales_user_id: payload.sales_user_id,
+        sales_person_name: payload.sales_person_name,
+        customer_info: payload.customer_info
+      });
     }
 
     try {
       console.log("Sending order with payload:", payload);
+      
+      // Use the correct token based on auth type
+      const token = isSalesMode 
+        ? localStorage.getItem('sales_token')
+        : localStorage.getItem('token');
+      
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
         withCredentials: true,
         headers: { 
           Accept: "application/json",
-          Authorization: `Bearer ${localStorage.getItem('sales_token') || localStorage.getItem('token')}`
+          Authorization: `Bearer ${token}`
         },
       });
+      
       if (res.data?.success) {
         toast.success("Order placed successfully!");
         
-        // Show customer info for sale role
-        if (user?.role === 'sale' && payload.customer_info) {
-          toast.info(`Customer: ${payload.customer_info.name}, Phone: ${payload.customer_info.phone}`);
-          
-          // Also show salesperson info if available in response
-          if (res.data.salesperson_info) {
+        // Show relevant info based on order type
+        if (isSalesOrder) {
+          toast.info(`Customer: ${customerInfo.name}, Phone: ${customerInfo.phone}`);
+          if (res.data.salesperson_info?.name) {
             toast.info(`Salesperson: ${res.data.salesperson_info.name}`);
           }
         }
         
         setCart([]);
         setTotal(0);
+        setCustomerInfo({ name: "", phone: "", email: "" });
+        
         router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}&order_id=${res.data.order_id}`);
       }
     } catch (err: any) {
       console.error("Order error:", err.response?.data || err);
-      toast.error(err.response?.data?.message || "Order failed. Please try again.");
+      
+      // Show specific error messages
+      if (err.response?.data?.message) {
+        toast.error(err.response.data.message);
+      } else if (err.response?.data?.errors) {
+        // Handle validation errors
+        const errorMessages = Object.values(err.response.data.errors).flat();
+        errorMessages.forEach((msg: any) => toast.error(msg));
+      } else {
+        toast.error("Order failed. Please try again.");
+      }
     }
   };
 
@@ -344,8 +410,20 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       toast.error("No reward products selected!");
       return;
     }
+    
+    let apiUserId: number;
+    
+    // Determine correct API user ID
+    if (isSalesMode && salesUser) {
+      // For sales users, use special ApiUser ID
+      apiUserId = 100000 + salesUser.id;
+    } else {
+      // For regular users
+      apiUserId = regularUser?.id || 0;
+    }
+    
     const payload = {
-      api_user_id: user?.id,
+      api_user_id: apiUserId,
       total_points: totalPoints,
       items: rewards.map(r => ({
         product_id: r.product_id,
@@ -357,7 +435,12 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-reward-order`, payload, {
         withCredentials: true,
-        headers: { Accept: "application/json" },
+        headers: { 
+          Accept: "application/json",
+          Authorization: `Bearer ${isSalesMode 
+            ? localStorage.getItem('sales_token')
+            : localStorage.getItem('token')}`
+        },
       });
       if (res.data?.success) {
         toast.success("Reward order placed successfully!");
@@ -384,16 +467,16 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           const coordinates = { lat: latitude, lng: longitude };
 
           // Get user's phone number
-          const userPhone = user?.phone || user?.mobile;
+          const userPhone = activeUser?.phone;
   
           try {
-            // Get human-readable short address using your existing utility
+            // Get human-readable short address
             const short_address = await getShortAddress(latitude, longitude);
   
             const currentAddr: Address = {
-              label: user?.name,
+              label: activeUser?.name || "Current Location",
               details: short_address || "Your current position",
-              phone: userPhone || "", // Set user's phone from account
+              phone: userPhone || "",
               coordinates,
               short_address,
             };
@@ -454,6 +537,11 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         setPaymentMethod,
         placeOrder,
         placeRewardOrder,
+        // New properties for sales mode
+        isSalesMode,
+        salespersonName,
+        customerInfo,
+        setCustomerInfo,
       }}
     >
       {children}
