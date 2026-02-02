@@ -211,6 +211,11 @@ const Page: React.FC = () => {
         // },
       ];
 
+  // Display name - will show real sales user name
+  const displayName = user?.name || "User";
+  
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -273,7 +278,7 @@ const Page: React.FC = () => {
 
           <div className="mt-3 text-center">
             <p className="font-semibold text-lg text-gray-900">
-              {user?.name}
+              {displayName}
             </p>
             {user?.role === "sale" && (
               <span className="inline-block mt-1 px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
