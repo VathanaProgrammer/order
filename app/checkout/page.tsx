@@ -968,49 +968,6 @@ const CombinedCheckoutPage = () => {
         ))}
       </section>
 
-      {/* Order Total and Place Order Button */}
-      <section className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
-        <div className="flex justify-between items-center mb-4">
-          <p className="text-lg font-semibold text-gray-800">{t.total}</p>
-          <p className="text-2xl font-bold text-blue-600">${total.toFixed(2)}</p>
-        </div>
-        
-        <button
-          onClick={async () => {
-            if (!selectedAddress) {
-              toast.error("Please select a shipping address");
-              return;
-            }
-            if (!paymentMethod) {
-              toast.error("Please select a payment method");
-              return;
-            }
-            
-            setIsSubmittingOrder(true);
-            try {
-              await placeOrder();
-              toast.success("Order placed successfully!");
-              router.push("/orders");
-            } catch (err: any) {
-              toast.error(err.message || "Failed to place order");
-            } finally {
-              setIsSubmittingOrder(false);
-            }
-          }}
-          disabled={isSubmittingOrder || !selectedAddress || !paymentMethod}
-          className="w-full py-4 bg-blue-600 text-white rounded-xl font-semibold text-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
-        >
-          {isSubmittingOrder ? (
-            <div className="flex items-center justify-center gap-2">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              Processing...
-            </div>
-          ) : (
-            t.placeOrder
-          )}
-        </button>
-      </section>
-
       {/* QR Popup */}
       {showQRPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
