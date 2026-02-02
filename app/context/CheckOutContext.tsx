@@ -120,6 +120,21 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [activeUser]);
 
+  // Update customer info when selecting a saved address
+  useEffect(() => {
+    if (isSalesMode && selectedAddress && selectedAddress !== "current") {
+      const address = selectedAddress as Address;
+      // Pre-fill customer info from saved address if available
+      if (address.label && address.phone) {
+        setCustomerInfo(prev => ({
+          ...prev,
+          name: address.label || prev.name,
+          phone: address.phone || prev.phone
+        }));
+      }
+    }
+  }, [selectedAddress, isSalesMode]);
+
   const recalcTotal = (items: CartItem[]) => items.reduce((sum, i) => sum + i.price * i.qty, 0);
   const recalcTotalPoints = (items: RewardItem[]) => items.reduce((sum, i) => sum + i.points_at_reward * i.qty, 0);
 
@@ -226,6 +241,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   // --- PLACE ORDER ---
   const placeOrder = async () => {
     let addressToSend: Address | null = null;
+    let customerName = "";
+    let customerPhone = "";
     
     if (selectedAddress === "current") {
       if (!currentAddress.coordinates) {
@@ -235,37 +252,71 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       
       // For sales mode, validate customer info
       if (isSalesMode) {
+        // Use customer info from the form
         if (!customerInfo.name || !customerInfo.phone) {
           toast.error("Please enter customer name and phone number");
           return;
         }
         
-        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
-        addressToSend = { 
-          ...currentAddress, 
-          short_address,
-          phone: customerInfo.phone,
-          label: customerInfo.name,
-          details: `Customer address: ${short_address}`,
-        };
-      } else {
-        // Regular user
-        const userPhone = regularUser?.phone || regularUser?.mobile || "";
-        if (!userPhone) {
-          toast.error("Please add your phone number in your account settings");
-          return;
-        }
+        customerName = customerInfo.name;
+        customerPhone = customerInfo.phone;
         
         const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
         addressToSend = { 
           ...currentAddress, 
           short_address,
-          phone: userPhone,
-          label: regularUser?.name || "Customer",
+          phone: customerPhone,
+          label: customerName,
+          details: `Customer address: ${short_address}`,
+        };
+      } else {
+        // Regular user
+        const userPhone = regularUser?.phone || "";
+        if (!userPhone) {
+          toast.error("Please add your phone number in your account settings");
+          return;
+        }
+        
+        customerName = regularUser?.name || "Customer";
+        customerPhone = userPhone;
+        
+        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
+        addressToSend = { 
+          ...currentAddress, 
+          short_address,
+          phone: customerPhone,
+          label: customerName,
         };
       }
     } else {
+      // For saved addresses
       addressToSend = selectedAddress as Address;
+      
+      if (!addressToSend) {
+        toast.error("Please select an address!");
+        return;
+      }
+      
+      // For sales mode with saved address
+      if (isSalesMode) {
+        // Check if saved address has customer info
+        if (addressToSend.label && addressToSend.phone) {
+          customerName = addressToSend.label;
+          customerPhone = addressToSend.phone;
+        } else {
+          // Use customer info from form
+          if (!customerInfo.name || !customerInfo.phone) {
+            toast.error("Please enter customer name and phone number");
+            return;
+          }
+          customerName = customerInfo.name;
+          customerPhone = customerInfo.phone;
+        }
+      } else {
+        // Regular user with saved address
+        customerName = regularUser?.name || addressToSend.label || "Customer";
+        customerPhone = addressToSend.phone || regularUser?.phone || "";
+      }
     }
 
     if (!addressToSend || cart.length === 0) {
@@ -280,21 +331,16 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     
     if (isSalesMode && salesUser) {
       // Salesperson is logged in via SalesAuth
-      // salesUser comes from users table (e.g., ID = 6)
-      // We need to find/create corresponding ApiUser
-      
       isSalesOrder = true;
       salesUserId = salesUser.id; // This is from users table (e.g., 6)
       
-      // For sales orders, api_user_id should point to a special ApiUser
-      // that represents the salesperson in the api_users table
-      // Based on your backend, this should be 100000 + salesUserId OR fixed ID 20
-      apiUserId = 100000 + salesUserId; // Or use fixed 20 if that's what your backend expects
+      // Use fixed api_user_id 20 for sales orders (based on your previous logs)
+      apiUserId = 20; // Fixed ID for sales orders
       
       console.log('Sales order detected:', {
         sales_user_id: salesUserId, // From users table (e.g., 6)
         salesperson_name: salespersonName,
-        api_user_id: apiUserId, // Special ApiUser ID for sales
+        api_user_id: apiUserId, // Fixed ID 20 for sales
         auth_type: 'SalesAuth'
       });
     } else if (regularUser) {
@@ -331,15 +377,15 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
 
     // 🔴 FIXED: Add customer_info for sales orders
     if (isSalesOrder) {
-      // For sales orders, use the customer info from state
-      if (!customerInfo.name || !customerInfo.phone) {
+      // For sales orders, use the determined customer info
+      if (!customerName || !customerPhone) {
         toast.error("For sales orders, please enter customer name and phone");
         return;
       }
       
       payload.customer_info = {
-        name: customerInfo.name,
-        phone: customerInfo.phone,
+        name: customerName,
+        phone: customerPhone,
         email: customerInfo.email || undefined,
       };
       
@@ -351,7 +397,9 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       console.log('Sending sales order info:', {
         sales_user_id: payload.sales_user_id,
         sales_person_name: payload.sales_person_name,
-        customer_info: payload.customer_info
+        customer_info: payload.customer_info,
+        customer_name: customerName,
+        customer_phone: customerPhone
       });
     }
 
@@ -376,7 +424,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         
         // Show relevant info based on order type
         if (isSalesOrder) {
-          toast.info(`Customer: ${customerInfo.name}, Phone: ${customerInfo.phone}`);
+          toast.info(`Customer: ${customerName}, Phone: ${customerPhone}`);
           if (res.data.salesperson_info?.name) {
             toast.info(`Salesperson: ${res.data.salesperson_info.name}`);
           }
@@ -415,8 +463,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     
     // Determine correct API user ID
     if (isSalesMode && salesUser) {
-      // For sales users, use special ApiUser ID
-      apiUserId = 100000 + salesUser.id;
+      // For sales users, use fixed ID 20
+      apiUserId = 20;
     } else {
       // For regular users
       apiUserId = regularUser?.id || 0;
