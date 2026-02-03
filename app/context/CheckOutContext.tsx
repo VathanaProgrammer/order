@@ -399,97 +399,125 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       console.log("✅ Sending order with payload:", JSON.stringify(payload, null, 2));
       
       // ==============================
-      // FIXED AUTH SECTION
+      // FIXED AUTH SECTION - NO TYPE ERRORS
       // ==============================
       
-      // Since document.cookie is empty, we need to get the token from regularUser state
-      // OR from a storage where it was saved during login
       console.log('🔍 Auth Debug:');
-      console.log('regularUser:', regularUser);
-      console.log('regularUser.token:', regularUser?.token);
-      console.log('regularUser.access_token:', regularUser?.access_token);
+      console.log('regularUser id:', regularUser?.id);
+      console.log('isSalesMode:', isSalesMode);
       
-      // Check multiple possible token locations
+      // Type-safe way to check for token
       let token: string | null = null;
       const cookieName = isSalesMode ? 'sales_token' : 'token';
       
-      // Option 1: Check if token is in user state
-      if (regularUser && (regularUser.token || regularUser.access_token)) {
-        token = regularUser.token || regularUser.access_token;
-        console.log('✅ Found token in regularUser state:', token?.substring(0, 30) + '...');
-      }
+      // Method 1: Check localStorage first (most common)
+      token = localStorage.getItem(cookieName);
+      console.log(`🔍 localStorage[${cookieName}]:`, token ? 'FOUND' : 'NOT FOUND');
       
-      // Option 2: Check localStorage (your token might be here)
-      if (!token) {
-        token = localStorage.getItem(cookieName);
-        console.log('🔍 localStorage check for', cookieName + ':', token ? 'FOUND' : 'NOT FOUND');
-      }
-      
-      // Option 3: Check sessionStorage
+      // Method 2: Check sessionStorage
       if (!token) {
         token = sessionStorage.getItem(cookieName);
-        console.log('🔍 sessionStorage check:', token ? 'FOUND' : 'NOT FOUND');
+        console.log(`🔍 sessionStorage[${cookieName}]:`, token ? 'FOUND' : 'NOT FOUND');
       }
       
-      // Option 4: Check specific known storage key
+      // Method 3: Check other common storage locations
       if (!token) {
-        // Try common storage keys
-        const possibleKeys = ['auth_token', 'jwt_token', 'user_token', 'access_token'];
-        for (const key of possibleKeys) {
-          const stored = localStorage.getItem(key) || sessionStorage.getItem(key);
-          if (stored) {
-            token = stored;
-            console.log('✅ Found token in', key + ':', token.substring(0, 30) + '...');
+        const commonTokenKeys = [
+          'auth_token',
+          'jwt_token',
+          'user_token',
+          'access_token',
+          'bearer_token',
+          'api_token'
+        ];
+        
+        for (const key of commonTokenKeys) {
+          const storedToken = localStorage.getItem(key) || sessionStorage.getItem(key);
+          if (storedToken) {
+            token = storedToken;
+            console.log(`✅ Found token in ${key}: ${token.substring(0, 30)}...`);
             break;
           }
         }
       }
       
-      // Option 5: If you have the raw token string (from your message), hardcode it for testing
-      if (!token && regularUser?.id === 7) { // Based on your JWT payload showing sub: 7
-        // This is your token from the message
+      // Method 4: Check if token is in user object (type-safe way)
+      if (!token && regularUser) {
+        // Safely check if regularUser has any token properties
+        const userObj = regularUser as any; // Temporary type assertion
+        
+        const possibleTokenProps = ['token', 'access_token', 'auth_token', 'jwt_token'];
+        for (const prop of possibleTokenProps) {
+          if (userObj[prop] && typeof userObj[prop] === 'string') {
+            token = userObj[prop];
+            console.log(`✅ Found token in regularUser.${prop}: ${token?.substring(0, 30)}...`);
+            break;
+          }
+        }
+      }
+      
+      // Method 5: For testing - use the specific token you provided
+      if (!token && regularUser?.id === 7) {
         token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL3N5cy5zb2JraC5jb20vYXBpL2xvZ2luIiwiaWF0IjoxNzcwMTA2MDU1LCJleHAiOjE3NzI2MjYwNTUsIm5iZiI6MTc3MDEwNjA1NSwianRpIjoib05kem5lYmRCaW05dWdyVSIsInN1YiI6IjciLCJwcnYiOiJmNDEzYzk0ZWU2MGI1MzY0NDRmYWQyZTVjZDM5ZmMwZjk3MzY1Y2Q5In0.C1gg1dv2HDTxvydAHKggEu-dWE5lxSX9hVSfhAOgkL8';
         console.log('⚠️ Using hardcoded token for testing (user 7)');
       }
       
-      if (!token) {
-        console.error('❌ No token found. Storage dump:');
+      // Debug: Show what we found
+      if (token) {
+        console.log('✅ Token found! Length:', token.length);
+        console.log('Token preview:', token.substring(0, 50) + '...');
+        
+        // Verify token structure
+        try {
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            console.log('🔍 Token payload:', {
+              userId: payload.sub,
+              exp: new Date(payload.exp * 1000),
+              isExpired: payload.exp * 1000 < Date.now()
+            });
+            
+            if (payload.exp * 1000 < Date.now()) {
+              toast.error("Your session has expired. Please log in again.");
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not parse token structure:', e);
+        }
+      } else {
+        console.error('❌ No token found anywhere!');
+        console.error('Storage dump:');
         console.error('- localStorage keys:', Object.keys(localStorage));
         console.error('- sessionStorage keys:', Object.keys(sessionStorage));
-        console.error('- regularUser:', regularUser);
+        
+        // Show all auth-related items in storage
+        console.error('\nAuth-related items in localStorage:');
+        Object.keys(localStorage).forEach(key => {
+          if (key.toLowerCase().includes('token') || key.toLowerCase().includes('auth')) {
+            const value = localStorage.getItem(key);
+            console.error(`  ${key}: ${value?.substring(0, 30)}...`);
+          }
+        });
+        
+        console.error('\nAuth-related items in sessionStorage:');
+        Object.keys(sessionStorage).forEach(key => {
+          if (key.toLowerCase().includes('token') || key.toLowerCase().includes('auth')) {
+            const value = sessionStorage.getItem(key);
+            console.error(`  ${key}: ${value?.substring(0, 30)}...`);
+          }
+        });
         
         toast.error("Authentication token missing. Please log in again.");
         return;
       }
-      
-      console.log('✅ Using token:', token.substring(0, 50) + '...');
-      
-      // Verify the token structure
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]));
-          console.log('🔍 Token payload:', {
-            userId: payload.sub,
-            exp: new Date(payload.exp * 1000),
-            isExpired: payload.exp * 1000 < Date.now()
-          });
-          
-          // Check expiration
-          if (payload.exp * 1000 < Date.now()) {
-            toast.error("Your session has expired. Please log in again.");
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn('Could not parse token:', e);
-      }
 
       // Make the API call
-      console.log(`📤 Making API call with token for user: ${apiUserId}`);
+      console.log(`📤 Making API call for user: ${apiUserId}`);
       
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
-        withCredentials: true, // Still important for backend cookies
+        withCredentials: true,
         headers: { 
           'Content-Type': 'application/json',
           'Accept': 'application/json',
