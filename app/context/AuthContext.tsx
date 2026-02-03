@@ -7,7 +7,7 @@ import {
   ReactNode,
   useRef,
 } from "react";
-import api, { clearApiState } from "@/api/api";
+import api from "@/api/api";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -74,29 +74,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
-  // 🔹 Restore user on mount - FIXED VERSION
+  // 🔹 Restore user on mount - SIMPLIFIED
   useEffect(() => {
     const fetchUser = async () => {
       try {
         console.log('🔄 Fetching user on mount...');
-        
-        // 🔴 FIRST: Check if we have any authentication token
-        const tokenFromStorage = localStorage.getItem('token');
-        const hasTokenInCookies = document.cookie.includes('token=');
-        
-        console.log('Auth check:', {
-          tokenInStorage: tokenFromStorage ? 'YES' : 'NO',
-          tokenInCookies: hasTokenInCookies ? 'YES' : 'NO',
-          cookies: document.cookie
-        });
-        
-        // If NO token exists anywhere, skip API call
-        if (!tokenFromStorage && !hasTokenInCookies) {
-          console.log('❌ No auth token found, skipping user fetch');
-          setUser(null);
-          setLoading(false);
-          return;
-        }
         
         const res = await api.get("/user", {
           headers: {
@@ -104,6 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             'Pragma': 'no-cache',
             'Expires': '0',
           },
+          // Adding a timestamp ensures Safari sees this as a brand new URL
           params: {
             _t: Date.now()
           }
@@ -121,15 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (err: any) {
         console.error("Auth restore failed:", err.message);
         
-        // Check if it's a 401 Unauthorized
-        if (err.response?.status === 401) {
-          console.log('🔴 401 Unauthorized - clearing auth');
-          // Clear any remaining tokens
-          localStorage.removeItem('token');
-          // Clear cookies
-          document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        }
-        
+        // Don't automatically redirect - let components handle
         setUser(null);
       } finally {
         setLoading(false);
@@ -238,56 +213,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // 🔹 Logout - MORE AGGRESSIVE VERSION
+  // 🔹 Logout
+// 🔹 Enhanced Logout
   const logout = async () => {
-    console.log('🚪 Starting logout process...');
-    
     try {
       await api.post("/logout");
-      console.log('✅ Logout API called');
-    } catch (e) { 
-      console.error('Logout API error:', e); 
+      
+    } catch (error: any) {
+      console.error("Logout error:", error);
     }
-
-    // 1. Clear ALL storage - SPECIFIC ITEMS
-    const storageItems = ['token', 'user', 'auth_token', 'refresh_token', 'sales_token'];
-    storageItems.forEach(item => {
-      localStorage.removeItem(item);
-      sessionStorage.removeItem(item);
-    });
     
-    // Also clear all just in case
-    localStorage.clear();
-    sessionStorage.clear();
-    
-    console.log('✅ Storage cleared');
-
-    // 2. Kill ALL cookies aggressively
-    const domains = ['', window.location.hostname, 'sobkh.com', '.sobkh.com'];
-    const cookieNames = ['token', 'auth_token', 'laravel_session', 'XSRF-TOKEN', 'remember_web'];
-    const paths = ['/', '/api'];
-    
-    domains.forEach(domain => {
-      cookieNames.forEach(name => {
-        paths.forEach(path => {
-          let cookieString = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path};`;
-          if (domain) {
-            cookieString += ` domain=${domain};`;
-          }
-          document.cookie = cookieString;
-          console.log('Deleted cookie:', cookieString);
-        });
-      });
-    });
-
-    // 3. Clear axios headers
-    delete api.defaults.headers.common['Authorization'];
-    
-    // 4. FORCE refresh - add random parameter to prevent cache
-    setTimeout(() => {
-      console.log('🔀 Redirecting to login...');
-      window.location.href = `/sign-in?r=${Date.now()}`;
-    }, 100);
+    setUser(null);
+    router.push("/sign-in");
   };
 
   return (
