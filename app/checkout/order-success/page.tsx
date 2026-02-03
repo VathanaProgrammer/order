@@ -34,6 +34,33 @@ const page = () => {
     return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   };
 
+  // Function to format address for display
+  const formatAddress = (addressData: any) => {
+    if (!addressData) return "No address provided";
+    
+    if (typeof addressData === 'string') {
+      return addressData;
+    }
+    
+    // Build address from parts
+    const parts = [];
+    if (addressData.street) parts.push(addressData.street);
+    if (addressData.city) parts.push(addressData.city);
+    if (addressData.state) parts.push(addressData.state);
+    if (addressData.country) parts.push(addressData.country);
+    if (addressData.postal_code) parts.push(addressData.postal_code);
+    
+    if (parts.length > 0) {
+      return parts.join(', ');
+    }
+    
+    // Fallback to short_address or details
+    if (addressData.short_address) return addressData.short_address;
+    if (addressData.details) return addressData.details;
+    
+    return "Address not specified";
+  };
+
   // Logic to "Download that Box" by rendering the box state to a high-res canvas
   const generateBoxImage = (orderData: any) => {
     if (!orderData) return;
@@ -43,21 +70,25 @@ const page = () => {
       try {
         const scale = 2;
         const width = 384;
+        
+        // Calculate dynamic height based on content
+        let baseHeight = 240; // Base height (header, customer, address)
         const itemsCount = orderData.items?.length || 0;
-        // Calculate height based on the "One Box" UI structure
-        const height = 220 + (itemsCount * 25) + 100; 
-
+        const itemsHeight = itemsCount * 35; // Height for items
+        const addressHeight = 40; // Height for address section
+        const totalHeight = baseHeight + itemsHeight + addressHeight + 100; // Add padding for total and buttons
+        
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
         canvas.width = width * scale;
-        canvas.height = height * scale;
+        canvas.height = totalHeight * scale;
         ctx.scale(scale, scale);
 
         // Draw the Box Style
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, width, height);
+        ctx.fillRect(0, 0, width, totalHeight);
         
         // Header (Matches your style)
         ctx.fillStyle = '#f8fafc'; // gray-50
@@ -80,27 +111,90 @@ const page = () => {
           y += 45;
         }
 
-        // Items
+        // Address Section
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText('Delivery Address:', 20, y);
+        
+        // Format and draw address (wrapped text)
+        const addressText = formatAddress(orderData.address_info?.address || 'Not specified');
+        ctx.fillStyle = '#64748b';
+        ctx.font = '11px Arial';
+        
+        // Simple text wrapping for address
+        const maxWidth = width - 40; // 20px padding on each side
+        const lineHeight = 14;
+        const words = addressText.split(' ');
+        let line = '';
+        let lineY = y + 20;
+        
+        for (let n = 0; n < words.length; n++) {
+          const testLine = line + words[n] + ' ';
+          const metrics = ctx.measureText(testLine);
+          const testWidth = metrics.width;
+          
+          if (testWidth > maxWidth && n > 0) {
+            ctx.fillText(line, 20, lineY);
+            line = words[n] + ' ';
+            lineY += lineHeight;
+          } else {
+            line = testLine;
+          }
+        }
+        ctx.fillText(line, 20, lineY);
+        
+        y = lineY + 25; // Move y down for items section
+
+        // Items Separator
         ctx.strokeStyle = '#e2e8f0';
-        ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(width - 20, y); ctx.stroke();
+        ctx.beginPath(); 
+        ctx.moveTo(20, y); 
+        ctx.lineTo(width - 20, y); 
+        ctx.stroke();
         y += 25;
 
+        // Items Header
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText('ITEMS', 20, y);
+        ctx.fillText('AMOUNT', width - 20, y);
+        y += 20;
+
+        // Items List
+        ctx.font = '12px Arial';
         orderData.items?.forEach((item: any) => {
           ctx.fillStyle = '#1e293b';
-          ctx.font = '13px Arial';
           ctx.textAlign = 'left';
-          ctx.fillText(item.product_name.substring(0, 35), 20, y);
+          
+          // Product name (truncated if too long)
+          const productName = item.product_name.length > 25 
+            ? item.product_name.substring(0, 22) + '...' 
+            : item.product_name;
+          ctx.fillText(productName, 20, y);
+          
+          // Price
           ctx.textAlign = 'right';
           ctx.fillText(formatCurrency(item.qty * item.price_at_order), width - 20, y);
+          
+          // Quantity and unit price
           ctx.fillStyle = '#94a3b8';
-          ctx.font = '11px Arial';
           ctx.textAlign = 'left';
           ctx.fillText(`${item.qty} x ${formatCurrency(item.price_at_order)}`, 20, y + 15);
+          
           y += 35;
         });
 
-        // Total Box
+        // Payment Method
         y += 10;
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(0, y, width, 30);
+        ctx.fillStyle = '#475569';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Payment Method: ${orderData.payment_method || 'Not specified'}`, 20, y + 20);
+        
+        // Total Box
+        y += 40;
         ctx.fillStyle = '#eff6ff'; // blue-50
         ctx.fillRect(0, y, width, 70);
         ctx.fillStyle = '#1e4ce4';
@@ -111,9 +205,21 @@ const page = () => {
         ctx.font = 'bold 20px Arial';
         ctx.fillText(formatCurrency(orderData.total), width - 20, y + 40);
 
+        // Reward Points if available
+        if (orderData.reward_points?.earned > 0) {
+          ctx.fillStyle = '#dbeafe';
+          ctx.fillRect(0, y + 70, width, 30);
+          ctx.fillStyle = '#1e40af';
+          ctx.font = 'bold 11px Arial';
+          ctx.textAlign = 'left';
+          ctx.fillText('🎁 Reward Points Earned:', 20, y + 90);
+          ctx.textAlign = 'right';
+          ctx.fillText(`+${orderData.reward_points.earned} points`, width - 20, y + 90);
+        }
+
         setInvoiceImage(canvas.toDataURL('image/png', 1.0));
       } catch (e) {
-        console.error(e);
+        console.error('Error generating invoice:', e);
       } finally {
         setIsGenerating(false);
       }
@@ -122,7 +228,7 @@ const page = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!orderId) return; // REMOVED: user?.role !== 'sale' condition
+      if (!orderId) return;
       try {
         setIsLoading(true);
         
@@ -173,13 +279,13 @@ const page = () => {
     };
     
     fetchData();
-  }, [orderId, user?.role]); // Keep user.role in dependencies for re-fetch if auth changes
+  }, [orderId, user?.role]);
 
   const handleDownload = () => {
     if (!invoiceImage) return;
     const a = document.createElement('a');
     a.href = invoiceImage;
-    a.download = `Order_${orderId}.png`;
+    a.download = `Order_${orderId}_Receipt.png`;
     a.click();
   };
 
@@ -187,14 +293,12 @@ const page = () => {
     if (!invoiceImage) return;
     try {
       const blob = await (await fetch(invoiceImage)).blob();
-      const file = new File([blob], `Order_${orderId}.png`, { type: 'image/png' });
+      const file = new File([blob], `Order_${orderId}_Receipt.png`, { type: 'image/png' });
       if (navigator.share) await navigator.share({ files: [file] });
       else handleDownload();
     } catch (e) { handleDownload(); }
   };
 
-  // REMOVED: The conditional rendering that only showed success message for non-sales users
-  
   // Show loading state
   if (isLoading) {
     return (
@@ -245,10 +349,25 @@ const page = () => {
                 <p className="text-sm text-gray-600">
                   {orderDetails.customer_info?.phone || 'N/A'}
                 </p>
+                
+                {/* Address Section - NEW */}
                 {orderDetails.address_info?.address && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    📍 {orderDetails.address_info.address}
-                  </p>
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-2">
+                      Delivery Address
+                    </p>
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                      <p className="text-sm text-gray-800 flex items-start gap-2">
+                        <Icon icon="mdi:map-marker-outline" className="text-gray-500 mt-0.5 flex-shrink-0" width={16} />
+                        <span className="flex-1">{formatAddress(orderDetails.address_info.address)}</span>
+                      </p>
+                      {orderDetails.address_info.type && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          Type: <span className="font-medium capitalize">{orderDetails.address_info.type}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -269,9 +388,12 @@ const page = () => {
               {/* Payment Method */}
               <div className="mt-6 pt-4 border-t border-gray-100">
                 <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">Payment</p>
-                <p className="text-sm text-gray-800">
-                  Method: <span className="font-bold">{orderDetails.payment_method || 'N/A'}</span>
-                </p>
+                <div className="flex items-center gap-2">
+                  <Icon icon="mdi:credit-card-outline" className="text-gray-500" width={18} />
+                  <p className="text-sm text-gray-800">
+                    <span className="font-bold">{orderDetails.payment_method || 'Not specified'}</span>
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -286,9 +408,17 @@ const page = () => {
               {orderDetails.reward_points?.earned > 0 && (
                 <div className="mt-3 pt-3 border-t border-blue-200">
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-blue-800">🎁 Reward Points Earned</span>
+                    <div className="flex items-center gap-2 text-blue-800">
+                      <Icon icon="mdi:gift-outline" width={16} />
+                      <span>Reward Points Earned</span>
+                    </div>
                     <span className="font-bold text-blue-800">+{orderDetails.reward_points.earned}</span>
                   </div>
+                  {orderDetails.reward_points.total > 0 && (
+                    <p className="text-xs text-blue-700 mt-1 text-right">
+                      Total: {orderDetails.reward_points.total} points
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -340,8 +470,7 @@ const page = () => {
         </div>
       )}
 
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 backdrop-blur-md border-t bg-white/95 flex gap-3">
+      <div className="p-4 backdrop-blur-md border-t bg-white/95 flex gap-3">
         <a href="/" className="flex-1 py-3 bg-gray-100 text-center rounded-xl font-bold text-gray-700 hover:bg-gray-200 transition-colors">
           {t.home || 'Home'}
         </a>
