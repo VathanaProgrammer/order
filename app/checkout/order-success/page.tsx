@@ -122,22 +122,58 @@ const page = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!orderId || user?.role !== 'sale') return;
+      if (!orderId) return; // REMOVED: user?.role !== 'sale' condition
       try {
         setIsLoading(true);
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`, { withCredentials: true });
+        
+        // Get token based on auth type
+        let token: string | null = null;
+        const isSalesMode = user?.role === 'sale';
+        
+        if (isSalesMode) {
+          token = localStorage.getItem('sales_token') || 
+                  localStorage.getItem('auth_token') || 
+                  sessionStorage.getItem('sales_token');
+        } else {
+          token = localStorage.getItem('auth_token') || 
+                  localStorage.getItem('token') || 
+                  sessionStorage.getItem('auth_token') ||
+                  sessionStorage.getItem('token');
+        }
+        
+        if (!token) {
+          toast.error("Please log in to view order details");
+          return;
+        }
+
+        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`, {
+          withCredentials: true,
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
         if (res.data?.success) {
           setOrderDetails(res.data.data);
           generateBoxImage(res.data.data);
         }
-      } catch (err) {
-        toast.error("Error fetching details");
+      } catch (err: any) {
+        console.error("Error fetching order details:", err);
+        
+        if (err.response?.status === 401) {
+          toast.error("Session expired. Please log in again.");
+        } else if (err.response?.status === 403) {
+          toast.error("You don't have permission to view this order");
+        } else {
+          toast.error("Error fetching order details");
+        }
       } finally {
         setIsLoading(false);
       }
     };
+    
     fetchData();
-  }, [orderId, user?.role]);
+  }, [orderId, user?.role]); // Keep user.role in dependencies for re-fetch if auth changes
 
   const handleDownload = () => {
     if (!invoiceImage) return;
@@ -157,13 +193,16 @@ const page = () => {
     } catch (e) { handleDownload(); }
   };
 
-  if (user?.role !== 'sale') {
+  // REMOVED: The conditional rendering that only showed success message for non-sales users
+  
+  // Show loading state
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
-        <Icon icon="mdi:check-circle" width={80} className="text-green-500 mb-4" />
-        <h1 className="text-2xl font-bold">Success!</h1>
-        <p className="text-gray-500 mb-6">Order #{orderId}</p>
-        <a href="/" className="w-full py-3 bg-blue-600 text-white rounded-lg text-center font-bold">{t.home}</a>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Icon icon="mdi:loading" width={40} className="animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading order details...</p>
+        </div>
       </div>
     );
   }
@@ -172,12 +211,10 @@ const page = () => {
     <div className="min-h-screen bg-gray-50 pb-24">
       <div className="bg-white p-4 border-b flex items-center gap-3">
         <button onClick={() => window.history.back()}><Icon icon="mdi:arrow-left" width={24}/></button>
-        <h1 className="font-bold text-lg">Receipt Details</h1>
+        <h1 className="font-bold text-lg">Order Receipt</h1>
       </div>
 
-      {isLoading ? (
-        <div className="p-10 text-center text-gray-400">Loading...</div>
-      ) : orderDetails && (
+      {orderDetails ? (
         <div className="p-4 max-w-md mx-auto">
           {/* THE MERGED BOX */}
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
@@ -186,20 +223,36 @@ const page = () => {
                 <div>
                   <h2 className="text-blue-600 font-black text-xl">Order #{orderId}</h2>
                   <p className="text-xs text-gray-500">{formatDate(orderDetails.created_at)}</p>
+                  {user?.role === 'sale' && orderDetails.salesperson_info && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      Salesperson: {orderDetails.salesperson_info.name}
+                    </p>
+                  )}
                 </div>
                 <span className="bg-blue-600 text-white text-[10px] px-2 py-1 rounded-full font-bold">OFFICIAL RECEIPT</span>
               </div>
             </div>
 
             <div className="p-5">
-              {orderDetails.customer_info && (
-                <div className="mb-6">
-                  <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">Customer</p>
-                  <p className="font-bold text-gray-800">{orderDetails.customer_info.name}</p>
-                  <p className="text-sm text-gray-600">{orderDetails.customer_info.phone}</p>
-                </div>
-              )}
+              {/* Customer Info Section */}
+              <div className="mb-6">
+                <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">
+                  {user?.role === 'sale' ? 'Customer' : 'Your Information'}
+                </p>
+                <p className="font-bold text-gray-800">
+                  {orderDetails.customer_info?.name || 'Customer'}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {orderDetails.customer_info?.phone || 'N/A'}
+                </p>
+                {orderDetails.address_info?.address && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    📍 {orderDetails.address_info.address}
+                  </p>
+                )}
+              </div>
 
+              {/* Order Items Section */}
               <div className="space-y-4">
                 <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Items</p>
                 {orderDetails.items?.map((item: any, i: number) => (
@@ -212,39 +265,95 @@ const page = () => {
                   </div>
                 ))}
               </div>
+              
+              {/* Payment Method */}
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">Payment</p>
+                <p className="text-sm text-gray-800">
+                  Method: <span className="font-bold">{orderDetails.payment_method || 'N/A'}</span>
+                </p>
+              </div>
             </div>
 
+            {/* Total Amount Section */}
             <div className="p-5 bg-blue-100 text-black">
               <div className="flex justify-between items-center">
                 <span className="font-medium opacity-80">Total Amount</span>
                 <span className="text-2xl font-black">{formatCurrency(orderDetails.total)}</span>
               </div>
+              
+              {/* Reward Points if available */}
+              {orderDetails.reward_points?.earned > 0 && (
+                <div className="mt-3 pt-3 border-t border-blue-200">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-blue-800">🎁 Reward Points Earned</span>
+                    <span className="font-bold text-blue-800">+{orderDetails.reward_points.earned}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* ACTION BUTTONS INSIDE THE BOX */}
+            {/* Action Buttons - Show for everyone */}
             <div className="p-4 grid grid-cols-2 gap-3 bg-gray-50">
               <button 
                 onClick={handleDownload}
-                className="flex items-center justify-center gap-2 py-3 bg-white border border-gray-200 text-gray-800 rounded-xl font-bold active:scale-95 transition-all shadow-sm"
+                disabled={!invoiceImage || isGenerating}
+                className={`flex items-center justify-center gap-2 py-3 bg-white border border-gray-200 text-gray-800 rounded-xl font-bold active:scale-95 transition-all shadow-sm ${(!invoiceImage || isGenerating) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <Icon icon="mdi:download" width={20}/> Download
+                {isGenerating ? (
+                  <>
+                    <Icon icon="mdi:loading" className="animate-spin" width={20}/>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="mdi:download" width={20}/>
+                    Download
+                  </>
+                )}
               </button>
               <button 
                 onClick={handleShare}
-                className="flex items-center justify-center gap-2 py-3 bg-gray-900 text-white rounded-xl font-bold active:scale-95 transition-all shadow-sm"
+                disabled={!invoiceImage || isGenerating}
+                className={`flex items-center justify-center gap-2 py-3 bg-gray-900 text-white rounded-xl font-bold active:scale-95 transition-all shadow-sm ${(!invoiceImage || isGenerating) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <Icon icon="mdi:share-variant" width={20}/> Share
+                <Icon icon="mdi:share-variant" width={20}/>
+                Share
               </button>
             </div>
           </div>
         </div>
+      ) : !isLoading && (
+        // Show error/empty state if no order details
+        <div className="p-10 text-center">
+          <Icon icon="mdi:file-document-outline" width={60} className="text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">Order Not Found</h3>
+          <p className="text-gray-500 mb-6">
+            We couldn't find the details for order #{orderId}
+          </p>
+          <a 
+            href="/" 
+            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold"
+          >
+            Back to Home
+          </a>
+        </div>
       )}
 
-      <div className="p-4 backdrop-blur-md border-t flex gap-3">
-        <a href="/" className="flex-1 py-3 bg-gray-200 text-center rounded-xl font-bold text-gray-700">{t.home}</a>
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 backdrop-blur-md border-t bg-white/95 flex gap-3">
+        <a href="/" className="flex-1 py-3 bg-gray-100 text-center rounded-xl font-bold text-gray-700 hover:bg-gray-200 transition-colors">
+          {t.home || 'Home'}
+        </a>
         {telegramLink && (
-          <a href={telegramLink} target="_blank" className="flex-1 py-3 bg-blue-600 text-white text-center rounded-xl font-bold flex items-center justify-center gap-2">
-            <Icon icon="mdi:telegram" width={20}/> Telegram
+          <a 
+            href={telegramLink} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex-1 py-3 bg-blue-600 text-white text-center rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
+          >
+            <Icon icon="mdi:telegram" width={20}/>
+            Telegram
           </a>
         )}
       </div>
