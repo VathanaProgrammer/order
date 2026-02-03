@@ -72,8 +72,11 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => {
-    // Detect token in any response and sync it
-    if (response.data?.token) {
+    // Only save the token if we are on the login or register page
+    // This prevents the "user" endpoint from accidentally re-saving a zombie token
+    const isAuthPath = response.config.url?.includes('login') || response.config.url?.includes('register');
+    
+    if (isAuthPath && response.data?.token) {
       updateToken(response.data.token);
     }
     return response;
