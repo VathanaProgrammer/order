@@ -14,6 +14,7 @@ const page = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [orderDetails, setOrderDetails] = useState<any>(null);
+  const [addressDetails, setAddressDetails] = useState<any>(null);
   const [invoiceImage, setInvoiceImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -34,176 +35,103 @@ const page = () => {
     return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   };
 
-  // Function to format address for display
-// Updated formatAddress function to handle the actual data structure
-const formatAddress = (orderData: any) => {
-  if (!orderData) return "No address provided";
-  
-  console.log('🔍 formatAddress called with:', orderData); // Debug
-  
-  // First check if we have address in address_info (even if empty)
-  if (orderData.address_info) {
-    // Check if we have a direct address string
-    if (orderData.address_info.address && orderData.address_info.address.trim() !== '') {
-      return orderData.address_info.address;
-    }
-  }
-  
-  // Check for savedAddress relationship (from your backend)
-  if (orderData.savedAddress) {
-    const addr = orderData.savedAddress;
-    // Build from parts
-    const parts = [];
-    if (addr.street) parts.push(addr.street);
-    if (addr.city) parts.push(addr.city);
-    if (addr.state) parts.push(addr.state);
-    if (addr.country) parts.push(addr.country);
-    if (addr.postal_code) parts.push(addr.postal_code);
+  // Function to fetch address details separately
+  const fetchAddressDetails = async (orderData: any, token: string) => {
+    if (!orderData || !orderData.address_info) return null;
     
-    if (parts.length > 0) {
-      return parts.join(', ');
-    }
-    
-    // Fallback to short_address or details
-    if (addr.short_address && addr.short_address.trim() !== '') {
-      return addr.short_address;
-    }
-    if (addr.details && addr.details.trim() !== '') {
-      return addr.details;
-    }
-  }
-  
-  // Check for currentAddress relationship (from your backend)
-  if (orderData.currentAddress) {
-    const addr = orderData.currentAddress;
-    // Build from parts
-    const parts = [];
-    if (addr.street) parts.push(addr.street);
-    if (addr.city) parts.push(addr.city);
-    if (addr.state) parts.push(addr.state);
-    if (addr.country) parts.push(addr.country);
-    if (addr.postal_code) parts.push(addr.postal_code);
-    
-    if (parts.length > 0) {
-      return parts.join(', ');
-    }
-    
-    // Fallback
-    if (addr.short_address && addr.short_address.trim() !== '') {
-      return addr.short_address;
-    }
-    if (addr.details && addr.details.trim() !== '') {
-      return addr.details;
-    }
-  }
-  
-  // Last resort: check if address is directly in the data
-  if (orderData.address && typeof orderData.address === 'string' && orderData.address.trim() !== '') {
-    return orderData.address;
-  }
-  
-  return "Address not specified";
-};
-
-// Updated getAddressType function
-const getAddressType = (orderData: any) => {
-  if (!orderData) return '';
-  
-  // Check address_info type
-  if (orderData.address_info?.type) {
-    return orderData.address_info.type;
-  }
-  
-  // Infer from relationships
-  if (orderData.savedAddress) return 'saved';
-  if (orderData.currentAddress) return 'current';
-  
-  return '';
-};
-
-// Enhanced fetch function that includes relationships
-useEffect(() => {
-  const fetchData = async () => {
-    if (!orderId) return;
     try {
-      setIsLoading(true);
+      // Based on your backend, addresses might need separate API calls
+      const addressType = orderData.address_info.type;
+      const endpoint = addressType === 'saved' && orderData.saved_address_id
+        ? `${process.env.NEXT_PUBLIC_API_URL}/user-addresses/${orderData.saved_address_id}`
+        : `${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}/address`;
       
-      // Get token based on auth type
-      let token: string | null = null;
-      const isSalesMode = user?.role === 'sale';
-      
-      if (isSalesMode) {
-        token = localStorage.getItem('sales_token') || 
-                localStorage.getItem('auth_token') || 
-                sessionStorage.getItem('sales_token');
-      } else {
-        token = localStorage.getItem('auth_token') || 
-                localStorage.getItem('token') || 
-                sessionStorage.getItem('auth_token') ||
-                sessionStorage.getItem('token');
-      }
-      
-      if (!token) {
-        toast.error("Please log in to view order details");
-        return;
-      }
-
-      // Fetch with includes to get related addresses
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}?include=address`, {
-        withCredentials: true,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
+      const res = await axios.get(endpoint, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      console.log('🔍 Full API Response:', res.data); // Debug
-      
-      if (res.data?.success) {
-        setOrderDetails(res.data.data);
-        generateBoxImage(res.data.data);
-      }
-    } catch (err: any) {
-      console.error("Error fetching order details:", err);
-      
-      // Try without include parameter if it fails
-      if (err.response?.status === 400 || err.response?.status === 404) {
-        try {
-          console.log('Trying without include parameter...');
-          const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-          const simpleRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`, {
-            withCredentials: true,
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Accept': 'application/json'
-            }
-          });
-          
-          if (simpleRes.data?.success) {
-            setOrderDetails(simpleRes.data.data);
-            generateBoxImage(simpleRes.data.data);
-          }
-        } catch (secondErr) {
-          console.error('Second attempt failed:', secondErr);
-          toast.error("Error fetching order details");
-        }
-      } else if (err.response?.status === 401) {
-        toast.error("Session expired. Please log in again.");
-      } else if (err.response?.status === 403) {
-        toast.error("You don't have permission to view this order");
-      } else {
-        toast.error("Error fetching order details");
-      }
-    } finally {
-      setIsLoading(false);
+      return res.data;
+    } catch (error) {
+      console.log('Could not fetch address details:', error);
+      return null;
     }
   };
-  
-  fetchData();
-}, [orderId, user?.role]);
 
-  // Logic to "Download that Box" by rendering the box state to a high-res canvas
-  const generateBoxImage = (orderData: any) => {
+  // Updated formatAddress function that handles the data structure properly
+  const formatAddress = (orderData: any, addressData: any = null) => {
+    if (!orderData) return "Address not available";
+    
+    console.log('🔍 formatAddress called with orderData:', orderData);
+    console.log('🔍 formatAddress called with addressData:', addressData);
+    
+    // First check if we have address data from separate fetch
+    if (addressData) {
+      if (addressData.short_address && addressData.short_address.trim() !== '') {
+        return addressData.short_address;
+      }
+      if (addressData.details && addressData.details.trim() !== '') {
+        return addressData.details;
+      }
+      // Build from parts
+      const parts = [];
+      if (addressData.street) parts.push(addressData.street);
+      if (addressData.city) parts.push(addressData.city);
+      if (addressData.state) parts.push(addressData.state);
+      if (addressData.country) parts.push(addressData.country);
+      if (addressData.postal_code) parts.push(addressData.postal_code);
+      
+      if (parts.length > 0) {
+        return parts.join(', ');
+      }
+    }
+    
+    // Check orderData for address
+    if (orderData.address_info?.address && orderData.address_info.address.trim() !== '') {
+      return orderData.address_info.address;
+    }
+    
+    // Check savedAddress
+    if (orderData.savedAddress) {
+      const addr = orderData.savedAddress;
+      if (addr.short_address && addr.short_address.trim() !== '') return addr.short_address;
+      if (addr.details && addr.details.trim() !== '') return addr.details;
+      
+      const parts = [];
+      if (addr.street) parts.push(addr.street);
+      if (addr.city) parts.push(addr.city);
+      if (addr.state) parts.push(addr.state);
+      if (addr.country) parts.push(addr.country);
+      if (addr.postal_code) parts.push(addr.postal_code);
+      
+      if (parts.length > 0) return parts.join(', ');
+    }
+    
+    // Check currentAddress
+    if (orderData.currentAddress) {
+      const addr = orderData.currentAddress;
+      if (addr.short_address && addr.short_address.trim() !== '') return addr.short_address;
+      if (addr.details && addr.details.trim() !== '') return addr.details;
+      
+      const parts = [];
+      if (addr.street) parts.push(addr.street);
+      if (addr.city) parts.push(addr.city);
+      if (addr.state) parts.push(addr.state);
+      if (addr.country) parts.push(addr.country);
+      if (addr.postal_code) parts.push(addr.postal_code);
+      
+      if (parts.length > 0) return parts.join(', ');
+    }
+    
+    return "Address not specified";
+  };
+
+  const getAddressType = (orderData: any) => {
+    if (!orderData || !orderData.address_info) return '';
+    return orderData.address_info.type || '';
+  };
+
+  // Logic to "Download that Box"
+  const generateBoxImage = (orderData: any, addrData: any = null) => {
     if (!orderData) return;
     setIsGenerating(true);
     
@@ -212,12 +140,12 @@ useEffect(() => {
         const scale = 2;
         const width = 384;
         
-        // Calculate dynamic height based on content
-        let baseHeight = 240; // Base height (header, customer, address)
+        // Calculate dynamic height
+        const baseHeight = 240;
         const itemsCount = orderData.items?.length || 0;
-        const itemsHeight = itemsCount * 35; // Height for items
-        const addressHeight = 40; // Height for address section
-        const totalHeight = baseHeight + itemsHeight + addressHeight + 100; // Add padding for total and buttons
+        const itemsHeight = itemsCount * 35;
+        const addressHeight = addrData ? 60 : 30; // Less height if no address
+        const totalHeight = baseHeight + itemsHeight + addressHeight + 100;
         
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -231,13 +159,13 @@ useEffect(() => {
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, width, totalHeight);
         
-        // Header (Matches your style)
-        ctx.fillStyle = '#f8fafc'; // gray-50
+        // Header
+        ctx.fillStyle = '#f8fafc';
         ctx.fillRect(0, 0, width, 80);
-        ctx.fillStyle = '#1e4ce4'; // blue-600
+        ctx.fillStyle = '#1e4ce4';
         ctx.font = 'bold 18px Arial';
         ctx.fillText(`Order #${orderId}`, 20, 35);
-        ctx.fillStyle = '#64748b'; // gray-500
+        ctx.fillStyle = '#64748b';
         ctx.font = '12px Arial';
         ctx.fillText(formatDate(orderData.created_at), 20, 55);
 
@@ -253,38 +181,43 @@ useEffect(() => {
         }
 
         // Address Section
-        ctx.fillStyle = '#1e293b';
-        ctx.font = 'bold 12px Arial';
-        ctx.fillText('Delivery Address:', 20, y);
-        
-        // Format and draw address (wrapped text)
-        const addressText = formatAddress(orderData.address_info?.address || 'Not specified');
-        ctx.fillStyle = '#64748b';
-        ctx.font = '11px Arial';
-        
-        // Simple text wrapping for address
-        const maxWidth = width - 40; // 20px padding on each side
-        const lineHeight = 14;
-        const words = addressText.split(' ');
-        let line = '';
-        let lineY = y + 20;
-        
-        for (let n = 0; n < words.length; n++) {
-          const testLine = line + words[n] + ' ';
-          const metrics = ctx.measureText(testLine);
-          const testWidth = metrics.width;
+        const addressText = formatAddress(orderData, addrData);
+        if (addressText !== "Address not specified") {
+          ctx.fillStyle = '#1e293b';
+          ctx.font = 'bold 12px Arial';
+          ctx.fillText('Delivery Address:', 20, y);
           
-          if (testWidth > maxWidth && n > 0) {
-            ctx.fillText(line, 20, lineY);
-            line = words[n] + ' ';
-            lineY += lineHeight;
-          } else {
-            line = testLine;
+          ctx.fillStyle = '#64748b';
+          ctx.font = '11px Arial';
+          
+          // Text wrapping for address
+          const maxWidth = width - 40;
+          const lineHeight = 14;
+          const words = addressText.split(' ');
+          let line = '';
+          let lineY = y + 20;
+          
+          for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            
+            if (testWidth > maxWidth && n > 0) {
+              ctx.fillText(line, 20, lineY);
+              line = words[n] + ' ';
+              lineY += lineHeight;
+            } else {
+              line = testLine;
+            }
           }
+          ctx.fillText(line, 20, lineY);
+          y = lineY + 25;
+        } else {
+          ctx.fillStyle = '#f59e0b';
+          ctx.font = 'italic 11px Arial';
+          ctx.fillText('⚠️ Delivery address not available', 20, y);
+          y += 30;
         }
-        ctx.fillText(line, 20, lineY);
-        
-        y = lineY + 25; // Move y down for items section
 
         // Items Separator
         ctx.strokeStyle = '#e2e8f0';
@@ -307,17 +240,14 @@ useEffect(() => {
           ctx.fillStyle = '#1e293b';
           ctx.textAlign = 'left';
           
-          // Product name (truncated if too long)
           const productName = item.product_name.length > 25 
             ? item.product_name.substring(0, 22) + '...' 
             : item.product_name;
           ctx.fillText(productName, 20, y);
           
-          // Price
           ctx.textAlign = 'right';
           ctx.fillText(formatCurrency(item.qty * item.price_at_order), width - 20, y);
           
-          // Quantity and unit price
           ctx.fillStyle = '#94a3b8';
           ctx.textAlign = 'left';
           ctx.fillText(`${item.qty} x ${formatCurrency(item.price_at_order)}`, 20, y + 15);
@@ -336,7 +266,7 @@ useEffect(() => {
         
         // Total Box
         y += 40;
-        ctx.fillStyle = '#eff6ff'; // blue-50
+        ctx.fillStyle = '#eff6ff';
         ctx.fillRect(0, y, width, 70);
         ctx.fillStyle = '#1e4ce4';
         ctx.font = 'bold 16px Arial';
@@ -345,18 +275,6 @@ useEffect(() => {
         ctx.textAlign = 'right';
         ctx.font = 'bold 20px Arial';
         ctx.fillText(formatCurrency(orderData.total), width - 20, y + 40);
-
-        // Reward Points if available
-        if (orderData.reward_points?.earned > 0) {
-          ctx.fillStyle = '#dbeafe';
-          ctx.fillRect(0, y + 70, width, 30);
-          ctx.fillStyle = '#1e40af';
-          ctx.font = 'bold 11px Arial';
-          ctx.textAlign = 'left';
-          ctx.fillText('🎁 Reward Points Earned:', 20, y + 90);
-          ctx.textAlign = 'right';
-          ctx.fillText(`+${orderData.reward_points.earned} points`, width - 20, y + 90);
-        }
 
         setInvoiceImage(canvas.toDataURL('image/png', 1.0));
       } catch (e) {
@@ -368,12 +286,12 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchOrderData = async () => {
       if (!orderId) return;
       try {
         setIsLoading(true);
         
-        // Get token based on auth type
+        // Get token
         let token: string | null = null;
         const isSalesMode = user?.role === 'sale';
         
@@ -393,16 +311,34 @@ useEffect(() => {
           return;
         }
 
+        // Fetch order details
         const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`, {
           withCredentials: true,
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
           }
         });
         
+        console.log('🔍 Order API Response:', res.data);
+        
         if (res.data?.success) {
-          setOrderDetails(res.data.data);
-          generateBoxImage(res.data.data);
+          const orderData = res.data.data;
+          setOrderDetails(orderData);
+          
+          // Try to fetch address details if address is empty
+          if (orderData.address_info && (!orderData.address_info.address || orderData.address_info.address.trim() === '')) {
+            const addressData = await fetchAddressDetails(orderData, token);
+            if (addressData) {
+              console.log('🔍 Address Data fetched:', addressData);
+              setAddressDetails(addressData);
+              generateBoxImage(orderData, addressData);
+            } else {
+              generateBoxImage(orderData);
+            }
+          } else {
+            generateBoxImage(orderData);
+          }
         }
       } catch (err: any) {
         console.error("Error fetching order details:", err);
@@ -419,7 +355,7 @@ useEffect(() => {
       }
     };
     
-    fetchData();
+    fetchOrderData();
   }, [orderId, user?.role]);
 
   const handleDownload = () => {
@@ -440,7 +376,6 @@ useEffect(() => {
     } catch (e) { handleDownload(); }
   };
 
-  // Show loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -454,12 +389,6 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-  <h3 className="font-bold text-yellow-800 mb-2">Debug Data:</h3>
-  <pre className="text-xs overflow-auto">
-    {JSON.stringify(orderDetails, null, 2)}
-  </pre>
-</div>
       <div className="bg-white p-4 border-b flex items-center gap-3">
         <button onClick={() => window.history.back()}><Icon icon="mdi:arrow-left" width={24}/></button>
         <h1 className="font-bold text-lg">Order Receipt</h1>
@@ -497,58 +426,41 @@ useEffect(() => {
                   {orderDetails.customer_info?.phone || 'N/A'}
                 </p>
                 
-                {/* Address Section - NEW */}
-                {orderDetails.address_info?.address && (
+                {/* Address Section - FIXED */}
+                {(orderDetails.address_info || addressDetails) && (
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-2">
                       Delivery Address
                     </p>
-                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                      <p className="text-sm text-gray-800 flex items-start gap-2">
-                        <Icon icon="mdi:map-marker-outline" className="text-gray-500 mt-0.5 flex-shrink-0" width={16} />
-                        <span className="flex-1">{formatAddress(orderDetails.address_info.address)}</span>
-                      </p>
-                      {orderDetails && (
-  <div className="mt-4 pt-4 border-t border-gray-100">
-    <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-2">
-      Delivery Address
-    </p>
-    
-    {formatAddress(orderDetails) !== "Address not specified" ? (
-      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-        <p className="text-sm text-gray-800 flex items-start gap-2">
-          <Icon icon="mdi:map-marker-outline" className="text-gray-500 mt-0.5 flex-shrink-0" width={16} />
-          <span className="flex-1">{formatAddress(orderDetails)}</span>
-        </p>
-        
-        {/* Show address type if available */}
-        {getAddressType(orderDetails) && (
-          <div className="mt-2 flex items-center gap-2 text-xs">
-            <span className="text-gray-500">Type:</span>
-            <span className={`font-medium capitalize px-2 py-0.5 rounded ${
-              getAddressType(orderDetails) === 'saved' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-blue-100 text-blue-800'
-            }`}>
-              {getAddressType(orderDetails)} address
-            </span>
-          </div>
-        )}
-      </div>
-    ) : (
-      <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-        <p className="text-sm text-yellow-800 flex items-center gap-2">
-          <Icon icon="mdi:alert-outline" width={16} />
-          Address information is not available for this order.
-        </p>
-        <p className="text-xs text-yellow-600 mt-1">
-          Please contact support if you need delivery information.
-        </p>
-      </div>
-    )}
-  </div>
-)}
-                    </div>
+                    
+                    {formatAddress(orderDetails, addressDetails) !== "Address not specified" ? (
+                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <p className="text-sm text-gray-800 flex items-start gap-2">
+                          <Icon icon="mdi:map-marker-outline" className="text-gray-500 mt-0.5 flex-shrink-0" width={16} />
+                          <span className="flex-1">{formatAddress(orderDetails, addressDetails)}</span>
+                        </p>
+                        
+                        {getAddressType(orderDetails) && (
+                          <div className="mt-2 flex items-center gap-2 text-xs">
+                            <span className="text-gray-500">Type:</span>
+                            <span className={`font-medium capitalize px-2 py-0.5 rounded ${
+                              getAddressType(orderDetails) === 'saved' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {getAddressType(orderDetails)} address
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                        <p className="text-sm text-yellow-800 flex items-center gap-2">
+                          <Icon icon="mdi:alert-outline" width={16} />
+                          Address information is not available for this order.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -585,27 +497,9 @@ useEffect(() => {
                 <span className="font-medium opacity-80">Total Amount</span>
                 <span className="text-2xl font-black">{formatCurrency(orderDetails.total)}</span>
               </div>
-              
-              {/* Reward Points if available */}
-              {orderDetails.reward_points?.earned > 0 && (
-                <div className="mt-3 pt-3 border-t border-blue-200">
-                  <div className="flex justify-between items-center text-sm">
-                    <div className="flex items-center gap-2 text-blue-800">
-                      <Icon icon="mdi:gift-outline" width={16} />
-                      <span>Reward Points Earned</span>
-                    </div>
-                    <span className="font-bold text-blue-800">+{orderDetails.reward_points.earned}</span>
-                  </div>
-                  {orderDetails.reward_points.total > 0 && (
-                    <p className="text-xs text-blue-700 mt-1 text-right">
-                      Total: {orderDetails.reward_points.total} points
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
 
-            {/* Action Buttons - Show for everyone */}
+            {/* Action Buttons */}
             <div className="p-4 grid grid-cols-2 gap-3 bg-gray-50">
               <button 
                 onClick={handleDownload}
@@ -636,7 +530,6 @@ useEffect(() => {
           </div>
         </div>
       ) : !isLoading && (
-        // Show error/empty state if no order details
         <div className="p-10 text-center">
           <Icon icon="mdi:file-document-outline" width={60} className="text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Order Not Found</h3>
@@ -652,7 +545,8 @@ useEffect(() => {
         </div>
       )}
 
-      <div className="p-4 backdrop-blur-md border-t bg-white/95 flex gap-3">
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 backdrop-blur-md border-t bg-white/95 flex gap-3">
         <a href="/" className="flex-1 py-3 bg-gray-100 text-center rounded-xl font-bold text-gray-700 hover:bg-gray-200 transition-colors">
           {t.home || 'Home'}
         </a>
