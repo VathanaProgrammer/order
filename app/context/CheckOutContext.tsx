@@ -398,93 +398,188 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log("✅ Sending order with payload:", JSON.stringify(payload, null, 2));
       
-      // FIXED: Get token from cookies instead of localStorage
+      // IMPROVED COOKIE HANDLING
+      console.log('🔍 STARTING COOKIE DEBUG');
+      console.log('Full cookie string:', document.cookie);
+      console.log('Cookie string length:', document.cookie.length);
+      
+      // Show all cookies
+      const allCookies = document.cookie.split(';');
+      console.log('All cookies parsed:');
+      allCookies.forEach((cookie, i) => {
+        console.log(`  ${i}: "${cookie.trim()}"`);
+      });
+      
+      // Robust getCookie function that handles edge cases
       const getCookie = (name: string): string | null => {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-        return null;
+        try {
+          // Try multiple methods
+          const methods = [
+            // Method 1: Standard split method
+            () => {
+              const value = `; ${document.cookie}`;
+              const parts = value.split(`; ${name}=`);
+              if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+              return null;
+            },
+            
+            // Method 2: Direct matching
+            () => {
+              const cookies = document.cookie.split(';');
+              for (let cookie of cookies) {
+                cookie = cookie.trim();
+                if (cookie.startsWith(name + '=')) {
+                  return cookie.substring(name.length + 1);
+                }
+              }
+              return null;
+            },
+            
+            // Method 3: Regex method
+            () => {
+              const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+              return match ? match[1] : null;
+            },
+            
+            // Method 4: Decode URI method
+            () => {
+              try {
+                const decoded = decodeURIComponent(document.cookie);
+                const match = decoded.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+                return match ? match[1] : null;
+              } catch (e) {
+                return null;
+              }
+            }
+          ];
+          
+          // Try each method
+          for (const method of methods) {
+            const result = method();
+            if (result) {
+              console.log(`Found cookie "${name}" using method ${methods.indexOf(method) + 1}`);
+              return result;
+            }
+          }
+          
+          return null;
+        } catch (error) {
+          console.error('Error getting cookie:', error);
+          return null;
+        }
       };
+
+      // Determine which cookie name to look for
+      const cookieName = isSalesMode ? 'sales_token' : 'token';
+      console.log(`\n🔍 Looking for cookie: "${cookieName}"`);
+      console.log('isSalesMode:', isSalesMode);
+      console.log('regularUser exists:', !!regularUser);
+      console.log('salesUser exists:', !!salesUser);
       
-      // DEBUG: Log what cookies we have
-      console.log('🔍 Available cookies:', document.cookie);
+      // Get the token
+      let token = getCookie(cookieName);
       
-      // Get token based on auth type
-      let token: string | null = null;
-      let cookieName = '';
-      
-      if (isSalesMode) {
-        cookieName = 'sales_token';
-        token = getCookie('sales_token');
-        console.log('🔍 Sales token lookup:', {
-          cookieName,
-          found: !!token,
-          tokenLength: token?.length,
-          tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
-        });
-      } else {
-        cookieName = 'token';
-        token = getCookie('token');
-        console.log('🔍 Regular token lookup:', {
-          cookieName,
-          found: !!token,
-          tokenLength: token?.length,
-          tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
-        });
-      }
-      
+      // If not found in cookies, check localStorage
       if (!token) {
-        // Check localStorage as fallback
+        console.log('⚠️ Cookie not found, checking localStorage...');
         const localStorageToken = isSalesMode 
           ? localStorage.getItem('sales_token')
           : localStorage.getItem('token');
           
         if (localStorageToken) {
-          console.log('⚠️ Token found in localStorage, not cookies. Using localStorage.');
+          console.log('✅ Found token in localStorage');
           token = localStorageToken;
         } else {
-          console.error('❌ No token found anywhere for:', cookieName);
-          toast.error("Authentication token missing. Please log in again.");
-          return;
-        }
-      }
-
-      // DEBUG: Check token format
-      if (token) {
-        try {
-          const tokenParts = token.split('.');
-          if (tokenParts.length === 3) {
-            const payload = JSON.parse(atob(tokenParts[1]));
-            console.log('🔍 Token payload:', {
-              userId: payload.sub,
-              role: payload.role,
-              exp: new Date(payload.exp * 1000).toISOString(),
-              now: new Date().toISOString(),
-              isExpired: payload.exp * 1000 < Date.now()
-            });
-            
-            if (payload.exp * 1000 < Date.now()) {
-              toast.error("Your session has expired. Please log in again.");
-              // Clear expired token
-              document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-              return;
+          console.log('❌ Token not found in localStorage either');
+          
+          // Check for any token-like cookies
+          console.log('\n🔍 Checking for any token-like cookies:');
+          const tokenPatterns = ['token', 'jwt', 'auth', 'access', 'bearer', 'session'];
+          for (const pattern of tokenPatterns) {
+            const found = getCookie(pattern);
+            if (found) {
+              console.log(`⚠️ Found cookie with pattern "${pattern}": ${found.substring(0, 20)}...`);
             }
           }
-        } catch (e) {
-          console.error('Error parsing token:', e);
+        }
+      } else {
+        console.log(`✅ Found cookie "${cookieName}"`);
+        console.log(`Token length: ${token.length}`);
+        console.log(`Token preview: ${token.substring(0, 30)}...`);
+      }
+
+      // FINAL CHECK: If still no token
+      if (!token) {
+        console.error('❌ CRITICAL: No authentication token found anywhere!');
+        console.error('Storage check:', {
+          cookies: document.cookie,
+          localStorageToken: localStorage.getItem('token'),
+          localStorageSalesToken: localStorage.getItem('sales_token'),
+          sessionStorageToken: sessionStorage.getItem('token'),
+          isSalesMode,
+          cookieNameSearched: cookieName,
+        });
+        
+        // Check if maybe the wrong mode is set
+        if (isSalesMode) {
+          const regularToken = getCookie('token');
+          if (regularToken) {
+            console.log('⚠️ Found regular token when in sales mode. Switching mode?');
+            token = regularToken;
+          }
+        } else {
+          const salesToken = getCookie('sales_token');
+          if (salesToken) {
+            console.log('⚠️ Found sales token when in regular mode. Switching mode?');
+            token = salesToken;
+          }
         }
       }
-      
-      console.log('🔍 Final token being sent:', {
-        type: isSalesMode ? 'sales' : 'regular',
-        cookieName,
-        tokenLength: token?.length,
-        header: `Bearer ${token?.substring(0, 30)}...`
-      });
 
-      // IMPORTANT: Send token in Authorization header AND ensure cookies are sent
+      if (!token) {
+        toast.error("Authentication token missing. Please log in again.");
+        
+        // Try to diagnose why
+        const hasAnyAuthData = 
+          document.cookie.includes('token') || 
+          localStorage.getItem('token') || 
+          localStorage.getItem('sales_token');
+          
+        if (!hasAnyAuthData) {
+          toast.info("No authentication data found. You need to log in first.");
+        }
+        
+        return;
+      }
+
+      // Debug token format
+      try {
+        const tokenParts = token.split('.');
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(atob(tokenParts[1]));
+          console.log('🔍 Token payload:', {
+            userId: payload.sub,
+            role: payload.role,
+            exp: new Date(payload.exp * 1000),
+            now: new Date(),
+            isExpired: payload.exp * 1000 < Date.now()
+          });
+        }
+      } catch (e) {
+        console.log('Could not parse JWT token structure');
+      }
+
+      // Make the API call
+      console.log(`\n📤 Making API call to: ${process.env.NEXT_PUBLIC_API_URL}/store-order`);
+      console.log('Headers being sent:', {
+        Authorization: `Bearer ${token.substring(0, 30)}...`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      });
+      console.log('withCredentials:', true);
+
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
-        withCredentials: true, // This ensures cookies are sent
+        withCredentials: true, // IMPORTANT: This sends cookies
         headers: { 
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -493,6 +588,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       });
       
       if (res.data?.success) {
+        console.log('✅ Order successful! Response:', res.data);
         toast.success("Order placed successfully!");
         
         // Show relevant info based on order type
@@ -510,23 +606,31 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}&order_id=${res.data.order_id}`);
       }
     } catch (err: any) {
-      console.error("❌ Order error:", err.response?.data || err);
+      console.error("❌ Order error:", err);
+      console.error("Error details:", {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        headers: err.response?.headers,
+      });
       
       // Handle specific authentication errors
       if (err.response?.status === 401) {
-        if (err.response?.data?.message === 'Unauthenticated.') {
-          console.error('❌ Authentication failed. Possible issues:');
-          console.error('1. Token expired or invalid');
-          console.error('2. Cookie not being sent properly');
-          console.error('3. Backend middleware issue');
+        const errorMsg = err.response?.data?.message || 'Unauthorized';
+        console.error('🔒 Authentication failed:', errorMsg);
+        
+        if (errorMsg.includes('Unauthenticated') || errorMsg === 'Unauthenticated.') {
+          // Clear potentially bad tokens
+          const cookiesToClear = ['token', 'sales_token'];
+          cookiesToClear.forEach(name => {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+          });
+          localStorage.removeItem('token');
+          localStorage.removeItem('sales_token');
           
-          // Clear the problematic token
-          const cookieName = isSalesMode ? 'sales_token' : 'token';
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+          toast.error("Session expired or invalid. Please log in again.");
           
-          toast.error("Session expired. Please log in again.");
-          
-          // Redirect to appropriate login
+          // Redirect after delay
           setTimeout(() => {
             if (isSalesMode) {
               router.push('/sales/login');
