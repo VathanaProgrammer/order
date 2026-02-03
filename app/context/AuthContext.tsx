@@ -229,6 +229,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Add other potential cookie names like 'session_id' or 'auth_token'
     document.cookie = "api_user_id=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
     localStorage.removeItem('auth_token');
+    delete api.defaults.headers.common["Authorization"];
     router.push("/sign-in");
   };
 
