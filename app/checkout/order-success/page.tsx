@@ -343,27 +343,22 @@ const page = () => {
                   {orderDetails.customer_info?.phone || 'N/A'}
                 </p>
                 
+                {/* Show customer type indicator for sales orders */}
+                {user?.role === 'sale' && orderDetails.customer_info?.name && (
+                  <div className="mt-1">
+                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                      អតិថិជនលក់
+                    </span>
+                  </div>
+                )}
+                
                 {/* SIMPLE ADDRESS DISPLAY BELOW PHONE NUMBER */}
-                {getDisplayAddress(orderDetails) && (
+                {orderDetails.address_info?.address && orderDetails.address_info.address !== 'Address not specified' && (
                   <div className="mt-3 pt-3 border-t border-gray-100">
                     <p className="text-sm text-gray-700 flex items-start gap-2">
                       <span className="text-gray-500 mt-0.5">📍</span>
-                      <span className="flex-1">{getDisplayAddress(orderDetails)}</span>
+                      <span className="flex-1">{orderDetails.address_info.address}</span>
                     </p>
-                    
-                    {/* Optional: Show address type badge */}
-                    {getAddressType(orderDetails) && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="text-xs text-gray-500">ប្រភេទ:</span>
-                        <span className={`text-xs font-medium capitalize px-2 py-0.5 rounded ${
-                          getAddressType(orderDetails) === 'saved' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {getAddressType(orderDetails) === 'saved' ? 'អាសយដ្ឋានដែលបានរក្សាទុក' : 'ទីតាំងបច្ចុប្បន្ន'}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
