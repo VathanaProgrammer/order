@@ -224,6 +224,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     setUser(null);
+    // We overwrite the cookie with an empty value and an expired date
+    document.cookie = "token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+    // Add other potential cookie names like 'session_id' or 'auth_token'
+    document.cookie = "api_user_id=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
     localStorage.removeItem('auth_token');
     router.push("/sign-in");
   };
