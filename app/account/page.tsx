@@ -167,6 +167,7 @@ const Page: React.FC = () => {
   const handleLogout = async () => {
     if (isSalesUser) {
       await salesLogout();
+      await regularLogout();
     } else {
       await regularLogout();
     }
