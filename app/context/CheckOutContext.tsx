@@ -270,8 +270,9 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           details: `Customer address: ${short_address}`,
         };
       } else {
-        // Regular user
-        const userPhone = regularUser?.phone || "";
+        // Regular user MUST have phone
+        const userPhone = regularUser?.mobile || regularUser?.phone || "";
+        
         if (!userPhone) {
           toast.error("Please add your phone number in your account settings");
           return;
@@ -311,11 +312,23 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           }
           customerName = customerInfo.name;
           customerPhone = customerInfo.phone;
+          
+          addressToSend.phone = customerPhone;
+          addressToSend.label = customerName;
         }
       } else {
         // Regular user with saved address
         customerName = regularUser?.name || addressToSend.label || "Customer";
-        customerPhone = addressToSend.phone || regularUser?.phone || "";
+        customerPhone = addressToSend.phone || regularUser?.mobile || regularUser?.phone || "";
+        
+        if (!customerPhone) {
+          toast.error("Saved address must have a phone number. Please update your address.");
+          return;
+        }
+        
+        if (!addressToSend.phone) {
+          addressToSend.phone = customerPhone;
+        }
       }
     }
 
@@ -324,35 +337,24 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // 🔴 FIXED: Determine correct IDs
+    if (!addressToSend.phone) {
+      toast.error("Phone number is required for delivery");
+      return;
+    }
+
+    // Determine correct IDs
     let apiUserId: number;
     let salesUserId: number | undefined;
     let isSalesOrder = false;
     
     if (isSalesMode && salesUser) {
-      // Salesperson is logged in via SalesAuth
       isSalesOrder = true;
-      salesUserId = salesUser.id; // This is from users table (e.g., 6)
-      
-      // Use fixed api_user_id 20 for sales orders (based on your previous logs)
+      salesUserId = salesUser.id;
       apiUserId = 20; // Fixed ID for sales orders
-      
-      console.log('Sales order detected:', {
-        sales_user_id: salesUserId, // From users table (e.g., 6)
-        salesperson_name: salespersonName,
-        api_user_id: apiUserId, // Fixed ID 20 for sales
-        auth_type: 'SalesAuth'
-      });
     } else if (regularUser) {
-      // Regular customer logged in
       apiUserId = regularUser.id; // From api_users table
       salesUserId = undefined;
       isSalesOrder = false;
-      
-      console.log('Regular customer order:', {
-        api_user_id: apiUserId,
-        auth_type: 'Regular Auth'
-      });
     } else {
       toast.error("You must be logged in to place an order!");
       return;
@@ -375,9 +377,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       })),
     };
 
-    // 🔴 FIXED: Add customer_info for sales orders
+    // Add customer_info for sales orders
     if (isSalesOrder) {
-      // For sales orders, use the determined customer info
       if (!customerName || !customerPhone) {
         toast.error("For sales orders, please enter customer name and phone");
         return;
@@ -389,33 +390,105 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         email: customerInfo.email || undefined,
       };
       
-      // Send salesperson info
-      payload.sales_user_id = salesUserId; // Salesperson's ID from users table
-      payload.sales_person_name = salespersonName; // Salesperson's real name
+      payload.sales_user_id = salesUserId;
+      payload.sales_person_name = salespersonName;
       payload.is_sales_order = true;
-      
-      console.log('Sending sales order info:', {
-        sales_user_id: payload.sales_user_id,
-        sales_person_name: payload.sales_person_name,
-        customer_info: payload.customer_info,
-        customer_name: customerName,
-        customer_phone: customerPhone
-      });
     }
 
     try {
-      console.log("Sending order with payload:", payload);
+      console.log("✅ Sending order with payload:", JSON.stringify(payload, null, 2));
       
-      // Use the correct token based on auth type
-      const token = isSalesMode 
-        ? localStorage.getItem('sales_token')
-        : localStorage.getItem('token');
+      // FIXED: Get token from cookies instead of localStorage
+      const getCookie = (name: string): string | null => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+        return null;
+      };
       
+      // DEBUG: Log what cookies we have
+      console.log('🔍 Available cookies:', document.cookie);
+      
+      // Get token based on auth type
+      let token: string | null = null;
+      let cookieName = '';
+      
+      if (isSalesMode) {
+        cookieName = 'sales_token';
+        token = getCookie('sales_token');
+        console.log('🔍 Sales token lookup:', {
+          cookieName,
+          found: !!token,
+          tokenLength: token?.length,
+          tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
+        });
+      } else {
+        cookieName = 'token';
+        token = getCookie('token');
+        console.log('🔍 Regular token lookup:', {
+          cookieName,
+          found: !!token,
+          tokenLength: token?.length,
+          tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
+        });
+      }
+      
+      if (!token) {
+        // Check localStorage as fallback
+        const localStorageToken = isSalesMode 
+          ? localStorage.getItem('sales_token')
+          : localStorage.getItem('token');
+          
+        if (localStorageToken) {
+          console.log('⚠️ Token found in localStorage, not cookies. Using localStorage.');
+          token = localStorageToken;
+        } else {
+          console.error('❌ No token found anywhere for:', cookieName);
+          toast.error("Authentication token missing. Please log in again.");
+          return;
+        }
+      }
+
+      // DEBUG: Check token format
+      if (token) {
+        try {
+          const tokenParts = token.split('.');
+          if (tokenParts.length === 3) {
+            const payload = JSON.parse(atob(tokenParts[1]));
+            console.log('🔍 Token payload:', {
+              userId: payload.sub,
+              role: payload.role,
+              exp: new Date(payload.exp * 1000).toISOString(),
+              now: new Date().toISOString(),
+              isExpired: payload.exp * 1000 < Date.now()
+            });
+            
+            if (payload.exp * 1000 < Date.now()) {
+              toast.error("Your session has expired. Please log in again.");
+              // Clear expired token
+              document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+              return;
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing token:', e);
+        }
+      }
+      
+      console.log('🔍 Final token being sent:', {
+        type: isSalesMode ? 'sales' : 'regular',
+        cookieName,
+        tokenLength: token?.length,
+        header: `Bearer ${token?.substring(0, 30)}...`
+      });
+
+      // IMPORTANT: Send token in Authorization header AND ensure cookies are sent
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
-        withCredentials: true,
+        withCredentials: true, // This ensures cookies are sent
         headers: { 
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
       });
       
@@ -437,13 +510,38 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}&order_id=${res.data.order_id}`);
       }
     } catch (err: any) {
-      console.error("Order error:", err.response?.data || err);
+      console.error("❌ Order error:", err.response?.data || err);
+      
+      // Handle specific authentication errors
+      if (err.response?.status === 401) {
+        if (err.response?.data?.message === 'Unauthenticated.') {
+          console.error('❌ Authentication failed. Possible issues:');
+          console.error('1. Token expired or invalid');
+          console.error('2. Cookie not being sent properly');
+          console.error('3. Backend middleware issue');
+          
+          // Clear the problematic token
+          const cookieName = isSalesMode ? 'sales_token' : 'token';
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+          
+          toast.error("Session expired. Please log in again.");
+          
+          // Redirect to appropriate login
+          setTimeout(() => {
+            if (isSalesMode) {
+              router.push('/sales/login');
+            } else {
+              router.push('/login');
+            }
+          }, 2000);
+          return;
+        }
+      }
       
       // Show specific error messages
       if (err.response?.data?.message) {
         toast.error(err.response.data.message);
       } else if (err.response?.data?.errors) {
-        // Handle validation errors
         const errorMessages = Object.values(err.response.data.errors).flat();
         errorMessages.forEach((msg: any) => toast.error(msg));
       } else {
