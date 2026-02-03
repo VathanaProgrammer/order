@@ -272,10 +272,10 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       } else {
         // Regular user
         const userPhone = regularUser?.phone || "";
-        if (!userPhone) {
-          toast.error("Please add your phone number in your account settings");
-          return;
-        }
+        // if (!userPhone) {
+        //   toast.error("Please add your phone number in your account settings");
+        //   return;
+        // }
         
         customerName = regularUser?.name || "Customer";
         customerPhone = userPhone;
