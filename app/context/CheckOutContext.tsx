@@ -252,7 +252,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       
       // For sales mode, validate customer info
       if (isSalesMode) {
-        // Use customer info from the form
         if (!customerInfo.name || !customerInfo.phone) {
           toast.error("Please enter customer name and phone number");
           return;
@@ -270,7 +269,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           details: `Customer address: ${short_address}`,
         };
       } else {
-        // Regular user MUST have phone
         const userPhone = regularUser?.mobile || regularUser?.phone || "";
         
         if (!userPhone) {
@@ -290,7 +288,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         };
       }
     } else {
-      // For saved addresses
       addressToSend = selectedAddress as Address;
       
       if (!addressToSend) {
@@ -298,14 +295,11 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
-      // For sales mode with saved address
       if (isSalesMode) {
-        // Check if saved address has customer info
         if (addressToSend.label && addressToSend.phone) {
           customerName = addressToSend.label;
           customerPhone = addressToSend.phone;
         } else {
-          // Use customer info from form
           if (!customerInfo.name || !customerInfo.phone) {
             toast.error("Please enter customer name and phone number");
             return;
@@ -317,7 +311,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           addressToSend.label = customerName;
         }
       } else {
-        // Regular user with saved address
         customerName = regularUser?.name || addressToSend.label || "Customer";
         customerPhone = addressToSend.phone || regularUser?.mobile || regularUser?.phone || "";
         
@@ -350,9 +343,9 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     if (isSalesMode && salesUser) {
       isSalesOrder = true;
       salesUserId = salesUser.id;
-      apiUserId = 20; // Fixed ID for sales orders
+      apiUserId = 20;
     } else if (regularUser) {
-      apiUserId = regularUser.id; // From api_users table
+      apiUserId = regularUser.id;
       salesUserId = undefined;
       isSalesOrder = false;
     } else {
@@ -377,7 +370,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       })),
     };
 
-    // Add customer_info for sales orders
     if (isSalesOrder) {
       if (!customerName || !customerPhone) {
         toast.error("For sales orders, please enter customer name and phone");
@@ -396,126 +388,46 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      console.log("✅ Sending order with payload:", JSON.stringify(payload, null, 2));
-      
       // ==============================
-      // FIXED AUTH SECTION - NO TYPE ERRORS
+      // SIMPLIFIED TOKEN RETRIEVAL
       // ==============================
       
-      console.log('🔍 Auth Debug:');
-      console.log('regularUser id:', regularUser?.id);
-      console.log('isSalesMode:', isSalesMode);
-      
-      // Type-safe way to check for token
+      // Get token based on auth mode
       let token: string | null = null;
-      const cookieName = isSalesMode ? 'sales_token' : 'token';
       
-      // Method 1: Check localStorage first (most common)
-      token = localStorage.getItem(cookieName);
-      console.log(`🔍 localStorage[${cookieName}]:`, token ? 'FOUND' : 'NOT FOUND');
-      
-      // Method 2: Check sessionStorage
-      if (!token) {
-        token = sessionStorage.getItem(cookieName);
-        console.log(`🔍 sessionStorage[${cookieName}]:`, token ? 'FOUND' : 'NOT FOUND');
-      }
-      
-      // Method 3: Check other common storage locations
-      if (!token) {
-        const commonTokenKeys = [
-          'auth_token',
-          'jwt_token',
-          'user_token',
-          'access_token',
-          'bearer_token',
-          'api_token'
-        ];
-        
-        for (const key of commonTokenKeys) {
-          const storedToken = localStorage.getItem(key) || sessionStorage.getItem(key);
-          if (storedToken) {
-            token = storedToken;
-            console.log(`✅ Found token in ${key}: ${token.substring(0, 30)}...`);
-            break;
-          }
-        }
-      }
-      
-      // Method 4: Check if token is in user object (type-safe way)
-      if (!token && regularUser) {
-        // Safely check if regularUser has any token properties
-        const userObj = regularUser as any; // Temporary type assertion
-        
-        const possibleTokenProps = ['token', 'access_token', 'auth_token', 'jwt_token'];
-        for (const prop of possibleTokenProps) {
-          if (userObj[prop] && typeof userObj[prop] === 'string') {
-            token = userObj[prop];
-            console.log(`✅ Found token in regularUser.${prop}: ${token?.substring(0, 30)}...`);
-            break;
-          }
-        }
-      }
-      
-      // Method 5: For testing - use the specific token you provided
-      if (!token && regularUser?.id === 7) {
-        token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL3N5cy5zb2JraC5jb20vYXBpL2xvZ2luIiwiaWF0IjoxNzcwMTA2MDU1LCJleHAiOjE3NzI2MjYwNTUsIm5iZiI6MTc3MDEwNjA1NSwianRpIjoib05kem5lYmRCaW05dWdyVSIsInN1YiI6IjciLCJwcnYiOiJmNDEzYzk0ZWU2MGI1MzY0NDRmYWQyZTVjZDM5ZmMwZjk3MzY1Y2Q5In0.C1gg1dv2HDTxvydAHKggEu-dWE5lxSX9hVSfhAOgkL8';
-        console.log('⚠️ Using hardcoded token for testing (user 7)');
-      }
-      
-      // Debug: Show what we found
-      if (token) {
-        console.log('✅ Token found! Length:', token.length);
-        console.log('Token preview:', token.substring(0, 50) + '...');
-        
-        // Verify token structure
-        try {
-          const parts = token.split('.');
-          if (parts.length === 3) {
-            const payload = JSON.parse(atob(parts[1]));
-            console.log('🔍 Token payload:', {
-              userId: payload.sub,
-              exp: new Date(payload.exp * 1000),
-              isExpired: payload.exp * 1000 < Date.now()
-            });
-            
-            if (payload.exp * 1000 < Date.now()) {
-              toast.error("Your session has expired. Please log in again.");
-              return;
-            }
-          }
-        } catch (e) {
-          console.warn('Could not parse token structure:', e);
-        }
+      if (isSalesMode) {
+        // For sales: check sales_token in localStorage
+        token = localStorage.getItem('sales_token') || 
+                localStorage.getItem('auth_token') || 
+                sessionStorage.getItem('sales_token');
       } else {
-        console.error('❌ No token found anywhere!');
-        console.error('Storage dump:');
-        console.error('- localStorage keys:', Object.keys(localStorage));
-        console.error('- sessionStorage keys:', Object.keys(sessionStorage));
-        
-        // Show all auth-related items in storage
-        console.error('\nAuth-related items in localStorage:');
-        Object.keys(localStorage).forEach(key => {
-          if (key.toLowerCase().includes('token') || key.toLowerCase().includes('auth')) {
-            const value = localStorage.getItem(key);
-            console.error(`  ${key}: ${value?.substring(0, 30)}...`);
-          }
-        });
-        
-        console.error('\nAuth-related items in sessionStorage:');
-        Object.keys(sessionStorage).forEach(key => {
-          if (key.toLowerCase().includes('token') || key.toLowerCase().includes('auth')) {
-            const value = sessionStorage.getItem(key);
-            console.error(`  ${key}: ${value?.substring(0, 30)}...`);
-          }
-        });
-        
+        // For regular users: check auth_token in localStorage (which we found)
+        token = localStorage.getItem('auth_token') || 
+                localStorage.getItem('token') || 
+                sessionStorage.getItem('auth_token') ||
+                sessionStorage.getItem('token');
+      }
+      
+      // Debug logging
+      console.log('🔍 Token lookup:', {
+        mode: isSalesMode ? 'sales' : 'regular',
+        found: !!token,
+        source: isSalesMode 
+          ? (localStorage.getItem('sales_token') ? 'sales_token localStorage' :
+             localStorage.getItem('auth_token') ? 'auth_token localStorage' :
+             sessionStorage.getItem('sales_token') ? 'sales_token sessionStorage' : 'none')
+          : (localStorage.getItem('auth_token') ? 'auth_token localStorage' :
+             localStorage.getItem('token') ? 'token localStorage' :
+             sessionStorage.getItem('auth_token') ? 'auth_token sessionStorage' :
+             sessionStorage.getItem('token') ? 'token sessionStorage' : 'none')
+      });
+      
+      if (!token) {
         toast.error("Authentication token missing. Please log in again.");
         return;
       }
 
       // Make the API call
-      console.log(`📤 Making API call for user: ${apiUserId}`);
-      
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
         withCredentials: true,
         headers: { 
@@ -526,10 +438,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       });
       
       if (res.data?.success) {
-        console.log('✅ Order successful! Response:', res.data);
         toast.success("Order placed successfully!");
         
-        // Show relevant info based on order type
         if (isSalesOrder) {
           toast.info(`Customer: ${customerName}, Phone: ${customerPhone}`);
           if (res.data.salesperson_info?.name) {
@@ -545,24 +455,22 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err: any) {
       console.error("❌ Order error:", err);
-      console.error("Error details:", {
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data,
-        headers: err.response?.headers,
-      });
       
-      // Handle specific authentication errors
       if (err.response?.status === 401) {
-        const errorMsg = err.response?.data?.message || 'Unauthorized';
-        console.error('🔒 Authentication failed:', errorMsg);
-        
-        if (errorMsg.includes('Unauthenticated') || errorMsg === 'Unauthenticated.') {
-          // Clear storage and redirect
-          localStorage.clear();
-          sessionStorage.clear();
+        if (err.response?.data?.message === 'Unauthenticated.') {
+          // Clear storage
+          if (isSalesMode) {
+            localStorage.removeItem('sales_token');
+            localStorage.removeItem('auth_token');
+            sessionStorage.removeItem('sales_token');
+          } else {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('token');
+            sessionStorage.removeItem('auth_token');
+            sessionStorage.removeItem('token');
+          }
           
-          toast.error("Session expired or invalid. Please log in again.");
+          toast.error("Session expired. Please log in again.");
           
           setTimeout(() => {
             if (isSalesMode) {
@@ -575,7 +483,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
-      // Show specific error messages
       if (err.response?.data?.message) {
         toast.error(err.response.data.message);
       } else if (err.response?.data?.errors) {
