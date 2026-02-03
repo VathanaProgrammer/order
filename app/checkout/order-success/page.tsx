@@ -313,6 +313,12 @@ const page = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
+      <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+  <h3 className="font-bold text-yellow-800 mb-2">Debug Data:</h3>
+  <pre className="text-xs overflow-auto">
+    {JSON.stringify(orderDetails, null, 2)}
+  </pre>
+</div>
       <div className="bg-white p-4 border-b flex items-center gap-3">
         <button onClick={() => window.history.back()}><Icon icon="mdi:arrow-left" width={24}/></button>
         <h1 className="font-bold text-lg">Order Receipt</h1>
