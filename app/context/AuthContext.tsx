@@ -214,32 +214,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // 🔹 Logout
-// 🔹 Enhanced Logout
   const logout = async () => {
     try {
       await api.post("/logout");
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
-    
-    // 1. Kill the internal variable in api.ts
-    clearApiState(); 
-
-    // 2. Clear Context state
-    setUser(null);
-
-    // 3. Nuclear clear of all possible storages
+    } catch (e) { console.error(e); }
+  
+    // 1. Clear ALL storage
     localStorage.clear();
     sessionStorage.clear();
-    
-    // 4. Overwrite cookies (including the path)
-    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    document.cookie = "auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
-    // 5. HARD RELOAD
-    // Using router.push("/sign-in") might keep the 'api.ts' memory alive.
-    // window.location.href forces the browser to dump the RAM and start over.
-    window.location.href = "/sign-in";
+  
+    // 2. Kill Cookies with every common variation
+    const cookieNames = ['token', 'auth_token', 'JSESSIONID', 'session'];
+    cookieNames.forEach(name => {
+      // Try to kill it for the root path and current domain
+      document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
+      document.cookie = `${name}=; Path=/; Domain=${window.location.hostname}; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
+      // If your API is on a subpath
+      document.cookie = `${name}=; Path=/api; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
+    });
+  
+    // 3. FORCE REFRESH TO LOGIN (Don't use router.push)
+    window.location.replace("/sign-in"); 
   };
 
   return (
