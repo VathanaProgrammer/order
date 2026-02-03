@@ -36,26 +36,26 @@ const page = () => {
   };
 
   // Function to fetch address details separately
-  const fetchAddressDetails = async (orderData: any, token: string) => {
-    if (!orderData || !orderData.address_info) return null;
+  // const fetchAddressDetails = async (orderData: any, token: string) => {
+  //   if (!orderData || !orderData.address_info) return null;
     
-    try {
-      // Based on your backend, addresses might need separate API calls
-      const addressType = orderData.address_info.type;
-      const endpoint = addressType === 'saved' && orderData.saved_address_id
-        ? `${process.env.NEXT_PUBLIC_API_URL}/user-addresses/${orderData.saved_address_id}`
-        : `${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}/address`;
+  //   try {
+  //     // Based on your backend, addresses might need separate API calls
+  //     const addressType = orderData.address_info.type;
+  //     const endpoint = addressType === 'saved' && orderData.saved_address_id
+  //       ? `${process.env.NEXT_PUBLIC_API_URL}/user-addresses/${orderData.saved_address_id}`
+  //       : `${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}/address`;
       
-      const res = await axios.get(endpoint, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+  //     const res = await axios.get(endpoint, {
+  //       headers: { 'Authorization': `Bearer ${token}` }
+  //     });
       
-      return res.data;
-    } catch (error) {
-      console.log('Could not fetch address details:', error);
-      return null;
-    }
-  };
+  //     return res.data;
+  //   } catch (error) {
+  //     console.log('Could not fetch address details:', error);
+  //     return null;
+  //   }
+  // };
 
   // Updated formatAddress function that handles the data structure properly
   const formatAddress = (orderData: any, addressData: any = null) => {
@@ -291,7 +291,7 @@ const page = () => {
       try {
         setIsLoading(true);
         
-        // Get token
+        // Get token based on auth type
         let token: string | null = null;
         const isSalesMode = user?.role === 'sale';
         
@@ -310,8 +310,8 @@ const page = () => {
           toast.error("Please log in to view order details");
           return;
         }
-
-        // Fetch order details
+  
+        // Fetch order details - ONLY from the correct endpoint
         const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`, {
           withCredentials: true,
           headers: {
@@ -326,19 +326,29 @@ const page = () => {
           const orderData = res.data.data;
           setOrderDetails(orderData);
           
-          // Try to fetch address details if address is empty
+          // Check what address info we got
+          console.log('🔍 Address info from API:', orderData.address_info);
+          console.log('🔍 Customer info from API:', orderData.customer_info);
+          
+          // If address is empty in response, we need to fix the backend
           if (orderData.address_info && (!orderData.address_info.address || orderData.address_info.address.trim() === '')) {
-            const addressData = await fetchAddressDetails(orderData, token);
-            if (addressData) {
-              console.log('🔍 Address Data fetched:', addressData);
-              setAddressDetails(addressData);
-              generateBoxImage(orderData, addressData);
-            } else {
-              generateBoxImage(orderData);
+            console.warn('⚠️ Address is empty in API response');
+            // Try to get address from localStorage as fallback
+            const storedAddress = localStorage.getItem(`order_${orderId}_address`);
+            if (storedAddress) {
+              try {
+                const parsedAddress = JSON.parse(storedAddress);
+                setAddressDetails(parsedAddress);
+                console.log('✅ Using address from localStorage:', parsedAddress);
+              } catch (e) {
+                console.error('Error parsing stored address:', e);
+              }
             }
-          } else {
-            generateBoxImage(orderData);
+          } else if (orderData.address_info?.address) {
+            console.log('✅ Address found in API response:', orderData.address_info.address);
           }
+          
+          generateBoxImage(orderData);
         }
       } catch (err: any) {
         console.error("Error fetching order details:", err);
@@ -347,8 +357,10 @@ const page = () => {
           toast.error("Session expired. Please log in again.");
         } else if (err.response?.status === 403) {
           toast.error("You don't have permission to view this order");
+        } else if (err.response?.status === 404) {
+          toast.error("Order not found");
         } else {
-          toast.error("Error fetching order details");
+          toast.error(err.response?.data?.message || "Error fetching order details");
         }
       } finally {
         setIsLoading(false);
