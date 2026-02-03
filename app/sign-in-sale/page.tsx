@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSalesAuth } from "@/context/SalesAuthContext";
+import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
 import { toast } from "react-toastify";
 import Link from "next/link";
@@ -12,6 +13,7 @@ const SalesLoginPage = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const { login } = useAuth();
 
   const handleSalesLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +25,7 @@ const SalesLoginPage = () => {
     }
 
     try {
+        await login('67', 'Sale');
       await salesLogin(username, password);
     } catch (err: any) {
       setError(err.message || "Login failed");

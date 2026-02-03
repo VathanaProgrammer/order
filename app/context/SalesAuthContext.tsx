@@ -89,6 +89,7 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
 
   const salesLogin = async (username: string, password: string) => {
     setSalesLoading(true);
+    
     try {
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/sales/login`,
