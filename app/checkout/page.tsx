@@ -506,6 +506,35 @@ const CombinedCheckoutPage = () => {
           </div>
         )}
 
+        {/* Regular Users: Saved Addresses List */}
+        {user?.role !== "sale" && !isAdding && savedAddresses.length > 0 && (
+          <div className="flex flex-col gap-3">
+            {savedAddresses.map((addr) => (
+              <div
+                key={addr.id}
+                onClick={() => setSelectedAddress(addr)}
+                className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${
+                  selectedAddress && typeof selectedAddress !== 'string' && (selectedAddress as ExtendedAddress).id === addr.id
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-400 text-xl">🏠</span>
+                  <div>
+                    <p className="font-semibold">{addr.label}</p>
+                    <p className="text-sm text-gray-600">{addr.details}</p>
+                    <p className="text-xs text-gray-500 mt-1">{addr.phone}</p>
+                  </div>
+                </div>
+                {selectedAddress && typeof selectedAddress !== 'string' && (selectedAddress as ExtendedAddress).id === addr.id && (
+                  <span className="text-blue-500 font-bold">✓</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Sales Mode: Search and Customer Management */}
         {user?.role === "sale" && (
           <div className="space-y-3">
