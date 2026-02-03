@@ -265,17 +265,19 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         addressToSend = { 
           ...currentAddress, 
           short_address,
-          phone: customerPhone,
+          phone: customerPhone, // ✅ PHONE INCLUDED
           label: customerName,
           details: `Customer address: ${short_address}`,
         };
       } else {
-        // Regular user
-        const userPhone = regularUser?.phone || "";
-        // if (!userPhone) {
-        //   toast.error("Please add your phone number in your account settings");
-        //   return;
-        // }
+        // 🔴 **CRITICAL FIX: Regular user MUST have phone**
+        const userPhone = regularUser?.mobile || regularUser?.phone || "";
+        
+        // 🔴 **VALIDATE PHONE EXISTS**
+        if (!userPhone) {
+          toast.error("Please add your phone number in your account settings");
+          return;
+        }
         
         customerName = regularUser?.name || "Customer";
         customerPhone = userPhone;
@@ -284,9 +286,15 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         addressToSend = { 
           ...currentAddress, 
           short_address,
-          phone: customerPhone,
+          phone: customerPhone, // ✅ PHONE INCLUDED
           label: customerName,
         };
+        
+        console.log('✅ Regular user address with phone:', {
+          phone: customerPhone,
+          name: customerName,
+          coordinates: currentAddress.coordinates,
+        });
       }
     } else {
       // For saved addresses
@@ -311,16 +319,37 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           }
           customerName = customerInfo.name;
           customerPhone = customerInfo.phone;
+          
+          // 🔴 Update saved address with phone
+          addressToSend.phone = customerPhone;
+          addressToSend.label = customerName;
         }
       } else {
         // Regular user with saved address
         customerName = regularUser?.name || addressToSend.label || "Customer";
-        customerPhone = addressToSend.phone || regularUser?.phone || "";
+        customerPhone = addressToSend.phone || regularUser?.mobile || regularUser?.phone || "";
+        
+        // 🔴 **VALIDATE PHONE EXISTS**
+        if (!customerPhone) {
+          toast.error("Saved address must have a phone number. Please update your address.");
+          return;
+        }
+        
+        // 🔴 Ensure saved address has phone
+        if (!addressToSend.phone) {
+          addressToSend.phone = customerPhone;
+        }
       }
     }
 
     if (!addressToSend || cart.length === 0) {
       toast.error("Cart is empty or no address selected!");
+      return;
+    }
+
+    // 🔴 **FINAL VALIDATION: Phone MUST exist**
+    if (!addressToSend.phone) {
+      toast.error("Phone number is required for delivery");
       return;
     }
 
@@ -332,16 +361,15 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     if (isSalesMode && salesUser) {
       // Salesperson is logged in via SalesAuth
       isSalesOrder = true;
-      salesUserId = salesUser.id; // This is from users table (e.g., 6)
-      
-      // Use fixed api_user_id 20 for sales orders (based on your previous logs)
+      salesUserId = salesUser.id;
       apiUserId = 20; // Fixed ID for sales orders
       
-      console.log('Sales order detected:', {
-        sales_user_id: salesUserId, // From users table (e.g., 6)
+      console.log('✅ Sales order detected:', {
+        sales_user_id: salesUserId,
         salesperson_name: salespersonName,
-        api_user_id: apiUserId, // Fixed ID 20 for sales
-        auth_type: 'SalesAuth'
+        api_user_id: apiUserId,
+        customer_phone: customerPhone,
+        customer_name: customerName,
       });
     } else if (regularUser) {
       // Regular customer logged in
@@ -349,9 +377,11 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       salesUserId = undefined;
       isSalesOrder = false;
       
-      console.log('Regular customer order:', {
+      console.log('✅ Regular customer order:', {
         api_user_id: apiUserId,
-        auth_type: 'Regular Auth'
+        customer_phone: customerPhone,
+        customer_name: customerName,
+        regular_user_phone: regularUser?.phone || regularUser?.mobile,
       });
     } else {
       toast.error("You must be logged in to place an order!");
@@ -375,6 +405,15 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       })),
     };
 
+    // 🔴 **VERIFY PAYLOAD HAS PHONE**
+    if (selectedAddress === "current" && payload.address) {
+      console.log('🔍 Current address payload:', {
+        has_phone: !!payload.address.phone,
+        phone: payload.address.phone,
+        label: payload.address.label,
+      });
+    }
+
     // 🔴 FIXED: Add customer_info for sales orders
     if (isSalesOrder) {
       // For sales orders, use the determined customer info
@@ -390,32 +429,37 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       };
       
       // Send salesperson info
-      payload.sales_user_id = salesUserId; // Salesperson's ID from users table
-      payload.sales_person_name = salespersonName; // Salesperson's real name
+      payload.sales_user_id = salesUserId;
+      payload.sales_person_name = salespersonName;
       payload.is_sales_order = true;
       
-      console.log('Sending sales order info:', {
+      console.log('✅ Sending sales order info:', {
         sales_user_id: payload.sales_user_id,
         sales_person_name: payload.sales_person_name,
-        customer_info: payload.customer_info,
-        customer_name: customerName,
-        customer_phone: customerPhone
+        customer_phone: customerPhone,
+        customer_name: customerName
       });
     }
 
     try {
-      console.log("Sending order with payload:", payload);
+      console.log("✅ Sending order with payload:", JSON.stringify(payload, null, 2));
       
       // Use the correct token based on auth type
       const token = isSalesMode 
         ? localStorage.getItem('sales_token')
         : localStorage.getItem('token');
       
+      if (!token) {
+        toast.error("Authentication token missing. Please log in again.");
+        return;
+      }
+      
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
         withCredentials: true,
         headers: { 
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
       });
       
@@ -437,7 +481,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}&order_id=${res.data.order_id}`);
       }
     } catch (err: any) {
-      console.error("Order error:", err.response?.data || err);
+      console.error("❌ Order error:", err.response?.data || err);
       
       // Show specific error messages
       if (err.response?.data?.message) {
