@@ -7,7 +7,7 @@ import {
   ReactNode,
   useRef,
 } from "react";
-import api from "@/api/api";
+import api, { clearApiState } from "@/api/api";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -218,19 +218,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     try {
       await api.post("/logout");
-      
-    } catch (error: any) {
+    } catch (error) {
       console.error("Logout error:", error);
     }
     
+    // 1. Kill the internal variable in api.ts
+    clearApiState(); 
+
+    // 2. Clear Context state
     setUser(null);
-    // We overwrite the cookie with an empty value and an expired date
-    document.cookie = "token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
-    // Add other potential cookie names like 'session_id' or 'auth_token'
-    document.cookie = "api_user_id=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
-    localStorage.removeItem('auth_token');
-    delete api.defaults.headers.common["Authorization"];
-    router.push("/sign-in");
+
+    // 3. Nuclear clear of all possible storages
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // 4. Overwrite cookies (including the path)
+    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = "auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+    // 5. HARD RELOAD
+    // Using router.push("/sign-in") might keep the 'api.ts' memory alive.
+    // window.location.href forces the browser to dump the RAM and start over.
+    window.location.href = "/sign-in";
   };
 
   return (

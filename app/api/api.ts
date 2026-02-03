@@ -8,6 +8,15 @@ export const isSafari = (): boolean => {
   return /^((?!chrome|android).)*safari/i.test(ua) || /iPad|iPhone|iPod/.test(ua);
 };
 
+export const clearApiState = () => {
+  currentToken = null;
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('auth_token');
+    // Force clear the header immediately
+    delete api.defaults.headers.common["Authorization"];
+  }
+};
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
