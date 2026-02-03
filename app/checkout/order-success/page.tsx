@@ -35,31 +35,172 @@ const page = () => {
   };
 
   // Function to format address for display
-  const formatAddress = (addressData: any) => {
-    if (!addressData) return "No address provided";
-    
-    if (typeof addressData === 'string') {
-      return addressData;
+// Updated formatAddress function to handle the actual data structure
+const formatAddress = (orderData: any) => {
+  if (!orderData) return "No address provided";
+  
+  console.log('🔍 formatAddress called with:', orderData); // Debug
+  
+  // First check if we have address in address_info (even if empty)
+  if (orderData.address_info) {
+    // Check if we have a direct address string
+    if (orderData.address_info.address && orderData.address_info.address.trim() !== '') {
+      return orderData.address_info.address;
     }
-    
-    // Build address from parts
+  }
+  
+  // Check for savedAddress relationship (from your backend)
+  if (orderData.savedAddress) {
+    const addr = orderData.savedAddress;
+    // Build from parts
     const parts = [];
-    if (addressData.street) parts.push(addressData.street);
-    if (addressData.city) parts.push(addressData.city);
-    if (addressData.state) parts.push(addressData.state);
-    if (addressData.country) parts.push(addressData.country);
-    if (addressData.postal_code) parts.push(addressData.postal_code);
+    if (addr.street) parts.push(addr.street);
+    if (addr.city) parts.push(addr.city);
+    if (addr.state) parts.push(addr.state);
+    if (addr.country) parts.push(addr.country);
+    if (addr.postal_code) parts.push(addr.postal_code);
     
     if (parts.length > 0) {
       return parts.join(', ');
     }
     
     // Fallback to short_address or details
-    if (addressData.short_address) return addressData.short_address;
-    if (addressData.details) return addressData.details;
+    if (addr.short_address && addr.short_address.trim() !== '') {
+      return addr.short_address;
+    }
+    if (addr.details && addr.details.trim() !== '') {
+      return addr.details;
+    }
+  }
+  
+  // Check for currentAddress relationship (from your backend)
+  if (orderData.currentAddress) {
+    const addr = orderData.currentAddress;
+    // Build from parts
+    const parts = [];
+    if (addr.street) parts.push(addr.street);
+    if (addr.city) parts.push(addr.city);
+    if (addr.state) parts.push(addr.state);
+    if (addr.country) parts.push(addr.country);
+    if (addr.postal_code) parts.push(addr.postal_code);
     
-    return "Address not specified";
+    if (parts.length > 0) {
+      return parts.join(', ');
+    }
+    
+    // Fallback
+    if (addr.short_address && addr.short_address.trim() !== '') {
+      return addr.short_address;
+    }
+    if (addr.details && addr.details.trim() !== '') {
+      return addr.details;
+    }
+  }
+  
+  // Last resort: check if address is directly in the data
+  if (orderData.address && typeof orderData.address === 'string' && orderData.address.trim() !== '') {
+    return orderData.address;
+  }
+  
+  return "Address not specified";
+};
+
+// Updated getAddressType function
+const getAddressType = (orderData: any) => {
+  if (!orderData) return '';
+  
+  // Check address_info type
+  if (orderData.address_info?.type) {
+    return orderData.address_info.type;
+  }
+  
+  // Infer from relationships
+  if (orderData.savedAddress) return 'saved';
+  if (orderData.currentAddress) return 'current';
+  
+  return '';
+};
+
+// Enhanced fetch function that includes relationships
+useEffect(() => {
+  const fetchData = async () => {
+    if (!orderId) return;
+    try {
+      setIsLoading(true);
+      
+      // Get token based on auth type
+      let token: string | null = null;
+      const isSalesMode = user?.role === 'sale';
+      
+      if (isSalesMode) {
+        token = localStorage.getItem('sales_token') || 
+                localStorage.getItem('auth_token') || 
+                sessionStorage.getItem('sales_token');
+      } else {
+        token = localStorage.getItem('auth_token') || 
+                localStorage.getItem('token') || 
+                sessionStorage.getItem('auth_token') ||
+                sessionStorage.getItem('token');
+      }
+      
+      if (!token) {
+        toast.error("Please log in to view order details");
+        return;
+      }
+
+      // Fetch with includes to get related addresses
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}?include=address`, {
+        withCredentials: true,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      
+      console.log('🔍 Full API Response:', res.data); // Debug
+      
+      if (res.data?.success) {
+        setOrderDetails(res.data.data);
+        generateBoxImage(res.data.data);
+      }
+    } catch (err: any) {
+      console.error("Error fetching order details:", err);
+      
+      // Try without include parameter if it fails
+      if (err.response?.status === 400 || err.response?.status === 404) {
+        try {
+          console.log('Trying without include parameter...');
+          const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+          const simpleRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`, {
+            withCredentials: true,
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (simpleRes.data?.success) {
+            setOrderDetails(simpleRes.data.data);
+            generateBoxImage(simpleRes.data.data);
+          }
+        } catch (secondErr) {
+          console.error('Second attempt failed:', secondErr);
+          toast.error("Error fetching order details");
+        }
+      } else if (err.response?.status === 401) {
+        toast.error("Session expired. Please log in again.");
+      } else if (err.response?.status === 403) {
+        toast.error("You don't have permission to view this order");
+      } else {
+        toast.error("Error fetching order details");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
+  
+  fetchData();
+}, [orderId, user?.role]);
 
   // Logic to "Download that Box" by rendering the box state to a high-res canvas
   const generateBoxImage = (orderData: any) => {
@@ -367,11 +508,46 @@ const page = () => {
                         <Icon icon="mdi:map-marker-outline" className="text-gray-500 mt-0.5 flex-shrink-0" width={16} />
                         <span className="flex-1">{formatAddress(orderDetails.address_info.address)}</span>
                       </p>
-                      {orderDetails.address_info.type && (
-                        <p className="text-xs text-gray-500 mt-2">
-                          Type: <span className="font-medium capitalize">{orderDetails.address_info.type}</span>
-                        </p>
-                      )}
+                      {orderDetails && (
+  <div className="mt-4 pt-4 border-t border-gray-100">
+    <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-2">
+      Delivery Address
+    </p>
+    
+    {formatAddress(orderDetails) !== "Address not specified" ? (
+      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+        <p className="text-sm text-gray-800 flex items-start gap-2">
+          <Icon icon="mdi:map-marker-outline" className="text-gray-500 mt-0.5 flex-shrink-0" width={16} />
+          <span className="flex-1">{formatAddress(orderDetails)}</span>
+        </p>
+        
+        {/* Show address type if available */}
+        {getAddressType(orderDetails) && (
+          <div className="mt-2 flex items-center gap-2 text-xs">
+            <span className="text-gray-500">Type:</span>
+            <span className={`font-medium capitalize px-2 py-0.5 rounded ${
+              getAddressType(orderDetails) === 'saved' 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-blue-100 text-blue-800'
+            }`}>
+              {getAddressType(orderDetails)} address
+            </span>
+          </div>
+        )}
+      </div>
+    ) : (
+      <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+        <p className="text-sm text-yellow-800 flex items-center gap-2">
+          <Icon icon="mdi:alert-outline" width={16} />
+          Address information is not available for this order.
+        </p>
+        <p className="text-xs text-yellow-600 mt-1">
+          Please contact support if you need delivery information.
+        </p>
+      </div>
+    )}
+  </div>
+)}
                     </div>
                   </div>
                 )}
