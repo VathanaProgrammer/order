@@ -337,10 +337,10 @@ const page = () => {
                   {user?.role === 'sale' ? 'អតិថិជន' : 'ព័ត៌មានរបស់អ្នក'}
                 </p>
                 <p className="font-bold text-gray-800">
-                  {orderDetails.customer_info?.name || 'អតិថិជន'}
+                  ឈ្មោះ​ {orderDetails.customer_info?.name || 'អតិថិជន'}
                 </p>
                 <p className="text-sm text-gray-600 mb-2">
-                  {orderDetails.customer_info?.phone || 'N/A'}
+                  លេខទូរសព្ទ {orderDetails.customer_info?.phone || 'N/A'}
                 </p>
                 
                 {/* Show customer type indicator for sales orders */}
@@ -354,9 +354,9 @@ const page = () => {
                 
                 {/* SIMPLE ADDRESS DISPLAY BELOW PHONE NUMBER */}
                 {orderDetails.address_info?.address && orderDetails.address_info.address !== 'Address not specified' && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="mb-3 pb-3 border-b border-gray-100">
                     <p className="text-sm text-gray-700 flex items-start gap-2">
-                      <span className="text-gray-500 mt-0.5">📍</span>
+                      <span className="text-gray-500 mt-0.5">អាសយដ្ឋាន</span>
                       <span className="flex-1">{orderDetails.address_info.address}</span>
                     </p>
                   </div>
