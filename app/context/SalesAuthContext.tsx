@@ -52,6 +52,7 @@ const getMainRole = (roles: string[]): string => {
     if (cleanRole.includes('sales on place')) return 'salesOnPlace';
     if (cleanRole.includes('admin')) return 'admin';
     if (cleanRole.includes('cashier')) return 'cashier';
+    if (cleanRole.includes('delivery')) return 'delivery';
   }
   
   return roles[0].replace(/#\d+$/, '').toLowerCase();
