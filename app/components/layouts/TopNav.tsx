@@ -69,7 +69,7 @@ const TopNav = () => {
   };
 
   const handleCustomerViewClick = () => {
-    if (user) router.push("/account/shipping-addresses");
+    if (user) router.push("/account/shipping-address");
     else router.push("/sign-in");
   };
 
