@@ -82,13 +82,6 @@ const Product: React.FC<ProductProps> = ({
           unoptimized
           sizes="(max-width: 768px) 100vw"
         />
-        
-        {/* In-cart badge */}
-        {displayIsInCart && (
-          <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full z-10">
-            In Cart
-          </div>
-        )}
       </div>
 
       <div className="p-3 flex flex-col flex-1">
