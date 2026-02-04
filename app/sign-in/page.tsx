@@ -87,9 +87,6 @@ const Page = () => {
               </span>
             </p>
           </div>
-          <div className="mt-2 w-full">
-            <p className="text-center text-[16px] font-medium pt-8 text-blue-600 cursor-pointer" onClick={()=>router.push('/sign-in-sale')}>Sign in as Sales</p>
-          </div>
         </form>
       </div>
     </div>
