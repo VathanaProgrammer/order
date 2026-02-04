@@ -15,35 +15,18 @@ export interface ProductData {
   };
 }
 
-// Define CartItem type that matches what ProductPage uses
-interface CartItem {
-  id: number;
-  title: string;
-  price: number;
-  image?: string;
-  qty: number;
-}
-
 interface ProductsProps {
   selectedCategory: string;
   searchQuery: string;
   allProducts: ProductData[];
   filteredProducts: ProductData[];
-  cartItems?: CartItem[]; // Add this
-  onAddToCart?: (product: ProductData) => void; // Add this
-  onRemoveFromCart?: (productId: number) => void; // Add this
-  onUpdateCartQuantity?: (productId: number, quantity: number) => void; // Add this
 }
 
 const Products: React.FC<ProductsProps> = ({ 
   selectedCategory, 
   searchQuery,
   allProducts,
-  filteredProducts,
-  cartItems = [], // Default to empty array
-  onAddToCart,
-  onRemoveFromCart,
-  onUpdateCartQuantity
+  filteredProducts 
 }) => {
   const { t } = useLanguage();
   const isEmpty = filteredProducts.length === 0;
@@ -75,26 +58,15 @@ const Products: React.FC<ProductsProps> = ({
     <div className="p-2">
       {/* Products grid */}
       <div className="grid grid-cols-2 gap-4">
-        {filteredProducts.map((item) => {
-          // Check if this product is in cart
-          const cartItem = cartItems.find(ci => ci.id === item.product.id);
-          const isInCart = !!cartItem;
-          
-          return (
-            <Product
-              key={item.product.id}
-              id={item.product.id}
-              title={item.product.name}
-              price={item.product.price ? Number(item.product.price) : 0}
-              image={item.product.image_url || "/img/default.png"}
-              isInCart={isInCart}
-              cartQuantity={cartItem?.qty || 0}
-              onAddToCart={onAddToCart ? () => onAddToCart(item) : undefined}
-              onRemoveFromCart={onRemoveFromCart ? () => onRemoveFromCart(item.product.id) : undefined}
-              onUpdateCartQuantity={onUpdateCartQuantity ? (quantity) => onUpdateCartQuantity(item.product.id, quantity) : undefined}
-            />
-          );
-        })}
+        {filteredProducts.map((item) => (
+          <Product
+            key={item.product.id}
+            id={item.product.id}
+            title={item.product.name}
+            price={item.product.price ? Number(item.product.price) : 0}
+            image={item.product.image_url || "/img/default.png"}
+          />
+        ))}
       </div>
     </div>
   );

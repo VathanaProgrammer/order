@@ -25,15 +25,6 @@ interface CategoryData {
   name: string;
 }
 
-// Define CartItem type (must match Products component)
-type CartItem = {
-  id: number;
-  title: string;
-  price: number;
-  image?: string;
-  qty: number;
-};
-
 // Cache keys
 const PRODUCTS_CACHE_KEY = 'cached_products';
 const CATEGORIES_CACHE_KEY = 'cached_categories';
@@ -50,107 +41,12 @@ export default function ProductPage() {
   const [error, setError] = useState<string | null>(null);
   const [isUsingCache, setIsUsingCache] = useState(false);
   
-  // Cart state - using the defined CartItem type
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  
   // Refs to track state
   const hasInitialized = useRef(false);
   const isFetching = useRef(false);
   
   // Cache for category-specific products
   const [categoryCache, setCategoryCache] = useState<Record<string, ProductData[]>>({});
-
-  // ========== CART FUNCTIONS WITH LOCALSTORAGE ==========
-  
-  // Load cart from localStorage on component mount
-  useEffect(() => {
-    const loadCartFromStorage = () => {
-      try {
-        const savedCart = localStorage.getItem('shopping_cart');
-        if (savedCart) {
-          const parsedCart = JSON.parse(savedCart);
-          if (Array.isArray(parsedCart)) {
-            setCartItems(parsedCart);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load cart from localStorage:', error);
-      }
-    };
-    
-    loadCartFromStorage();
-  }, []);
-
-  // Save cart to localStorage whenever it changes
-  useEffect(() => {
-    const saveCartToStorage = () => {
-      try {
-        localStorage.setItem('shopping_cart', JSON.stringify(cartItems));
-      } catch (error) {
-        console.error('Failed to save cart to localStorage:', error);
-      }
-    };
-    
-    saveCartToStorage();
-  }, [cartItems]);
-
-  // Add product to cart
-  const addToCart = (product: ProductData) => {
-    const newItem: CartItem = {
-      id: product.product.id,
-      title: product.product.name,
-      price: typeof product.product.price === 'string' 
-        ? parseFloat(product.product.price) 
-        : (product.product.price as number) || 0,
-      image: product.product.image_url || "",
-      qty: 1
-    };
-
-    setCartItems(prev => {
-      // Check if product already in cart
-      const existingIndex = prev.findIndex(item => item.id === product.product.id);
-      
-      if (existingIndex >= 0) {
-        // Increase quantity
-        const newCart = [...prev];
-        newCart[existingIndex] = {
-          ...newCart[existingIndex],
-          qty: newCart[existingIndex].qty + 1
-        };
-        return newCart;
-      } else {
-        // Add new item
-        return [...prev, newItem];
-      }
-    });
-  };
-
-  // Remove product from cart
-  const removeFromCart = (productId: number) => {
-    setCartItems(prev => prev.filter(item => item.id !== productId));
-  };
-
-  // Update cart item quantity
-  const updateCartQuantity = (productId: number, quantity: number) => {
-    if (quantity < 1) {
-      removeFromCart(productId);
-      return;
-    }
-    
-    setCartItems(prev => 
-      prev.map(item => 
-        item.id === productId 
-          ? { ...item, qty: quantity } 
-          : item
-      )
-    );
-  };
-
-  // Clear cart
-  const clearCart = () => {
-    setCartItems([]);
-    localStorage.removeItem('shopping_cart');
-  };
 
   // Save products to localStorage
   const saveProductsToCache = (products: ProductData[]) => {
@@ -214,15 +110,15 @@ export default function ProductPage() {
     return null;
   };
 
-  // Clear product cache (not cart)
-  const clearProductCache = () => {
+  // Clear cache
+  const clearCache = () => {
     try {
       localStorage.removeItem(PRODUCTS_CACHE_KEY);
       localStorage.removeItem(CATEGORIES_CACHE_KEY);
       localStorage.removeItem(CACHE_TIMESTAMP_KEY);
       setCategoryCache({});
       setIsUsingCache(false);
-      console.log('Product cache cleared');
+      console.log('Cache cleared');
     } catch (error) {
       console.error('Failed to clear cache:', error);
     }
@@ -481,9 +377,9 @@ export default function ProductPage() {
                 </span>
               )}
               <button
-                onClick={clearProductCache}
+                onClick={clearCache}
                 className="text-sm text-gray-500 hover:text-gray-700"
-                title="Clear product cache"
+                title="Clear cache"
               >
                 Clear Cache
               </button>
@@ -515,7 +411,7 @@ export default function ProductPage() {
                   Retry
                 </button>
                 <button
-                  onClick={clearProductCache}
+                  onClick={clearCache}
                   className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
                 >
                   Clear Cache
@@ -547,7 +443,7 @@ export default function ProductPage() {
                   Refresh
                 </button>
                 <button
-                  onClick={clearProductCache}
+                  onClick={clearCache}
                   className="text-sm text-gray-500 hover:text-gray-700"
                   title="Clear cache"
                 >
@@ -560,10 +456,6 @@ export default function ProductPage() {
               searchQuery={searchQuery}
               allProducts={allProducts}
               filteredProducts={allProducts}
-              cartItems={cartItems}
-              onAddToCart={addToCart}
-              onRemoveFromCart={removeFromCart}
-              onUpdateCartQuantity={updateCartQuantity}
             />
           </div>
         )}
