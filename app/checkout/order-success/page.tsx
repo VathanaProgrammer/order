@@ -154,7 +154,7 @@ const page = () => {
         ctx.fillStyle = '#1e293b';
         ctx.font = 'bold 12px Arial';
         ctx.fillText('ទំនិញ', 20, y); // Items in Khmer
-        ctx.fillText('តម្លៃ', width - 30, y); // Amount in Khmer
+        ctx.fillText('តម្លៃ', width - 50, y); // Amount in Khmer
         y += 20;
 
         // Items List
