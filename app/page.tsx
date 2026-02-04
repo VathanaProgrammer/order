@@ -360,6 +360,8 @@ export default function ProductPage() {
         </div>
       </div>
 
+      <h1>Test</h1>
+
       <div className="flex flex-1 overflow-y-auto">
         <Categories 
           selectedCategory={selectedCategory} 
