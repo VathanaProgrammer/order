@@ -47,6 +47,9 @@ export default function ShippingAddressPage() {
     api_user_id: user?.id || undefined
   });
 
+  // Current location detection state
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+
   async function fetchAddress() {
     setLoading(true);
     try {
@@ -64,6 +67,66 @@ export default function ShippingAddressPage() {
   useEffect(() => {
     fetchAddress();
   }, [setLoading]);
+
+  // Current location detection function
+  const handleDetectCurrentLocation = async () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      const coordinates = { lat: latitude, lng: longitude };
+      
+      // Update the form with current location
+      setNewAddress(prev => ({
+        ...prev,
+        coordinates: coordinates,
+        label: prev.label || "Current Location",
+        details: prev.details || `Current Location (${latitude.toFixed(6)}, ${longitude.toFixed(6)})`
+      }));
+
+      toast.success("Current location detected successfully!");
+      
+      // If map modal is open, update the map view
+      if (showMapModal) {
+        setShowMapModal(true); // Keep modal open with new location
+      } else {
+        setShowMapModal(true); // Open map modal to show the location
+      }
+      
+    } catch (error: any) {
+      console.error("Geolocation error:", error);
+      let errorMessage = "Failed to detect location";
+      
+      switch(error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage = "Location permission denied. Please enable location services in your browser settings.";
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMessage = "Location information is unavailable.";
+          break;
+        case error.TIMEOUT:
+          errorMessage = "Location request timed out.";
+          break;
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setIsDetectingLocation(false);
+    }
+  };
 
   // Filter addresses based on search query
   const filteredAddresses = useMemo(() => {
@@ -125,10 +188,8 @@ export default function ShippingAddressPage() {
         // Edit existing address
         console.log("Editing address ID:", editingId, "Data:", newAddress);
         
-        // Try PUT request with the updated data
         const res = await api.put(`/addresses/${editingId}`, {
           ...newAddress,
-          // Ensure all required fields are included
           label: newAddress.label.trim(),
           phone: newAddress.phone?.trim() || user?.phone || user?.mobile || "",
           details: newAddress.details.trim(),
@@ -145,7 +206,6 @@ export default function ShippingAddressPage() {
         setSelectedAddress(updated.id ?? null);
         toast.success(t.addressUpdatedSuccessfully || "Address updated successfully");
         
-        // Refresh the list
         fetchAddress();
       } else {
         // Add new address
@@ -163,11 +223,9 @@ export default function ShippingAddressPage() {
         setSelectedAddress(saved.id ?? null);
         toast.success(t.addressSavedSuccessfully || "Address saved successfully");
         
-        // Refresh the list
         fetchAddress();
       }
 
-      // Reset form and close modal
       resetForm();
       setShowFormModal(false);
     } catch (err: any) {
@@ -214,7 +272,6 @@ export default function ShippingAddressPage() {
     try {
       console.log("Deleting address ID:", id);
       
-      // Try standard DELETE
       await api.delete(`/addresses/${id}`);
       
       setSavedAddresses(prev => prev.filter(addr => addr.id !== id));
@@ -227,7 +284,6 @@ export default function ShippingAddressPage() {
     } catch (err: any) {
       console.error("Delete error:", err);
       
-      // If DELETE fails, try POST with _method
       try {
         await api.post(`/addresses/${id}`, {
           _method: 'DELETE'
@@ -292,7 +348,7 @@ export default function ShippingAddressPage() {
   const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = parseInt(e.target.value);
     setItemsPerPage(value);
-    setCurrentPage(1); // Reset to first page
+    setCurrentPage(1);
   };
 
   // Clear search
@@ -565,16 +621,48 @@ export default function ShippingAddressPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {user?.role === "sale" ? "Delivery Address *" : "Address Details *"}
                 </label>
-                <textarea
-                  placeholder={user?.role === "sale" 
-                    ? "Street, building, floor, delivery notes..." 
-                    : "Full address details..."
-                  }
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={newAddress.details}
-                  onChange={(e) => setNewAddress({ ...newAddress, details: e.target.value })}
-                  rows={3}
-                />
+                <div className="space-y-3">
+                  <textarea
+                    placeholder={user?.role === "sale" 
+                      ? "Street, building, floor, delivery notes..." 
+                      : "Full address details..."
+                    }
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={newAddress.details}
+                    onChange={(e) => setNewAddress({ ...newAddress, details: e.target.value })}
+                    rows={3}
+                  />
+                  
+                  {/* Current Location Detection Button */}
+                  <button
+                    type="button"
+                    onClick={handleDetectCurrentLocation}
+                    disabled={isDetectingLocation}
+                    className={`w-full p-3 border rounded-lg flex items-center justify-center gap-2 ${
+                      isDetectingLocation 
+                        ? "bg-gray-100 text-gray-500 cursor-wait" 
+                        : "bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200"
+                    }`}
+                  >
+                    {isDetectingLocation ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Detecting location...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span>Use Current Location</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Location Selection */}
@@ -594,6 +682,11 @@ export default function ShippingAddressPage() {
                         <br />
                         Lng: {newAddress.coordinates.lng.toFixed(6)}
                       </p>
+                      {newAddress.details && (
+                        <p className="text-xs text-gray-500 mt-2 truncate max-w-full">
+                          {newAddress.details}
+                        </p>
+                      )}
                       <p className="text-xs text-blue-600 mt-2">Click to change location</p>
                     </div>
                   ) : (
@@ -728,9 +821,38 @@ export default function ShippingAddressPage() {
                       </p>
                     </div>
                   </div>
-                  <p className="text-xs text-green-600 mt-2">
-                    ✓ Location selected. You can also drag the marker to adjust.
-                  </p>
+                  
+                  {/* Current Location Button */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleDetectCurrentLocation}
+                      disabled={isDetectingLocation}
+                      className={`w-full p-2 border rounded flex items-center justify-center gap-2 text-sm ${
+                        isDetectingLocation 
+                          ? "bg-gray-100 text-gray-500 cursor-wait" 
+                          : "bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200"
+                      }`}
+                    >
+                      {isDetectingLocation ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>Detecting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span>Use My Current Location</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">
