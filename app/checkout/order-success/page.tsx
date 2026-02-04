@@ -343,15 +343,6 @@ const page = () => {
                   លេខទូរសព្ទ {orderDetails.customer_info?.phone || 'N/A'}
                 </p>
                 
-                {/* Show customer type indicator for sales orders */}
-                {user?.role === 'sale' && orderDetails.customer_info?.name && (
-                  <div className="mt-1">
-                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                      អតិថិជនលក់
-                    </span>
-                  </div>
-                )}
-                
                 {/* SIMPLE ADDRESS DISPLAY BELOW PHONE NUMBER */}
                 {orderDetails.address_info?.address && orderDetails.address_info.address !== 'Address not specified' && (
                   <div className="mb-3 pb-3 border-b border-gray-100">

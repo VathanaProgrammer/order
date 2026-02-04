@@ -166,8 +166,8 @@ const Page: React.FC = () => {
   // ✅ Logout function that handles both user types
   const handleLogout = async () => {
     if (isSalesUser) {
-      await salesLogout();
       await regularLogout();
+      await salesLogout();
     } else {
       await regularLogout();
     }
