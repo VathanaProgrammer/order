@@ -5,6 +5,7 @@ import Header from "@/components/layouts/Header";
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import { useCheckout, Address as ContextAddress } from "@/context/CheckOutContext";
 import { useAuth } from "@/context/AuthContext";
+import { useSalesAuth } from "@/context/SalesAuthContext";
 import { useLoading } from "@/context/LoadingContext";
 import api from "@/api/api";
 import { toast } from "react-toastify";
@@ -33,6 +34,7 @@ const ITEMS_PER_PAGE = 5;
 
 const CombinedCheckoutPage = () => {
   const { user, setUser } = useAuth();
+  const { salesUser } = useSalesAuth();
   const router = useRouter();
   const {
     cart,
@@ -738,6 +740,8 @@ const CombinedCheckoutPage = () => {
           </div>
         ))}
       </section>
+
+          {salesUser?.role === "salesOnline" && <h2>Hi</h2>}
 
       {/* Shipping Address Section */}
       <section className="flex flex-col gap-3">
