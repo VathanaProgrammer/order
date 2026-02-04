@@ -73,6 +73,11 @@ type CheckoutContextType = {
 
 const CheckoutContext = createContext<CheckoutContextType | undefined>(undefined);
 
+// LocalStorage keys
+const CART_STORAGE_KEY = 'shopping_cart_v2';
+const REWARDS_STORAGE_KEY = 'rewards_cart_v2';
+const CART_EXPIRY_HOURS = 24; // Cart expires after 24 hours
+
 export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   const { user: regularUser } = useAuth();
   const { salesUser, isSalesAuthenticated } = useSalesAuth();
@@ -90,11 +95,107 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     email: ""
   });
 
+  // ========== LOCALSTORAGE FUNCTIONS ==========
+  
+  // Load cart from localStorage
+  const loadCartFromStorage = (): CartItem[] => {
+    try {
+      const stored = localStorage.getItem(CART_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Check if data has expiry
+        if (parsed.expiry && Date.now() > parsed.expiry) {
+          // Cart expired, clear it
+          localStorage.removeItem(CART_STORAGE_KEY);
+          return [];
+        }
+        return parsed.cart || [];
+      }
+    } catch (error) {
+      console.error('Failed to load cart from storage:', error);
+    }
+    return [];
+  };
+
+  // Save cart to localStorage with expiry
+  const saveCartToStorage = (cartItems: CartItem[]) => {
+    try {
+      const cartData = {
+        cart: cartItems,
+        expiry: Date.now() + (CART_EXPIRY_HOURS * 60 * 60 * 1000), // 24 hours from now
+        lastUpdated: Date.now()
+      };
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartData));
+    } catch (error) {
+      console.error('Failed to save cart to storage:', error);
+    }
+  };
+
+  // Load rewards from localStorage
+  const loadRewardsFromStorage = (): RewardItem[] => {
+    try {
+      const stored = localStorage.getItem(REWARDS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.expiry && Date.now() > parsed.expiry) {
+          // Rewards expired, clear it
+          localStorage.removeItem(REWARDS_STORAGE_KEY);
+          return [];
+        }
+        return parsed.rewards || [];
+      }
+    } catch (error) {
+      console.error('Failed to load rewards from storage:', error);
+    }
+    return [];
+  };
+
+  // Save rewards to localStorage
+  const saveRewardsToStorage = (rewardItems: RewardItem[]) => {
+    try {
+      const rewardsData = {
+        rewards: rewardItems,
+        expiry: Date.now() + (CART_EXPIRY_HOURS * 60 * 60 * 1000), // 24 hours from now
+        lastUpdated: Date.now()
+      };
+      localStorage.setItem(REWARDS_STORAGE_KEY, JSON.stringify(rewardsData));
+    } catch (error) {
+      console.error('Failed to save rewards to storage:', error);
+    }
+  };
+
+  // Clear all cart data from localStorage
+  const clearCartStorage = () => {
+    try {
+      localStorage.removeItem(CART_STORAGE_KEY);
+      localStorage.removeItem(REWARDS_STORAGE_KEY);
+    } catch (error) {
+      console.error('Failed to clear cart storage:', error);
+    }
+  };
+
+  // Initialize cart from localStorage on mount
   const [cart, setCart] = useState<CartItem[]>([]);
   const [total, setTotal] = useState(0);
 
   const [rewards, setRewards] = useState<RewardItem[]>([]);
   const [totalPoints, setTotalPoints] = useState(0);
+
+  useEffect(() => {
+    // Load cart from localStorage on initial mount
+    const savedCart = loadCartFromStorage();
+    if (savedCart.length > 0) {
+      setCart(savedCart);
+      setTotal(recalcTotal(savedCart));
+    }
+
+    // Load rewards from localStorage
+    const savedRewards = loadRewardsFromStorage();
+    if (savedRewards.length > 0) {
+      setRewards(savedRewards);
+      setTotalPoints(recalcTotalPoints(savedRewards));
+    }
+  }, []);
 
   const [selectedAddress, setSelectedAddress] = useState<Address | "current" | null>(null);
   const [currentAddress, setCurrentAddress] = useState<Address>({
@@ -206,6 +307,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       if (idx === -1 && deltaQty > 0) {
         const newItems = [...prev, { ...product, qty: deltaQty }];
         setTotal(recalcTotal(newItems));
+        // Save to localStorage
+        saveCartToStorage(newItems);
         return newItems;
       }
       if (idx === -1) return prev;
@@ -215,11 +318,15 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       if (newQty <= 0) {
         const newItems = prev.filter(i => i.id !== product.id);
         setTotal(recalcTotal(newItems));
+        // Save to localStorage
+        saveCartToStorage(newItems);
         return newItems;
       }
       const updated = { ...existing, qty: newQty };
       const newItems = [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
       setTotal(recalcTotal(newItems));
+      // Save to localStorage
+      saveCartToStorage(newItems);
       return newItems;
     });
   };
@@ -231,11 +338,15 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       if (qty <= 0) {
         const newItems = prev.filter(i => i.id !== id);
         setTotal(recalcTotal(newItems));
+        // Save to localStorage
+        saveCartToStorage(newItems);
         return newItems;
       }
       const updated = { ...prev[idx], qty };
       const newItems = [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
       setTotal(recalcTotal(newItems));
+      // Save to localStorage
+      saveCartToStorage(newItems);
       return newItems;
     });
   };
@@ -244,6 +355,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     setCart(prev => {
       const newItems = prev.filter(i => i.id !== id);
       setTotal(recalcTotal(newItems));
+      // Save to localStorage
+      saveCartToStorage(newItems);
       return newItems;
     });
   };
@@ -267,11 +380,24 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         return prev;
       }
 
-      if (idx === -1 && deltaQty > 0) return [...prev, { ...reward, qty: deltaQty }];
-      if (newQty <= 0) return prev.filter(r => r.product_id !== reward.product_id);
+      if (idx === -1 && deltaQty > 0) {
+        const newItems = [...prev, { ...reward, qty: deltaQty }];
+        // Save to localStorage
+        saveRewardsToStorage(newItems);
+        return newItems;
+      }
+      if (newQty <= 0) {
+        const newItems = prev.filter(r => r.product_id !== reward.product_id);
+        // Save to localStorage
+        saveRewardsToStorage(newItems);
+        return newItems;
+      }
 
       const updated = { ...prev[idx], qty: newQty };
-      return [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
+      const newItems = [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
+      // Save to localStorage
+      saveRewardsToStorage(newItems);
+      return newItems;
     });
   };
 
@@ -282,11 +408,15 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       if (qty <= 0) {
         const newItems = prev.filter(r => r.product_id !== product_id);
         setTotalPoints(recalcTotalPoints(newItems));
+        // Save to localStorage
+        saveRewardsToStorage(newItems);
         return newItems;
       }
       const updated = { ...prev[idx], qty };
       const newItems = [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
       setTotalPoints(recalcTotalPoints(newItems));
+      // Save to localStorage
+      saveRewardsToStorage(newItems);
       return newItems;
     });
   };
@@ -295,6 +425,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     setRewards(prev => {
       const newItems = prev.filter(r => r.product_id !== product_id);
       setTotalPoints(recalcTotalPoints(newItems));
+      // Save to localStorage
+      saveRewardsToStorage(newItems);
       return newItems;
     });
   };
@@ -502,8 +634,10 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         
+        // Clear cart after successful order
         setCart([]);
         setTotal(0);
+        clearCartStorage(); // Also clear from localStorage
         setCustomerInfo({ name: "", phone: "", email: "" });
         
         router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}&order_id=${res.data.order_id}`);
@@ -592,6 +726,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         toast.success("Reward order placed successfully!");
         setRewards([]);
         setTotalPoints(0);
+        // Clear rewards from localStorage
+        localStorage.removeItem(REWARDS_STORAGE_KEY);
         router.push(`/checkout/reward-success`);
       }
     } catch (err: any) {
