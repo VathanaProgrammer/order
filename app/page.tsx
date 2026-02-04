@@ -25,6 +25,12 @@ interface CategoryData {
   name: string;
 }
 
+// Cache keys
+const PRODUCTS_CACHE_KEY = 'cached_products';
+const CATEGORIES_CACHE_KEY = 'cached_categories';
+const CACHE_TIMESTAMP_KEY = 'products_cache_timestamp';
+const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes cache expiry
+
 export default function ProductPage() {
   const { t } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<string>(t.all);
@@ -37,34 +43,134 @@ export default function ProductPage() {
   // Cache for category-specific products
   const [categoryCache, setCategoryCache] = useState<Record<string, ProductData[]>>({});
 
-  // Fetch categories on mount
+  // Save products to localStorage
+  const saveProductsToCache = (products: ProductData[]) => {
+    try {
+      localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(products));
+      localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+      console.log('Products saved to cache:', products.length);
+    } catch (error) {
+      console.error('Failed to save products to cache:', error);
+    }
+  };
+
+  // Load products from localStorage
+  const loadProductsFromCache = (): ProductData[] | null => {
+    try {
+      const cached = localStorage.getItem(PRODUCTS_CACHE_KEY);
+      const cacheTime = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+      
+      if (cached && cacheTime) {
+        const timeDiff = Date.now() - parseInt(cacheTime);
+        if (timeDiff < CACHE_EXPIRY_MS) {
+          console.log('Loading products from cache');
+          return JSON.parse(cached);
+        } else {
+          console.log('Cache expired, clearing...');
+          clearCache();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load products from cache:', error);
+    }
+    return null;
+  };
+
+  // Save categories to localStorage
+  const saveCategoriesToCache = (categoriesData: CategoryData[]) => {
+    try {
+      localStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(categoriesData));
+    } catch (error) {
+      console.error('Failed to save categories to cache:', error);
+    }
+  };
+
+  // Load categories from localStorage
+  const loadCategoriesFromCache = (): CategoryData[] | null => {
+    try {
+      const cached = localStorage.getItem(CATEGORIES_CACHE_KEY);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      console.error('Failed to load categories from cache:', error);
+    }
+    return null;
+  };
+
+  // Clear cache
+  const clearCache = () => {
+    try {
+      localStorage.removeItem(PRODUCTS_CACHE_KEY);
+      localStorage.removeItem(CATEGORIES_CACHE_KEY);
+      localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+      setCategoryCache({});
+    } catch (error) {
+      console.error('Failed to clear cache:', error);
+    }
+  };
+
+  // Fetch categories on mount with cache support
   useEffect(() => {
     async function fetchCategories() {
       try {
+        // Try to load from cache first
+        const cachedCategories = loadCategoriesFromCache();
+        if (cachedCategories && cachedCategories.length > 0) {
+          setCategories(cachedCategories);
+          console.log('Loaded categories from cache:', cachedCategories.length);
+        }
+
+        // Always fetch fresh data
         const res = await api.get("/category/all");
         const categoriesData = Array.isArray(res.data)
           ? res.data
           : (res.data?.data || res.data || []);
+        
         setCategories(categoriesData);
+        saveCategoriesToCache(categoriesData);
+        console.log('Fetched fresh categories:', categoriesData.length);
       } catch (err) {
         console.error("Failed to fetch categories:", err);
+        // If fetch fails and no cache, set empty array
+        if (!categories.length) {
+          setCategories([]);
+        }
       }
     }
     fetchCategories();
   }, []);
 
-  // Fetch products based on selected category
-  const fetchProducts = useCallback(async (category: string, search: string) => {
+  // Fetch products based on selected category with cache support
+  const fetchProducts = useCallback(async (category: string, search: string, isInitialLoad: boolean = false) => {
     setIsLoading(true);
     setError(null);
     
     try {
       let products: ProductData[] = [];
+      let shouldUseCache = false;
       
-      // Check cache first
-      if (categoryCache[category] && !search) {
-        console.log(`Using cache for ${category}`);
+      // On initial load, try to use cache if available
+      if (isInitialLoad && !search) {
+        const cachedProducts = loadProductsFromCache();
+        if (cachedProducts && cachedProducts.length > 0) {
+          console.log('Using cached products initially:', cachedProducts.length);
+          setAllProducts(cachedProducts);
+          setIsLoading(false);
+          shouldUseCache = true;
+        }
+      }
+      
+      // Check category cache if not searching
+      if (categoryCache[category] && !search && !shouldUseCache) {
+        console.log(`Using category cache for "${category}"`);
         setAllProducts(categoryCache[category]);
+        setIsLoading(false);
+        return;
+      }
+      
+      // If using cache and no search, we can skip API call for now
+      if (shouldUseCache && !search) {
         setIsLoading(false);
         return;
       }
@@ -86,7 +192,7 @@ export default function ProductPage() {
         url += `?${queryString}`;
       }
       
-      console.log(`Fetching from: ${url}`);
+      console.log(`Fetching products from API: ${url}`);
       
       const res = await api.get(url);
       const productsData = Array.isArray(res.data)
@@ -96,6 +202,11 @@ export default function ProductPage() {
       console.log(`Fetched ${productsData.length} products for category: ${category}`);
       
       setAllProducts(productsData);
+      
+      // Save to localStorage if fetching all products without search
+      if ((category === "All" || category === "ទាំងអស់") && !search.trim()) {
+        saveProductsToCache(productsData);
+      }
       
       // Cache the results if not searching
       if (!search.trim() && category !== "All" && category !== "ទាំងអស់") {
@@ -107,25 +218,52 @@ export default function ProductPage() {
       
     } catch (err: any) {
       console.error("Error fetching products:", err);
+      
+      // Try to use cache as fallback
+      if (isInitialLoad || (!search && category === "All")) {
+        const cachedProducts = loadProductsFromCache();
+        if (cachedProducts && cachedProducts.length > 0) {
+          console.log('Using cached products as fallback:', cachedProducts.length);
+          setAllProducts(cachedProducts);
+          setError(`Network error. Showing cached products (${cachedProducts.length} items)`);
+          setIsLoading(false);
+          return;
+        }
+      }
+      
       setError(`Failed to load products: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
   }, [categoryCache]);
 
-  // Fetch products when category or search changes
+  // Initial load: fetch all products on mount
   useEffect(() => {
     if (categories.length > 0) {
+      // Pass true for initial load to use cache if available
+      fetchProducts(t.all, "", true);
+    }
+  }, [categories.length, t.all]);
+
+  // Fetch products when category or search changes
+  useEffect(() => {
+    if (categories.length > 0 && selectedCategory !== t.all) {
       fetchProducts(selectedCategory, searchQuery);
     }
-  }, [selectedCategory, searchQuery, categories.length, fetchProducts]);
+  }, [selectedCategory, searchQuery, categories.length, fetchProducts, t.all]);
 
   // Handle category selection
   const handleCategorySelect = (category: string) => {
     console.log(`Category selected: ${category}`);
     setSelectedCategory(category);
-    // Search will be cleared when changing categories
+    // Clear search when changing categories
     setSearchQuery("");
+  };
+
+  // Handle manual refresh/retry
+  const handleRefresh = () => {
+    clearCache();
+    fetchProducts(selectedCategory, searchQuery);
   };
 
   console.log(`Current: Category="${selectedCategory}", Search="${searchQuery}", Products=${allProducts.length}`);
@@ -149,6 +287,16 @@ export default function ProductPage() {
         {/* Show loading state */}
         {isLoading ? (
           <div className="flex-1 p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Loading Products...</h2>
+              <button
+                onClick={clearCache}
+                className="text-sm text-gray-500 hover:text-gray-700"
+                title="Clear cache"
+              >
+                Clear Cache
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="animate-pulse">
@@ -168,16 +316,38 @@ export default function ProductPage() {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-gray-700">{error}</h3>
-              <button
-                onClick={() => fetchProducts(selectedCategory, searchQuery)}
-                className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-              >
-                Retry
-              </button>
+              <div className="flex gap-2 justify-center mt-4">
+                <button
+                  onClick={() => fetchProducts(selectedCategory, searchQuery)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                  Retry
+                </button>
+                <button
+                  onClick={handleRefresh}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                >
+                  Refresh Cache
+                </button>
+              </div>
             </div>
           </div>
         ) : (
           <div className="flex-1">
+            <div className="flex justify-between items-center p-2">
+              <span className="text-sm text-gray-500">
+                Showing {allProducts.length} products
+                {selectedCategory !== "All" && selectedCategory !== "ទាំងអស់" && ` in "${selectedCategory}"`}
+                {searchQuery && ` matching "${searchQuery}"`}
+              </span>
+              <button
+                onClick={handleRefresh}
+                className="text-sm text-blue-500 hover:text-blue-700"
+                title="Refresh and clear cache"
+              >
+                Refresh
+              </button>
+            </div>
             <Products 
               selectedCategory={selectedCategory} 
               searchQuery={searchQuery}
