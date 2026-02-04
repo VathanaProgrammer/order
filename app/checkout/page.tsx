@@ -646,14 +646,22 @@ const CombinedCheckoutPage = () => {
                     className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     rows={3}
                   />
-                  <input
+                  {salesUser?.role === 'salesOnline' &&<input
                     type="button"
                     readOnly
                     value={t.clickToSelectLocation}
                     onClick={() => setShowMap(true)}
                     className="p-2 border rounded-lg text-white cursor-pointer bg-blue-500 hover:bg-blue-600"
                     placeholder={t.clickToSelectLocation}
-                  />
+                  />}
+                  {salesUser?.role === 'salesOnPlace' &&<input
+                    type="button"
+                    readOnly
+                    value={t.currentLocation}
+                    onClick={handleDetectCurrentLocation}
+                    className="p-2 border rounded-lg text-white cursor-pointer bg-blue-500 hover:bg-blue-600"
+                    placeholder={t.currentLocation}
+                  />}
                 </div>
               </div>
 
@@ -740,8 +748,6 @@ const CombinedCheckoutPage = () => {
           </div>
         ))}
       </section>
-
-          {salesUser?.role === "salesOnline" && <h2>Hi</h2>}
 
       {/* Shipping Address Section */}
       <section className="flex flex-col gap-3">
