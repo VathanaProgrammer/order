@@ -5,36 +5,67 @@ import Image from "next/image";
 import { useCheckout } from "@/context/CheckOutContext";
 import { useLanguage } from "@/context/LanguageContext";
 
-// Add onAdd to the ProductProps type
+// Update the ProductProps type to accept optional cart props
 type ProductProps = {
   id: number;
   title: string;
   price: number;
   image?: string;
+  // Add these optional props for direct control
+  isInCart?: boolean;
+  cartQuantity?: number;
+  onAddToCart?: () => void;
+  onRemoveFromCart?: () => void;
+  onUpdateCartQuantity?: (quantity: number) => void;
 };
 
-const Product: React.FC<ProductProps> = ({ id, title, price, image }) => {
+const Product: React.FC<ProductProps> = ({ 
+  id, 
+  title, 
+  price, 
+  image,
+  // Optional props from Products component
+  isInCart,
+  cartQuantity,
+  onAddToCart,
+  onRemoveFromCart,
+  onUpdateCartQuantity
+}) => {
   const { cart, addToCart } = useCheckout();
   const { t } = useLanguage();
 
-  const cartItem = cart.find((item) => item.id === id);
-  const qty = cartItem?.qty || 0;
+  // Use direct props if provided, otherwise use context
+  const hasDirectControl = onAddToCart !== undefined;
+  const displayQty = hasDirectControl ? (cartQuantity || 0) : (cart.find((item) => item.id === id)?.qty || 0);
+  const displayIsInCart = hasDirectControl ? (isInCart || false) : displayQty > 0;
 
   const handleIncrement = () => {
-    const imageFile = image ? image.split("/").pop() : undefined;
-    const product = { id, title, price, image: imageFile };
-
-    // Update context
-    addToCart(product, 1);
+    if (hasDirectControl && onAddToCart) {
+      // Use direct control from Products component
+      onAddToCart();
+    } else {
+      // Use CheckoutContext
+      const imageFile = image ? image.split("/").pop() : undefined;
+      const product = { id, title, price, image: imageFile };
+      addToCart(product, 1);
+    }
   };
 
   const handleDecrement = () => {
-    if (qty === 0) return;
-    const imageFile = image ? image.split("/").pop() : undefined;
-    const product = { id, title, price, image: imageFile };
-
-    // Update context
-    addToCart(product, -1);
+    if (displayQty === 0) return;
+    
+    if (hasDirectControl) {
+      if (displayQty === 1 && onRemoveFromCart) {
+        onRemoveFromCart();
+      } else if (onUpdateCartQuantity) {
+        onUpdateCartQuantity(displayQty - 1);
+      }
+    } else {
+      // Use CheckoutContext
+      const imageFile = image ? image.split("/").pop() : undefined;
+      const product = { id, title, price, image: imageFile };
+      addToCart(product, -1);
+    }
   };
 
   const displayImage =
@@ -51,6 +82,13 @@ const Product: React.FC<ProductProps> = ({ id, title, price, image }) => {
           unoptimized
           sizes="(max-width: 768px) 100vw"
         />
+        
+        {/* In-cart badge */}
+        {displayIsInCart && (
+          <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full z-10">
+            In Cart
+          </div>
+        )}
       </div>
 
       <div className="p-3 flex flex-col flex-1">
@@ -62,7 +100,7 @@ const Product: React.FC<ProductProps> = ({ id, title, price, image }) => {
         </p>
       </div>
 
-      {qty === 0 ? (
+      {displayQty === 0 ? (
         <div className="px-3 pb-3">
           <button
             onClick={handleIncrement}
@@ -75,16 +113,16 @@ const Product: React.FC<ProductProps> = ({ id, title, price, image }) => {
         <div className="flex items-center justify-between px-3 pb-3">
           <button
             onClick={handleDecrement}
-            disabled={qty === 0}
+            disabled={displayQty === 0}
             className={`w-8 h-8 flex items-center justify-center rounded text-gray-700 ${
-              qty === 0
+              displayQty === 0
                 ? "bg-gray-100 cursor-not-allowed"
                 : "bg-gray-200 hover:bg-gray-300"
             }`}
           >
             -
           </button>
-          <span className="text-gray-800 font-semibold">{qty}</span>
+          <span className="text-gray-800 font-semibold">{displayQty}</span>
           <button
             onClick={handleIncrement}
             className="w-8 h-8 flex items-center justify-center bg-blue-600 rounded hover:bg-blue-700 text-white"
