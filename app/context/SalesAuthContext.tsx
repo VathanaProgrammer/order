@@ -48,7 +48,8 @@ const getMainRole = (roles: string[]): string => {
   
   for (const role of roles) {
     const cleanRole = role.toLowerCase().replace(/#\d+$/, '');
-    if (cleanRole.includes('sales')) return 'sales';
+    if (cleanRole.includes('sales online')) return 'salesOnline';
+    if (cleanRole.includes('sales on place')) return 'salesOnPlace';
     if (cleanRole.includes('admin')) return 'admin';
     if (cleanRole.includes('cashier')) return 'cashier';
   }
@@ -104,7 +105,7 @@ export const SalesAuthProvider: React.FC<SalesAuthProviderProps> = ({ children }
       if (response.data.success) {
         const userData = response.data.user;
         const token = response.data.token;
-        const roles = response.data.roles || 'sale';
+        const roles = response.data.roles;
 
         const salesUserData: SalesUser = {
           id: userData.id,
