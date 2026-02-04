@@ -68,6 +68,11 @@ const TopNav = () => {
     else router.push("/sign-in");
   };
 
+  const handleCustomerViewClick = () => {
+    if (user) router.push("/account/shipping-addresses");
+    else router.push("/sign-in");
+  };
+
   return (
     <section className="flex flex-col gap-1">
       <div className="flex flex-row justify-between items-center">
@@ -85,6 +90,9 @@ const TopNav = () => {
           <div onClick={handleProfileClick} className="p-1 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition">
             <Icon className="text-gray-500" icon="mdi:account" width={18} height={18} />
           </div>
+          {user?.role === "sale" && <div onClick={handleCustomerViewClick} className="p-1 flex items-center rounded-[10px] border border-gray-300 cursor-pointer hover:bg-gray-100 transition">
+            Customer
+          </div>}
         </div>
       </div>
 
