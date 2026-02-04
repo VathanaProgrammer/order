@@ -107,6 +107,67 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   const [paymentMethod, setPaymentMethod] = useState("QR");
   const userPoints = regularUser?.reward_points?.available || 0;
 
+  // Enhanced token retrieval function
+  const getAuthToken = (): string | null => {
+    if (typeof window === 'undefined') return null;
+
+    // For sales mode
+    if (isSalesMode) {
+      // Check localStorage first
+      let token = localStorage.getItem('sales_token');
+      if (token) return token;
+      
+      // Check localStorage legacy
+      token = localStorage.getItem('auth_token');
+      if (token) return token;
+      
+      // Check sessionStorage
+      token = sessionStorage.getItem('sales_token');
+      if (token) return token;
+      
+      // Check URL parameters (for OAuth redirects)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken = urlParams.get('token') || urlParams.get('access_token');
+      if (urlToken) {
+        localStorage.setItem('sales_token', urlToken);
+        // Clean URL
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+        return urlToken;
+      }
+    } 
+    // For regular users
+    else {
+      // Check localStorage first
+      let token = localStorage.getItem('auth_token');
+      if (token) return token;
+      
+      // Check localStorage legacy
+      token = localStorage.getItem('token');
+      if (token) return token;
+      
+      // Check sessionStorage
+      token = sessionStorage.getItem('auth_token');
+      if (token) return token;
+      
+      token = sessionStorage.getItem('token');
+      if (token) return token;
+      
+      // Check URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken = urlParams.get('token') || urlParams.get('access_token');
+      if (urlToken) {
+        localStorage.setItem('auth_token', urlToken);
+        // Clean URL
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+        return urlToken;
+      }
+    }
+
+    return null;
+  };
+
   // Update currentAddress phone when active user changes
   useEffect(() => {
     if (activeUser) {
@@ -388,42 +449,36 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // ==============================
-      // SIMPLIFIED TOKEN RETRIEVAL
-      // ==============================
+      // Get token using enhanced function
+      const token = getAuthToken();
       
-      // Get token based on auth mode
-      let token: string | null = null;
-      
-      if (isSalesMode) {
-        // For sales: check sales_token in localStorage
-        token = localStorage.getItem('sales_token') || 
-                localStorage.getItem('auth_token') || 
-                sessionStorage.getItem('sales_token');
-      } else {
-        // For regular users: check auth_token in localStorage (which we found)
-        token = localStorage.getItem('auth_token') || 
-                localStorage.getItem('token') || 
-                sessionStorage.getItem('auth_token') ||
-                sessionStorage.getItem('token');
-      }
-      
-      // Debug logging
-      console.log('🔍 Token lookup:', {
+      console.log('🔍 Order Placement:', {
         mode: isSalesMode ? 'sales' : 'regular',
-        found: !!token,
-        source: isSalesMode 
-          ? (localStorage.getItem('sales_token') ? 'sales_token localStorage' :
-             localStorage.getItem('auth_token') ? 'auth_token localStorage' :
-             sessionStorage.getItem('sales_token') ? 'sales_token sessionStorage' : 'none')
-          : (localStorage.getItem('auth_token') ? 'auth_token localStorage' :
-             localStorage.getItem('token') ? 'token localStorage' :
-             sessionStorage.getItem('auth_token') ? 'auth_token sessionStorage' :
-             sessionStorage.getItem('token') ? 'token sessionStorage' : 'none')
+        tokenFound: !!token,
+        tokenLength: token?.length,
+        apiUserId,
+        isSalesOrder,
+        salesUserId
       });
       
       if (!token) {
         toast.error("Authentication token missing. Please log in again.");
+        
+        // Clear storage to force re-login
+        if (isSalesMode) {
+          localStorage.removeItem('sales_token');
+          localStorage.removeItem('auth_token');
+          sessionStorage.removeItem('sales_token');
+          toast.info("Redirecting to sales login...");
+          setTimeout(() => router.push('/sales/login'), 1000);
+        } else {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('token');
+          sessionStorage.removeItem('auth_token');
+          sessionStorage.removeItem('token');
+          toast.info("Redirecting to login...");
+          setTimeout(() => router.push('/login'), 1000);
+        }
         return;
       }
 
@@ -463,22 +518,16 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
             localStorage.removeItem('sales_token');
             localStorage.removeItem('auth_token');
             sessionStorage.removeItem('sales_token');
+            toast.info("Sales session expired. Redirecting to login...");
+            setTimeout(() => router.push('/sales/login'), 1000);
           } else {
             localStorage.removeItem('auth_token');
             localStorage.removeItem('token');
             sessionStorage.removeItem('auth_token');
             sessionStorage.removeItem('token');
+            toast.info("Session expired. Redirecting to login...");
+            setTimeout(() => router.push('/login'), 1000);
           }
-          
-          toast.error("Session expired. Please log in again.");
-          
-          setTimeout(() => {
-            if (isSalesMode) {
-              router.push('/sales/login');
-            } else {
-              router.push('/login');
-            }
-          }, 2000);
           return;
         }
       }
@@ -523,15 +572,22 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     };
 
     try {
+      // Get token using the same function
+      const token = getAuthToken();
+      
+      if (!token) {
+        toast.error("Authentication token missing. Please log in again.");
+        return;
+      }
+
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-reward-order`, payload, {
         withCredentials: true,
         headers: { 
           Accept: "application/json",
-          Authorization: `Bearer ${isSalesMode 
-            ? localStorage.getItem('sales_token')
-            : localStorage.getItem('token')}`
+          Authorization: `Bearer ${token}`
         },
       });
+      
       if (res.data?.success) {
         toast.success("Reward order placed successfully!");
         setRewards([]);
