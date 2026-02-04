@@ -57,10 +57,9 @@ type CheckoutContextType = {
   paymentMethod: string;
   setPaymentMethod: (method: string) => void;
 
-  placeOrder: () => void;
-  placeRewardOrder: () => void;
+  placeOrder: () => Promise<void>;
+  placeRewardOrder: () => Promise<void>;
   
-  // New properties for sales mode
   isSalesMode: boolean;
   salespersonName: string;
   customerInfo: {
@@ -74,16 +73,14 @@ type CheckoutContextType = {
 const CheckoutContext = createContext<CheckoutContextType | undefined>(undefined);
 
 export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
-  const { user: regularUser } = useAuth();
-  const { salesUser, isSalesAuthenticated } = useSalesAuth();
+  const { user: regularUser, logout: regularLogout } = useAuth();
+  const { salesUser, isSalesAuthenticated, salesLogout } = useSalesAuth();
   const router = useRouter();
 
-  // Determine active user and mode
   const activeUser = isSalesAuthenticated ? salesUser : regularUser;
   const isSalesMode = isSalesAuthenticated;
   const salespersonName = salesUser?.name || "Sales Staff";
 
-  // Customer info state for sales mode
   const [customerInfo, setCustomerInfo] = useState({
     name: "",
     phone: "",
@@ -107,7 +104,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
   const [paymentMethod, setPaymentMethod] = useState("QR");
   const userPoints = regularUser?.reward_points?.available || 0;
 
-  // Enhanced token retrieval function
+  // Enhanced token retrieval with fallbacks
   const getAuthToken = (): string | null => {
     if (typeof window === 'undefined') return null;
 
@@ -117,20 +114,15 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       let token = localStorage.getItem('sales_token');
       if (token) return token;
       
-      // Check localStorage legacy
-      token = localStorage.getItem('auth_token');
-      if (token) return token;
-      
       // Check sessionStorage
       token = sessionStorage.getItem('sales_token');
       if (token) return token;
       
-      // Check URL parameters (for OAuth redirects)
+      // Check for any token in URL (OAuth redirect)
       const urlParams = new URLSearchParams(window.location.search);
       const urlToken = urlParams.get('token') || urlParams.get('access_token');
       if (urlToken) {
         localStorage.setItem('sales_token', urlToken);
-        // Clean URL
         const cleanUrl = window.location.pathname;
         window.history.replaceState({}, '', cleanUrl);
         return urlToken;
@@ -138,27 +130,19 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     } 
     // For regular users
     else {
-      // Check localStorage first
+      // Check localStorage
       let token = localStorage.getItem('auth_token');
-      if (token) return token;
-      
-      // Check localStorage legacy
-      token = localStorage.getItem('token');
       if (token) return token;
       
       // Check sessionStorage
       token = sessionStorage.getItem('auth_token');
       if (token) return token;
       
-      token = sessionStorage.getItem('token');
-      if (token) return token;
-      
-      // Check URL parameters
+      // Check URL
       const urlParams = new URLSearchParams(window.location.search);
       const urlToken = urlParams.get('token') || urlParams.get('access_token');
       if (urlToken) {
         localStorage.setItem('auth_token', urlToken);
-        // Clean URL
         const cleanUrl = window.location.pathname;
         window.history.replaceState({}, '', cleanUrl);
         return urlToken;
@@ -168,7 +152,50 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     return null;
   };
 
-  // Update currentAddress phone when active user changes
+  // Function to clear all tokens
+  const clearAllTokens = () => {
+    if (typeof window === 'undefined') return;
+    
+    // Clear localStorage
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('sales_token');
+    localStorage.removeItem('token');
+    
+    // Clear sessionStorage
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('sales_token');
+    sessionStorage.removeItem('token');
+    
+    // Clear cookies
+    document.cookie = 'auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    document.cookie = 'sales_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    
+    // Clear axios default headers
+    delete axios.defaults.headers.common["Authorization"];
+    
+    console.log('🧹 All tokens cleared');
+  };
+
+  // Function to handle 401 errors
+  const handleUnauthorizedError = (error: any, isSalesMode: boolean) => {
+    console.error('🔐 401 Unauthorized error:', error);
+    
+    // Clear all tokens
+    clearAllTokens();
+    
+    // Call appropriate logout
+    if (isSalesMode) {
+      if (salesLogout) salesLogout();
+      toast.error("Sales session expired. Please log in again.");
+      setTimeout(() => router.push('/sales/login'), 1000);
+    } else {
+      if (regularLogout) regularLogout();
+      toast.error("Session expired. Please log in again.");
+      setTimeout(() => router.push('/login'), 1000);
+    }
+  };
+
   useEffect(() => {
     if (activeUser) {
       const userPhone = activeUser.phone;
@@ -181,11 +208,9 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [activeUser]);
 
-  // Update customer info when selecting a saved address
   useEffect(() => {
     if (isSalesMode && selectedAddress && selectedAddress !== "current") {
       const address = selectedAddress as Address;
-      // Pre-fill customer info from saved address if available
       if (address.label && address.phone) {
         setCustomerInfo(prev => ({
           ...prev,
@@ -311,7 +336,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
-      // For sales mode, validate customer info
       if (isSalesMode) {
         if (!customerInfo.name || !customerInfo.phone) {
           toast.error("Please enter customer name and phone number");
@@ -396,7 +420,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Determine correct IDs
     let apiUserId: number;
     let salesUserId: number | undefined;
     let isSalesOrder = false;
@@ -449,48 +472,43 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Get token using enhanced function
       const token = getAuthToken();
       
-      console.log('🔍 Order Placement:', {
+      console.log('🔍 Order Placement Details:', {
         mode: isSalesMode ? 'sales' : 'regular',
         tokenFound: !!token,
         tokenLength: token?.length,
         apiUserId,
         isSalesOrder,
-        salesUserId
+        cartItems: cart.length,
+        total,
+        paymentMethod
       });
       
       if (!token) {
         toast.error("Authentication token missing. Please log in again.");
-        
-        // Clear storage to force re-login
-        if (isSalesMode) {
-          localStorage.removeItem('sales_token');
-          localStorage.removeItem('auth_token');
-          sessionStorage.removeItem('sales_token');
-          toast.info("Redirecting to sales login...");
-          setTimeout(() => router.push('/sales/login'), 1000);
-        } else {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('auth_token');
-          sessionStorage.removeItem('token');
-          toast.info("Redirecting to login...");
-          setTimeout(() => router.push('/login'), 1000);
-        }
+        clearAllTokens();
+        setTimeout(() => {
+          router.push(isSalesMode ? '/sales/login' : '/login');
+        }, 1000);
         return;
       }
 
-      // Make the API call
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-order`, payload, {
-        withCredentials: true,
-        headers: { 
+      // Create axios instance specifically for this request
+      const apiInstance = axios.create({
+        baseURL: process.env.NEXT_PUBLIC_API_URL,
+        timeout: 15000,
+        headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
+        }
       });
+
+      // Remove withCredentials for now to test if it's a cookie issue
+      // withCredentials: true,
+
+      const res = await apiInstance.post('/store-order', payload);
       
       if (res.data?.success) {
         toast.success("Order placed successfully!");
@@ -512,24 +530,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       console.error("❌ Order error:", err);
       
       if (err.response?.status === 401) {
-        if (err.response?.data?.message === 'Unauthenticated.') {
-          // Clear storage
-          if (isSalesMode) {
-            localStorage.removeItem('sales_token');
-            localStorage.removeItem('auth_token');
-            sessionStorage.removeItem('sales_token');
-            toast.info("Sales session expired. Redirecting to login...");
-            setTimeout(() => router.push('/sales/login'), 1000);
-          } else {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('auth_token');
-            sessionStorage.removeItem('token');
-            toast.info("Session expired. Redirecting to login...");
-            setTimeout(() => router.push('/login'), 1000);
-          }
-          return;
-        }
+        handleUnauthorizedError(err, isSalesMode);
+        return;
       }
       
       if (err.response?.data?.message) {
@@ -537,6 +539,8 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
       } else if (err.response?.data?.errors) {
         const errorMessages = Object.values(err.response.data.errors).flat();
         errorMessages.forEach((msg: any) => toast.error(msg));
+      } else if (err.message === 'Network Error') {
+        toast.error("Network error. Please check your internet connection.");
       } else {
         toast.error("Order failed. Please try again.");
       }
@@ -552,12 +556,9 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     
     let apiUserId: number;
     
-    // Determine correct API user ID
     if (isSalesMode && salesUser) {
-      // For sales users, use fixed ID 20
       apiUserId = 20;
     } else {
-      // For regular users
       apiUserId = regularUser?.id || 0;
     }
     
@@ -572,21 +573,27 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     };
 
     try {
-      // Get token using the same function
       const token = getAuthToken();
       
       if (!token) {
         toast.error("Authentication token missing. Please log in again.");
+        clearAllTokens();
+        setTimeout(() => {
+          router.push(isSalesMode ? '/sales/login' : '/login');
+        }, 1000);
         return;
       }
 
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/store-reward-order`, payload, {
-        withCredentials: true,
-        headers: { 
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`
-        },
+      const apiInstance = axios.create({
+        baseURL: process.env.NEXT_PUBLIC_API_URL,
+        timeout: 15000,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
+
+      const res = await apiInstance.post('/store-reward-order', payload);
       
       if (res.data?.success) {
         toast.success("Reward order placed successfully!");
@@ -595,8 +602,14 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         router.push(`/checkout/reward-success`);
       }
     } catch (err: any) {
+      console.error("❌ Reward order error:", err);
+      
+      if (err.response?.status === 401) {
+        handleUnauthorizedError(err, isSalesMode);
+        return;
+      }
+      
       toast.error("Reward order failed. Please try again.");
-      console.error(err);
     }
   };
 
@@ -612,11 +625,9 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
           const { latitude, longitude } = position.coords;
           const coordinates = { lat: latitude, lng: longitude };
 
-          // Get user's phone number
           const userPhone = activeUser?.phone;
   
           try {
-            // Get human-readable short address
             const short_address = await getShortAddress(latitude, longitude);
   
             const currentAddr: Address = {
@@ -630,7 +641,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
             setCurrentAddress(currentAddr);
             resolve(currentAddr);
           } catch (err) {
-            // Fallback if reverse geocoding fails
             const fallbackAddr: Address = {
               label: "Current Location",
               details: "Detected location",
@@ -683,7 +693,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
         setPaymentMethod,
         placeOrder,
         placeRewardOrder,
-        // New properties for sales mode
         isSalesMode,
         salespersonName,
         customerInfo,
