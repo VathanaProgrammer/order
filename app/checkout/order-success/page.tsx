@@ -208,72 +208,220 @@ const page = () => {
     }, 200);
   };
 
-  useEffect(() => {
-    const fetchOrderData = async () => {
-      if (!orderId) return;
-      try {
-        setIsLoading(true);
-        
-        // Get token based on auth type
-        let token: string | null = null;
-        const isSalesMode = user?.role === 'sale';
-        
-        if (isSalesMode) {
-          token = localStorage.getItem('sales_token') || 
-                  localStorage.getItem('auth_token') || 
-                  sessionStorage.getItem('sales_token');
-        } else {
-          token = localStorage.getItem('auth_token') || 
-                  localStorage.getItem('token') || 
-                  sessionStorage.getItem('auth_token') ||
-                  sessionStorage.getItem('token');
-        }
-        
-        if (!token) {
-          toast.error("Please log in to view order details");
-          return;
-        }
+// Add these helper functions at the TOP of your component, before the useEffect
+
+// Helper function to get cookies
+const getCookie = (name: string): string | null => {
+  if (typeof document === 'undefined') return null;
   
-        // Fetch order details
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`, {
-          withCredentials: true,
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-          }
-        });
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+};
+
+const isIOS = (): boolean => {
+  if (typeof navigator === 'undefined') return false;
+  
+  const userAgent = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  
+  return /iPad|iPhone|iPod/.test(userAgent) || 
+         /iPad|iPhone|iPod/.test(platform);
+};
+
+// Now here's the complete useEffect with all functions properly defined
+useEffect(() => {
+  const fetchOrderData = async () => {
+    if (!orderId) return;
+    try {
+      setIsLoading(true);
+      
+      // Get token - check multiple sources
+      let token: string | null = null;
+      const isSalesMode = user?.role === 'sale';
+      const tokenName = isSalesMode ? 'sales_token' : 'auth_token';
+      
+      // Check localStorage first
+      token = localStorage.getItem(tokenName) || 
+              localStorage.getItem(isSalesMode ? 'sales_token' : 'token');
+      
+      // If not in localStorage, check sessionStorage
+      if (!token) {
+        token = sessionStorage.getItem(tokenName) || 
+                sessionStorage.getItem(isSalesMode ? 'sales_token' : 'token');
+      }
+      
+      // Debug: Log token status
+      console.log('🔍 Token status:', {
+        found: !!token,
+        length: token?.length,
+        source: token ? 'storage' : 'none'
+      });
+      
+      if (!token) {
+        toast.error("Please log in to view order details");
+        return;
+      }
+
+      // Detect iOS
+      const iOSDevice = isIOS();
+      console.log('🔍 Platform detection:', { isIOS: iOSDevice, userAgent: navigator.userAgent });
+      
+      const config: any = {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      // iOS-specific handling
+      if (iOSDevice) {
+        console.log('📱 iOS device detected - using alternative cookie handling');
+        // iOS often blocks third-party cookies, so we rely on Authorization header
+        config.headers['X-Requested-With'] = 'XMLHttpRequest';
+        config.headers['X-iOS-Device'] = 'true';
         
-        console.log('🔍 Order API Response:', res.data);
+        // Try to get cookie as fallback
+        const cookieToken = getCookie(tokenName);
+        if (cookieToken && cookieToken !== token) {
+          console.log('🔍 iOS: Cookie token differs from storage token');
+          // Use whichever token is available
+          config.headers['Authorization'] = `Bearer ${cookieToken}`;
+        }
+      } else {
+        // Non-iOS: Use standard withCredentials
+        config.withCredentials = true;
+      }
+
+      // Fetch order details
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`,
+        config
+      );
+      
+      console.log('🔍 Order API Response:', res.data);
+      
+      if (res.data?.success) {
+        const orderData = res.data.data;
+        setOrderDetails(orderData);
+        generateBoxImage(orderData);
+      }
+    } catch (err: any) {
+      console.error("Error fetching order details:", err);
+      
+      // Check if it's an iOS device
+      const iOSDevice = isIOS();
+      
+      if (err.response?.status === 401 || err.response?.status === 419) {
+        if (iOSDevice) {
+          console.log('🔄 iOS authentication issue detected');
+          await handleIOSAuthError();
+        } else {
+          toast.error("Session expired. Please log in again.");
+        }
+      } else if (err.response?.status === 403) {
+        toast.error("You don't have permission to view this order");
+      } else if (err.response?.status === 404) {
+        toast.error("Order not found");
+      } else {
+        toast.error(err.response?.data?.message || "Error fetching order details");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Handle iOS authentication errors
+  const handleIOSAuthError = async () => {
+    console.log('🔄 Handling iOS authentication error');
+    
+    const isSalesMode = user?.role === 'sale';
+    const tokenName = isSalesMode ? 'sales_token' : 'auth_token';
+    
+    // Try multiple strategies for iOS
+    
+    // Strategy 1: Check URL for token (common in OAuth redirects)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token') || urlParams.get('access_token');
+    
+    if (urlToken) {
+      console.log('✅ iOS: Found token in URL');
+      localStorage.setItem(tokenName, urlToken);
+      // Clean URL
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+      // Retry
+      fetchOrderData();
+      return;
+    }
+    
+    // Strategy 2: Check if we have token but cookies aren't working
+    const storedToken = localStorage.getItem(tokenName) || sessionStorage.getItem(tokenName);
+    if (storedToken) {
+      console.log('🔄 iOS: Retrying with Authorization header only');
+      try {
+        const res = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${storedToken}`,
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+            // Explicitly NOT using withCredentials for iOS retry
+          }
+        );
         
         if (res.data?.success) {
           const orderData = res.data.data;
           setOrderDetails(orderData);
-          
-          // Log address info for debugging
-          console.log('🔍 Address info:', orderData.address_info);
-          console.log('🔍 Customer info:', orderData.customer_info);
-          
           generateBoxImage(orderData);
+          return;
         }
-      } catch (err: any) {
-        console.error("Error fetching order details:", err);
-        
-        if (err.response?.status === 401) {
-          toast.error("Session expired. Please log in again.");
-        } else if (err.response?.status === 403) {
-          toast.error("You don't have permission to view this order");
-        } else if (err.response?.status === 404) {
-          toast.error("Order not found");
-        } else {
-          toast.error(err.response?.data?.message || "Error fetching order details");
-        }
-      } finally {
-        setIsLoading(false);
+      } catch (retryErr: any) {
+        console.error('iOS retry failed:', retryErr);
       }
-    };
+    }
     
-    fetchOrderData();
-  }, [orderId, user?.role]);
+    // Strategy 3: Try with a simple fetch instead of axios
+    try {
+      console.log('🔄 iOS: Trying with fetch API');
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/online-orders/${orderId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${storedToken}`,
+            'Accept': 'application/json'
+          },
+          credentials: 'omit' // Don't send cookies
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setOrderDetails(data.data);
+          generateBoxImage(data.data);
+          return;
+        }
+      }
+    } catch (fetchErr) {
+      console.error('Fetch API also failed:', fetchErr);
+    }
+    
+    // Last resort: show login prompt
+    toast.error(
+      <div>
+        <p>iOS authentication issue detected.</p>
+        <p>Please log in again.</p>
+      </div>
+    );
+  };
+
+  fetchOrderData();
+}, [orderId, user?.role]);
 
   const handleDownload = () => {
     if (!invoiceImage) return;
