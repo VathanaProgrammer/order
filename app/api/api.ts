@@ -70,10 +70,9 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// In your api.ts file, update the response interceptor:
 api.interceptors.response.use(
   (response) => {
-    // Only save the token if we are on the login or register page
-    // This prevents the "user" endpoint from accidentally re-saving a zombie token
     const isAuthPath = response.config.url?.includes('login') || response.config.url?.includes('register');
     
     if (isAuthPath && response.data?.token) {
@@ -82,11 +81,11 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    // 🔐 FIX 3: Don't clear token if it's a network error (status undefined)
-    // Only clear if the server explicitly says 401
-    if (error.response?.status === 401 && !error.config?.url?.includes('login')) {
-      console.warn('401 → clearing token');
-      updateToken(null);
+    // DON'T clear token automatically - let the calling code handle it
+    // This prevents the global interceptor from interfering with specific flows
+    if (error.response?.status === 401) {
+      console.warn('401 detected - letting calling code handle');
+      // Don't clear token here - let CheckoutContext handle it
     }
     return Promise.reject(error);
   }

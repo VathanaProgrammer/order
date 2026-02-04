@@ -1,1054 +1,711 @@
 "use client";
-
-import React, { useState, useEffect, useMemo } from "react";
-import Header from "@/components/layouts/Header";
-import { GoogleMap, Marker } from "@react-google-maps/api";
-import { useCheckout, Address as ContextAddress } from "@/context/CheckOutContext";
+import { createContext, useContext, ReactNode, useState, useEffect } from "react";
+import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
-import { useLoading } from "@/context/LoadingContext";
-import api from "@/api/api";
+import { useSalesAuth } from "@/context/SalesAuthContext";
 import { toast } from "react-toastify";
-import { useLanguage } from "@/context/LanguageContext";
+import { getShortAddress } from "@/context/utils/geocode";
 import { useRouter } from "next/navigation";
 
-// Define the API Address type
-type APIAddress = {
+export type CartItem = {
+  id: number;
+  title: string;
+  price: number;
+  image?: string;
+  qty: number;
+};
+
+export type RewardItem = {
+  product_id: number;
+  name: string;
+  points_at_reward: number;
+  qty: number;
+  image?: string;
+};
+
+export type Address = {
   id?: number;
-  api_user_id: number | undefined;
-  label: string;
-  phone?: string;
+  label: any;
   details?: string;
+  phone?: string;
   coordinates?: { lat: number; lng: number };
+  short_address?: string;
+  customer_name?: string;
+  customer_email?: string;
+  customer_company?: string;
 };
 
-// Extended type that includes both context and API properties
-type ExtendedAddress = ContextAddress & {
-  api_user_id?: number;
+type CheckoutContextType = {
+  cart: CartItem[];
+  total: number;
+  addToCart: (product: Omit<CartItem, "qty">, deltaQty: number) => void;
+  updateItemQty: (id: number, qty: number) => void;
+  removeItem: (id: number) => void;
+
+  rewards: RewardItem[];
+  totalPoints: number;
+  addReward: (reward: Omit<RewardItem, "qty">, deltaQty: number) => void;
+  updateRewardQty: (product_id: number, qty: number) => void;
+  removeReward: (product_id: number) => void;
+
+  selectedAddress: Address | "current" | null;
+  setSelectedAddress: (addr: Address | "current") => void;
+  currentAddress: Address;
+  setCurrentAddress: (addr: Address) => void;
+  detectCurrentLocation: () => Promise<Address>;
+
+  paymentMethod: string;
+  setPaymentMethod: (method: string) => void;
+
+  placeOrder: () => Promise<void>;
+  placeRewardOrder: () => Promise<void>;
+  
+  isSalesMode: boolean;
+  salespersonName: string;
+  customerInfo: {
+    name: string;
+    phone: string;
+    email: string;
+  };
+  setCustomerInfo: (info: { name: string; phone: string; email: string }) => void;
 };
 
-const containerStyle = { width: "100%", height: "400px" };
+const CheckoutContext = createContext<CheckoutContextType | undefined>(undefined);
 
-// Pagination configuration
-const ITEMS_PER_PAGE = 5;
-
-const CombinedCheckoutPage = () => {
-  const { user, setUser } = useAuth();
+export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
+  const { user: regularUser, logout: regularLogout } = useAuth();
+  const { salesUser, isSalesAuthenticated, salesLogout } = useSalesAuth();
   const router = useRouter();
-  const {
-    cart,
-    total,
-    updateItemQty,
-    selectedAddress,
-    currentAddress,
-    setSelectedAddress,
-    setCurrentAddress,
-    detectCurrentLocation,
-    paymentMethod,
-    setPaymentMethod,
-    placeOrder,
-  } = useCheckout();
 
-  const { setLoading } = useLoading();
+  const activeUser = isSalesAuthenticated ? salesUser : regularUser;
+  const isSalesMode = isSalesAuthenticated;
+  const salespersonName = salesUser?.name || "Sales Staff";
 
-  const [savedAddresses, setSavedAddresses] = useState<ExtendedAddress[]>([]);
-  const [isAdding, setIsAdding] = useState(false);
-  const [showMap, setShowMap] = useState(false);
-  const [tempAddress, setTempAddress] = useState<Partial<APIAddress>>({
-    label: "",
+  const [customerInfo, setCustomerInfo] = useState({
+    name: "",
     phone: "",
-    details: "",
-    coordinates: { lat: 11.567, lng: 104.928 },
-    api_user_id: user?.id,
+    email: ""
   });
 
-  const [showQRPopup, setShowQRPopup] = useState(false);
-  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const { t } = useLanguage();
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [total, setTotal] = useState(0);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(ITEMS_PER_PAGE);
+  const [rewards, setRewards] = useState<RewardItem[]>([]);
+  const [totalPoints, setTotalPoints] = useState(0);
 
-  // State to control when to show search results
-  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<Address | "current" | null>(null);
+  const [currentAddress, setCurrentAddress] = useState<Address>({
+    label: "Current Location",
+    details: "",
+    phone: activeUser?.phone || "",
+    coordinates: { lat: 0, lng: 0 },
+  });
 
-  const paymentMethods = [
-    { name: t.QR, image: "/qr.jpg" },
-    { name: t.cash, image: "/cash.jpg" },
-  ];
+  const [paymentMethod, setPaymentMethod] = useState("QR");
+  const userPoints = regularUser?.reward_points?.available || 0;
 
-  const IMAGE_URL = process.env.NEXT_PUBLIC_IMAGE_URL!;
+  // Enhanced token retrieval with fallbacks
+  const getAuthToken = (): string | null => {
+    if (typeof window === 'undefined') return null;
 
-  const currentSelectedAddress = selectedAddress === "current" ? currentAddress : selectedAddress;
-
-  // Filter saved addresses based on search query
-  const filteredAddresses = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return [];
-    }
-
-    const query = searchQuery.toLowerCase().trim();
-    return savedAddresses.filter(address => {
-      const labelMatch = address.label?.toLowerCase().includes(query) || false;
-      const phoneMatch = address.phone?.toLowerCase().includes(query) || false;
-      const detailsMatch = address.details?.toLowerCase().includes(query) || false;
-
-      return labelMatch || phoneMatch || detailsMatch;
-    });
-  }, [savedAddresses, searchQuery]);
-
-  // Determine if search query starts with a number (phone) or not (name)
-  const isLikelyPhoneNumber = useMemo(() => {
-    if (!searchQuery.trim()) return false;
-    const firstChar = searchQuery.trim().charAt(0);
-    // Check if first character is a digit (0-9)
-    return /^\d/.test(firstChar);
-  }, [searchQuery]);
-
-  // Calculate pagination data
-  const paginatedAddresses = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredAddresses.slice(startIndex, endIndex);
-  }, [filteredAddresses, currentPage, itemsPerPage]);
-
-  const totalPages = Math.ceil(filteredAddresses.length / itemsPerPage);
-
-  // Fetch saved addresses
-  useEffect(() => {
-    const fetchSavedAddresses = async () => {
-      setLoading(true);
-      try {
-        const res = await api.get("/addresses/all");
-        const addresses: ExtendedAddress[] = res.data?.data.map((addr: any) => ({
-          ...addr,
-        })) || [];
-        setSavedAddresses(addresses);
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load addresses");
-      } finally {
-        setLoading(false);
+    // For sales mode
+    if (isSalesMode) {
+      // Check localStorage first
+      let token = localStorage.getItem('sales_token');
+      if (token) return token;
+      
+      // Check sessionStorage
+      token = sessionStorage.getItem('sales_token');
+      if (token) return token;
+      
+      // Check for any token in URL (OAuth redirect)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken = urlParams.get('token') || urlParams.get('access_token');
+      if (urlToken) {
+        localStorage.setItem('sales_token', urlToken);
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+        return urlToken;
       }
-    };
-    if (user) {
-      fetchSavedAddresses();
-    }
-  }, [setLoading, user]);
-
-  // Update tempAddress when user changes
-  useEffect(() => {
-    if (user && !tempAddress.api_user_id) {
-      setTempAddress((prev) => ({
-        ...prev,
-        api_user_id: user.id,
-        phone: user?.role === "sale" ? "" : getPhoneFromUser(user) || "",
-      }));
-    }
-  }, [user]);
-
-  // Update form fields in real-time as user types in search
-  useEffect(() => {
-    if (searchQuery.trim() && user?.role === "sale") {
-      // If it starts with a number → phone number field
-      if (isLikelyPhoneNumber) {
-        setTempAddress(prev => ({
-          ...prev,
-          phone: searchQuery.trim(),
-          // Don't clear label if user already typed something there
-          label: prev.label || ""
-        }));
-      } else {
-        // If it starts with letter or other character → name field
-        setTempAddress(prev => ({
-          ...prev,
-          label: searchQuery.trim(),
-          // Don't clear phone if user already typed something there
-          phone: prev.phone || ""
-        }));
+    } 
+    // For regular users
+    else {
+      // Check localStorage
+      let token = localStorage.getItem('auth_token');
+      if (token) return token;
+      
+      // Check sessionStorage
+      token = sessionStorage.getItem('auth_token');
+      if (token) return token;
+      
+      // Check URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken = urlParams.get('token') || urlParams.get('access_token');
+      if (urlToken) {
+        localStorage.setItem('auth_token', urlToken);
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+        return urlToken;
       }
     }
-  }, [searchQuery, isLikelyPhoneNumber, user?.role]);
-
-  // Clear form fields when form disappears
-  useEffect(() => {
-    if (!isAdding && !searchQuery.trim() && user?.role === "sale") {
-      setTempAddress({
-        label: "",
-        phone: user?.role === "sale" ? "" : getPhoneFromUser(user) || "",
-        details: "",
-        coordinates: { lat: 11.567, lng: 104.928 },
-        api_user_id: user?.id,
-      });
-    }
-  }, [isAdding, searchQuery, user]);
-
-  // Helper to extract phone from user object
-  const getPhoneFromUser = (userData: any): string | null => {
-    if (!userData) return null;
-
-    if (userData.phone && userData.phone.trim()) return userData.phone.trim();
-    if (userData.mobile && userData.mobile.trim()) return userData.mobile.trim();
-    if (userData.contact?.mobile && userData.contact.mobile.trim()) return userData.contact.mobile.trim();
-    if (userData.contact?.phone && userData.contact.phone.trim()) return userData.contact.phone.trim();
 
     return null;
   };
 
-  const userPhone = getPhoneFromUser(user);
-
-  const handleDetectCurrentLocation = async () => {
-    setIsDetectingLocation(true);
-    try {
-      await detectCurrentLocation();
-      setSelectedAddress("current");
-      toast.success("Current location detected!");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to detect location");
-    } finally {
-      setIsDetectingLocation(false);
-    }
-  };
-
-  const handleSelectSavedAddress = (addr: ExtendedAddress) => {
-    setSelectedAddress(addr);
-    setIsAdding(false);
-    // Keep search query to show selected customer
-    setShowSearchResults(true);
-  };
-
-  const handleMapClick = (e: google.maps.MapMouseEvent) => {
-    if (e.latLng) {
-      setTempAddress({
-        ...tempAddress,
-        coordinates: { lat: e.latLng.lat(), lng: e.latLng.lng() },
-      });
-    }
-  };
-
-  const handleMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
-    if (e.latLng) {
-      setTempAddress({
-        ...tempAddress,
-        coordinates: { lat: e.latLng.lat(), lng: e.latLng.lng() },
-      });
-    }
-  };
-
-  // Handle search input change
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchQuery(value);
+  // Function to clear all tokens
+  const clearAllTokens = () => {
+    if (typeof window === 'undefined') return;
     
-    // Show search results when user starts typing
-    if (value.trim()) {
-      setShowSearchResults(true);
-      setIsAdding(true); // Always show form when searching
+    // Clear localStorage
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('sales_token');
+    localStorage.removeItem('token');
+    
+    // Clear sessionStorage
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('sales_token');
+    sessionStorage.removeItem('token');
+    
+    // Clear cookies
+    document.cookie = 'auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    document.cookie = 'sales_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    
+    // Clear axios default headers
+    delete axios.defaults.headers.common["Authorization"];
+    
+    console.log('🧹 All tokens cleared');
+  };
+
+  // Function to handle 401 errors
+  const handleUnauthorizedError = (error: any, isSalesMode: boolean) => {
+    console.error('🔐 401 Unauthorized error:', error);
+    
+    // Clear all tokens
+    clearAllTokens();
+    
+    // Call appropriate logout
+    if (isSalesMode) {
+      if (salesLogout) salesLogout();
+      toast.error("Sales session expired. Please log in again.");
+      setTimeout(() => router.push('/sales/login'), 1000);
     } else {
-      setShowSearchResults(false);
-      setIsAdding(false);
+      if (regularLogout) regularLogout();
+      toast.error("Session expired. Please log in again.");
+      setTimeout(() => router.push('/login'), 1000);
     }
   };
 
-  // Save new address - label is customer name for sales, address label for regular users
-  const handleSaveNewAddress = async () => {
-    // Validate label (customer name for sales, address label for regular users)
-    if (!tempAddress.label?.trim()) {
-      toast.error(
-        user?.role === "sale"
-          ? "Please enter customer name"
-          : "Please enter a name/label for the address"
-      );
-      return;
-    }
-
-    // Validate phone
-    if (user?.role === "sale") {
-      if (!tempAddress.phone?.trim()) {
-        toast.error("Please enter customer phone number");
-        return;
-      }
-    } else {
-      if (!userPhone?.trim()) {
-        toast.error("Please add your phone number in account settings");
-        return;
+  useEffect(() => {
+    if (activeUser) {
+      const userPhone = activeUser.phone;
+      if (userPhone && userPhone !== currentAddress.phone) {
+        setCurrentAddress(prev => ({
+          ...prev,
+          phone: userPhone
+        }));
       }
     }
+  }, [activeUser]);
 
-    // Validate address details
-    if (!tempAddress.details?.trim()) {
-      toast.error("Please enter address details");
-      return;
+  useEffect(() => {
+    if (isSalesMode && selectedAddress && selectedAddress !== "current") {
+      const address = selectedAddress as Address;
+      if (address.label && address.phone) {
+        setCustomerInfo(prev => ({
+          ...prev,
+          name: address.label || prev.name,
+          phone: address.phone || prev.phone
+        }));
+      }
     }
+  }, [selectedAddress, isSalesMode]);
 
-    if (!tempAddress.coordinates) {
-      toast.error("Please select a location on the map");
-      return;
-    }
+  const recalcTotal = (items: CartItem[]) => items.reduce((sum, i) => sum + i.price * i.qty, 0);
+  const recalcTotalPoints = (items: RewardItem[]) => items.reduce((sum, i) => sum + i.points_at_reward * i.qty, 0);
 
-    // Determine phone number to use
-    const finalPhone = user?.role === "sale"
-      ? (tempAddress.phone || "").trim()
-      : userPhone?.trim();
+  // --- CART METHODS ---
+  const addToCart = (product: Omit<CartItem, "qty">, deltaQty: number) => {
+    setCart(prev => {
+      const idx = prev.findIndex(i => i.id === product.id);
+      if (idx === -1 && deltaQty > 0) {
+        const newItems = [...prev, { ...product, qty: deltaQty }];
+        setTotal(recalcTotal(newItems));
+        return newItems;
+      }
+      if (idx === -1) return prev;
 
-    if (!finalPhone) {
-      toast.error(
-        user?.role === "sale"
-          ? "Please enter customer's phone number"
-          : "Please add your phone number in account settings"
-      );
-      return;
-    }
-
-    if (!tempAddress.api_user_id) {
-      toast.error("User not authenticated");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      // Prepare address data
-      const addressData: APIAddress = {
-        label: (tempAddress.label || "").trim(),
-        phone: finalPhone,
-        details: (tempAddress.details || "").trim(),
-        coordinates: tempAddress.coordinates,
-        api_user_id: tempAddress.api_user_id,
-      };
-
-      console.log("Saving address:", addressData);
-
-      const res = await api.post("/addresses", addressData);
-      const apiResponse = res.data?.data;
-
-      const newAddress: ExtendedAddress = {
-        ...apiResponse,
-        id: apiResponse.id,
-        label: apiResponse.label,
-        phone: apiResponse.phone,
-        details: apiResponse.details,
-        coordinates: apiResponse.coordinates,
-        api_user_id: apiResponse.api_user_id,
-      };
-
-      setSavedAddresses((prev) => [...prev, newAddress]);
-      setSelectedAddress(newAddress);
-      setIsAdding(false);
-      setSearchQuery(newAddress.label || ""); // Set search query to the new customer name
-      setShowSearchResults(true);
-      setCurrentPage(1);
-
-      // Reset form fields after successful save
-      setTempAddress({
-        label: "",
-        phone: user?.role === "sale" ? "" : userPhone || "",
-        details: "",
-        coordinates: { lat: 11.567, lng: 104.928 },
-        api_user_id: user?.id,
-      });
-
-      toast.success("Address saved successfully");
-    } catch (err: any) {
-      console.error("Save address error:", err);
-      toast.error(err.response?.data?.message || "Failed to save address");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePaymentMethodSelect = (methodName: string) => {
-    setPaymentMethod(methodName);
-    if (methodName === "QR") {
-      setShowQRPopup(true);
-    }
-  };
-
-  const handleDownloadQR = () => {
-    try {
-      const link = document.createElement("a");
-      link.download = "payment-qr-code.png";
-      link.href = "/qr.jpg";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success("QR code downloaded");
-    } catch (error) {
-      toast.error("Failed to download QR code");
-    }
-  };
-
-  // Pagination handlers
-  const goToPage = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
-  };
-
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const goToPreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = parseInt(e.target.value);
-    setItemsPerPage(value);
-    setCurrentPage(1);
-  };
-
-  // Handle adding new customer for sales
-  const handleAddNewCustomer = () => {
-    setIsAdding(true);
-    setSearchQuery("");
-    setShowSearchResults(false);
-    setTempAddress({
-      label: "",
-      phone: "",
-      details: "",
-      coordinates: { lat: 11.567, lng: 104.928 },
-      api_user_id: user?.id,
+      const existing = prev[idx];
+      const newQty = existing.qty + deltaQty;
+      if (newQty <= 0) {
+        const newItems = prev.filter(i => i.id !== product.id);
+        setTotal(recalcTotal(newItems));
+        return newItems;
+      }
+      const updated = { ...existing, qty: newQty };
+      const newItems = [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
+      setTotal(recalcTotal(newItems));
+      return newItems;
     });
   };
 
-  // Clear search and reset form
-  const handleClearSearch = () => {
-    setSearchQuery("");
-    setShowSearchResults(false);
-    setIsAdding(false);
-    setSelectedAddress('current');
-    setTempAddress({
-      label: "",
-      phone: user?.role === "sale" ? "" : userPhone || "",
-      details: "",
-      coordinates: { lat: 11.567, lng: 104.928 },
-      api_user_id: user?.id,
+  const updateItemQty = (id: number, qty: number) => {
+    setCart(prev => {
+      const idx = prev.findIndex(i => i.id === id);
+      if (idx === -1) return prev;
+      if (qty <= 0) {
+        const newItems = prev.filter(i => i.id !== id);
+        setTotal(recalcTotal(newItems));
+        return newItems;
+      }
+      const updated = { ...prev[idx], qty };
+      const newItems = [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
+      setTotal(recalcTotal(newItems));
+      return newItems;
+    });
+  };
+
+  const removeItem = (id: number) => {
+    setCart(prev => {
+      const newItems = prev.filter(i => i.id !== id);
+      setTotal(recalcTotal(newItems));
+      return newItems;
+    });
+  };
+
+  // --- REWARD METHODS ---
+  const addReward = (reward: Omit<RewardItem, "qty">, deltaQty: number) => {
+    setRewards(prev => {
+      const idx = prev.findIndex(r => r.product_id === reward.product_id);
+      const existingQty = idx === -1 ? 0 : prev[idx].qty;
+      const newQty = existingQty + deltaQty;
+
+      const newTotalPoints = prev.reduce((sum, r, i) => {
+        if (i === idx) return sum + newQty * reward.points_at_reward;
+        return sum + r.qty * r.points_at_reward;
+      }, 0) + (idx === -1 ? deltaQty * reward.points_at_reward : 0);
+
+      if (newTotalPoints > userPoints) {
+        setTimeout(() => {
+          toast.error("You don't have enough reward points!", { autoClose: 2000 });
+        }, 0);
+        return prev;
+      }
+
+      if (idx === -1 && deltaQty > 0) return [...prev, { ...reward, qty: deltaQty }];
+      if (newQty <= 0) return prev.filter(r => r.product_id !== reward.product_id);
+
+      const updated = { ...prev[idx], qty: newQty };
+      return [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
+    });
+  };
+
+  const updateRewardQty = (product_id: number, qty: number) => {
+    setRewards(prev => {
+      const idx = prev.findIndex(r => r.product_id === product_id);
+      if (idx === -1) return prev;
+      if (qty <= 0) {
+        const newItems = prev.filter(r => r.product_id !== product_id);
+        setTotalPoints(recalcTotalPoints(newItems));
+        return newItems;
+      }
+      const updated = { ...prev[idx], qty };
+      const newItems = [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
+      setTotalPoints(recalcTotalPoints(newItems));
+      return newItems;
+    });
+  };
+
+  const removeReward = (product_id: number) => {
+    setRewards(prev => {
+      const newItems = prev.filter(r => r.product_id !== product_id);
+      setTotalPoints(recalcTotalPoints(newItems));
+      return newItems;
+    });
+  };
+
+  // --- PLACE ORDER ---
+  const placeOrder = async () => {
+    let addressToSend: Address | null = null;
+    let customerName = "";
+    let customerPhone = "";
+    
+    if (selectedAddress === "current") {
+      if (!currentAddress.coordinates) {
+        toast.error("Current address coordinates not set!");
+        return;
+      }
+      
+      if (isSalesMode) {
+        if (!customerInfo.name || !customerInfo.phone) {
+          toast.error("Please enter customer name and phone number");
+          return;
+        }
+        
+        customerName = customerInfo.name;
+        customerPhone = customerInfo.phone;
+        
+        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
+        addressToSend = { 
+          ...currentAddress, 
+          short_address,
+          phone: customerPhone,
+          label: customerName,
+          details: `Customer address: ${short_address}`,
+        };
+      } else {
+        const userPhone = regularUser?.mobile || regularUser?.phone || "";
+        
+        if (!userPhone) {
+          toast.error("Please add your phone number in your account settings");
+          return;
+        }
+        
+        customerName = regularUser?.name || "Customer";
+        customerPhone = userPhone;
+        
+        const short_address = await getShortAddress(currentAddress.coordinates.lat, currentAddress.coordinates.lng);
+        addressToSend = { 
+          ...currentAddress, 
+          short_address,
+          phone: customerPhone,
+          label: customerName,
+        };
+      }
+    } else {
+      addressToSend = selectedAddress as Address;
+      
+      if (!addressToSend) {
+        toast.error("Please select an address!");
+        return;
+      }
+      
+      if (isSalesMode) {
+        if (addressToSend.label && addressToSend.phone) {
+          customerName = addressToSend.label;
+          customerPhone = addressToSend.phone;
+        } else {
+          if (!customerInfo.name || !customerInfo.phone) {
+            toast.error("Please enter customer name and phone number");
+            return;
+          }
+          customerName = customerInfo.name;
+          customerPhone = customerInfo.phone;
+          
+          addressToSend.phone = customerPhone;
+          addressToSend.label = customerName;
+        }
+      } else {
+        customerName = regularUser?.name || addressToSend.label || "Customer";
+        customerPhone = addressToSend.phone || regularUser?.mobile || regularUser?.phone || "";
+        
+        if (!customerPhone) {
+          toast.error("Saved address must have a phone number. Please update your address.");
+          return;
+        }
+        
+        if (!addressToSend.phone) {
+          addressToSend.phone = customerPhone;
+        }
+      }
+    }
+
+    if (!addressToSend || cart.length === 0) {
+      toast.error("Cart is empty or no address selected!");
+      return;
+    }
+
+    if (!addressToSend.phone) {
+      toast.error("Phone number is required for delivery");
+      return;
+    }
+
+    let apiUserId: number;
+    let salesUserId: number | undefined;
+    let isSalesOrder = false;
+    
+    if (isSalesMode && salesUser) {
+      isSalesOrder = true;
+      salesUserId = salesUser.id;
+      apiUserId = 20;
+    } else if (regularUser) {
+      apiUserId = regularUser.id;
+      salesUserId = undefined;
+      isSalesOrder = false;
+    } else {
+      toast.error("You must be logged in to place an order!");
+      return;
+    }
+
+    const payload: any = {
+      api_user_id: apiUserId,
+      saved_address_id: selectedAddress !== "current" ? addressToSend.id : undefined,
+      address: selectedAddress === "current" ? addressToSend : undefined,
+      address_type: selectedAddress === "current" ? "current" : "saved",
+      paymentMethod,
+      total_qty: cart.reduce((sum, i) => sum + i.qty, 0),
+      total,
+      items: cart.map(i => ({
+        product_id: i.id,
+        qty: i.qty,
+        price_at_order: i.price,
+        total_line: Number((i.price * i.qty).toFixed(2)),
+        image_url: (i.image ?? "").split("/").pop(),
+      })),
+    };
+
+    if (isSalesOrder) {
+      if (!customerName || !customerPhone) {
+        toast.error("For sales orders, please enter customer name and phone");
+        return;
+      }
+      
+      payload.customer_info = {
+        name: customerName,
+        phone: customerPhone,
+        email: customerInfo.email || undefined,
+      };
+      
+      payload.sales_user_id = salesUserId;
+      payload.sales_person_name = salespersonName;
+      payload.is_sales_order = true;
+    }
+
+    try {
+      const token = getAuthToken();
+      
+      console.log('🔍 Order Placement Details:', {
+        mode: isSalesMode ? 'sales' : 'regular',
+        tokenFound: !!token,
+        tokenLength: token?.length,
+        apiUserId,
+        isSalesOrder,
+        cartItems: cart.length,
+        total,
+        paymentMethod
+      });
+      
+      if (!token) {
+        toast.error("Authentication token missing. Please log in again.");
+        clearAllTokens();
+        setTimeout(() => {
+          router.push(isSalesMode ? '/sales/login' : '/login');
+        }, 1000);
+        return;
+      }
+
+      // Create axios instance specifically for this request
+      const apiInstance = axios.create({
+        baseURL: process.env.NEXT_PUBLIC_API_URL,
+        timeout: 15000,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      // Remove withCredentials for now to test if it's a cookie issue
+      // withCredentials: true,
+
+      const res = await apiInstance.post('/store-order', payload);
+      
+      if (res.data?.success) {
+        toast.success("Order placed successfully!");
+        
+        if (isSalesOrder) {
+          toast.info(`Customer: ${customerName}, Phone: ${customerPhone}`);
+          if (res.data.salesperson_info?.name) {
+            toast.info(`Salesperson: ${res.data.salesperson_info.name}`);
+          }
+        }
+        
+        setCart([]);
+        setTotal(0);
+        setCustomerInfo({ name: "", phone: "", email: "" });
+        
+        router.push(`/checkout/order-success?telegram=${encodeURIComponent(res.data.telegram_start_link)}&order_id=${res.data.order_id}`);
+      }
+    } catch (err: any) {
+      console.error("❌ Order error:", err);
+      
+      if (err.response?.status === 401) {
+        handleUnauthorizedError(err, isSalesMode);
+        return;
+      }
+      
+      if (err.response?.data?.message) {
+        toast.error(err.response.data.message);
+      } else if (err.response?.data?.errors) {
+        const errorMessages = Object.values(err.response.data.errors).flat();
+        errorMessages.forEach((msg: any) => toast.error(msg));
+      } else if (err.message === 'Network Error') {
+        toast.error("Network error. Please check your internet connection.");
+      } else {
+        toast.error("Order failed. Please try again.");
+      }
+    }
+  };
+
+  // --- PLACE REWARD ORDER ---
+  const placeRewardOrder = async () => {
+    if (rewards.length === 0) {
+      toast.error("No reward products selected!");
+      return;
+    }
+    
+    let apiUserId: number;
+    
+    if (isSalesMode && salesUser) {
+      apiUserId = 20;
+    } else {
+      apiUserId = regularUser?.id || 0;
+    }
+    
+    const payload = {
+      api_user_id: apiUserId,
+      total_points: totalPoints,
+      items: rewards.map(r => ({
+        product_id: r.product_id,
+        qty: r.qty,
+        points_at_reward: r.points_at_reward,
+      })),
+    };
+
+    try {
+      const token = getAuthToken();
+      
+      if (!token) {
+        toast.error("Authentication token missing. Please log in again.");
+        clearAllTokens();
+        setTimeout(() => {
+          router.push(isSalesMode ? '/sales/login' : '/login');
+        }, 1000);
+        return;
+      }
+
+      const apiInstance = axios.create({
+        baseURL: process.env.NEXT_PUBLIC_API_URL,
+        timeout: 15000,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const res = await apiInstance.post('/store-reward-order', payload);
+      
+      if (res.data?.success) {
+        toast.success("Reward order placed successfully!");
+        setRewards([]);
+        setTotalPoints(0);
+        router.push(`/checkout/reward-success`);
+      }
+    } catch (err: any) {
+      console.error("❌ Reward order error:", err);
+      
+      if (err.response?.status === 401) {
+        handleUnauthorizedError(err, isSalesMode);
+        return;
+      }
+      
+      toast.error("Reward order failed. Please try again.");
+    }
+  };
+
+  const detectCurrentLocation = async () => {
+    return new Promise<Address>((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported by your browser"));
+        return;
+      }
+  
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          const coordinates = { lat: latitude, lng: longitude };
+
+          const userPhone = activeUser?.phone;
+  
+          try {
+            const short_address = await getShortAddress(latitude, longitude);
+  
+            const currentAddr: Address = {
+              label: activeUser?.name || "Current Location",
+              details: short_address || "Your current position",
+              phone: userPhone || "",
+              coordinates,
+              short_address,
+            };
+  
+            setCurrentAddress(currentAddr);
+            resolve(currentAddr);
+          } catch (err) {
+            const fallbackAddr: Address = {
+              label: "Current Location",
+              details: "Detected location",
+              phone: userPhone || "",
+              coordinates,
+            };
+            setCurrentAddress(fallbackAddr);
+            resolve(fallbackAddr);
+          }
+        },
+        (error) => {
+          let message = "Unable to retrieve your location";
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              message = "Location access denied. Please enable it in browser settings.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              message = "Location information unavailable.";
+              break;
+            case error.TIMEOUT:
+              message = "Location request timed out.";
+              break;
+          }
+          reject(new Error(message));
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      );
     });
   };
 
   return (
-    <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar pb-24">
-      <Header title={t.checkout} />
-
-      {/* Order Summary */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-2xl font-semibold text-gray-800">{t.orderSummary}</h2>
-        {cart.length === 0 && <p>{t.yourCartIsEmpty}</p>}
-
-        {cart.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center justify-between border-b border-gray-300 p-3 gap-3"
-          >
-            <img
-              src={item.image && item.image.trim() ? IMAGE_URL + item.image : "https://syspro.asia/img/default.png"}
-              alt={item.title}
-              className="w-16 h-16 object-cover rounded"
-            />
-            <div className="flex-1">
-              <p className="font-medium">{item.title}</p>
-              <p className="text-gray-600">
-                ${item.price.toFixed(2)} × {item.qty} = ${(item.price * item.qty).toFixed(2)}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => updateItemQty(item.id, Math.max(1, item.qty - 1))}
-                className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              >
-                -
-              </button>
-              <span className="w-6 text-center">{item.qty}</span>
-              <button
-                onClick={() => updateItemQty(item.id, item.qty + 1)}
-                className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              >
-                +
-              </button>
-            </div>
-          </div>
-        ))}
-      </section>
-
-      {/* Shipping Address Section */}
-      <section className="flex flex-col gap-3">
-        {user?.role !== "sale" && <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>}
-
-        {/* Current Location */}
-        {user?.role !== "sale" && (
-          <div
-            onClick={handleDetectCurrentLocation}
-            className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${selectedAddress === "current" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
-              } ${isDetectingLocation ? "opacity-70" : ""}`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-blue-500 text-xl">📍</span>
-              <div>
-                <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
-                <p className="text-sm text-gray-500">
-                  {isDetectingLocation
-                    ? t.detectingYourCurrentLocation
-                    : currentAddress
-                      ? t.clickToUseYourCurrentLocation
-                      : t.clickToDetectYourCurrentLocation}
-                </p>
-              </div>
-            </div>
-            {isDetectingLocation && (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-            )}
-          </div>
-        )}
-
-        {/* Regular Users: Saved Addresses List */}
-        {user?.role !== "sale" && !isAdding && savedAddresses.length > 0 && (
-          <div className="flex flex-col gap-3">
-            {savedAddresses.map((addr) => (
-              <div
-                key={addr.id}
-                onClick={() => setSelectedAddress(addr)}
-                className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${
-                  selectedAddress && typeof selectedAddress !== 'string' && (selectedAddress as ExtendedAddress).id === addr.id
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-400 text-xl">🏠</span>
-                  <div>
-                    <p className="font-semibold">{addr.label}</p>
-                    <p className="text-sm text-gray-600">{addr.details}</p>
-                    <p className="text-xs text-gray-500 mt-1">{addr.phone}</p>
-                  </div>
-                </div>
-                {selectedAddress && typeof selectedAddress !== 'string' && (selectedAddress as ExtendedAddress).id === addr.id && (
-                  <span className="text-blue-500 font-bold">✓</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Sales Mode: Search and Customer Management */}
-        {user?.role === "sale" && (
-          <div className="space-y-3">
-            {/* Search Bar */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search customer by name or phone number..."
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <div className="absolute left-3 top-3 text-gray-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              {searchQuery && (
-                <button
-                  onClick={handleClearSearch}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
-
-            {/* Selected Customer Display */}
-            {selectedAddress && typeof selectedAddress !== 'string' && (
-              <div className="p-4 border border-green-300 bg-green-50 rounded-xl">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-semibold text-gray-800 mb-2">Selected Customer:</h3>
-                    <div className="space-y-1">
-                      <p className="font-medium text-gray-900">{(selectedAddress as ExtendedAddress).label}</p>
-                      <p className="text-sm text-gray-600">Phone: {(selectedAddress as ExtendedAddress).phone}</p>
-                      <p className="text-sm text-gray-600">Address: {(selectedAddress as ExtendedAddress).details}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedAddress('current');
-                      setSearchQuery("");
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Show search results when searching OR when a customer is selected */}
-            {(showSearchResults || (selectedAddress && typeof selectedAddress !== 'string')) && searchQuery.trim() && (
-              <div className="space-y-3">
-                {/* Search Results Header */}
-                <div className="text-sm text-gray-500">
-                  {filteredAddresses.length > 0 ? (
-                    <div className="flex justify-between items-center">
-                      <span>Found {filteredAddresses.length} customer(s)</span>
-                      {selectedAddress && typeof selectedAddress !== 'string' && (
-                        <span className="text-blue-600 font-medium">
-                          ✓ Selected
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex justify-between items-center">
-                      <span>No customer found with "{searchQuery}"</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Search Results - Customer List */}
-                {paginatedAddresses.map((addr) => (
-                  <div
-                    key={addr.id}
-                    onClick={() => handleSelectSavedAddress(addr)}
-                    className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${selectedAddress && 
-                      typeof selectedAddress !== 'string' && 
-                      (selectedAddress as ExtendedAddress).id === addr.id
-                        ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
-                        : "border-gray-200 hover:bg-gray-50"
-                      }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold">{addr.label}</p>
-                          {selectedAddress && 
-                           typeof selectedAddress !== 'string' && 
-                           (selectedAddress as ExtendedAddress).id === addr.id && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                              Selected
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">Phone: {addr.phone}</p>
-                        <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
-                      </div>
-                      <span className="text-blue-500 text-lg">📍</span>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Pagination Controls for Search Results */}
-                {totalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 p-4 border border-gray-200 rounded-xl">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={goToPreviousPage}
-                        disabled={currentPage === 1}
-                        className={`px-3 py-1 border rounded ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
-                      >
-                        ← Previous
-                      </button>
-
-                      <div className="flex gap-1">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                          <button
-                            key={page}
-                            onClick={() => goToPage(page)}
-                            className={`w-8 h-8 rounded-full ${currentPage === page ? 'bg-blue-600 text-white' : 'border hover:bg-gray-50'}`}
-                          >
-                            {page}
-                          </button>
-                        ))}
-                      </div>
-
-                      <button
-                        onClick={goToNextPage}
-                        disabled={currentPage === totalPages}
-                        className={`px-3 py-1 border rounded ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
-                      >
-                        Next →
-                      </button>
-                    </div>
-
-                    <div className="text-sm text-gray-600">
-                      Page {currentPage} of {totalPages}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Customer Form - Show when actively adding OR when searching with no results */}
-            {(isAdding || (searchQuery.trim() && filteredAddresses.length === 0)) && (
-              <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl mt-3">
-                <h3 className="text-lg font-semibold text-gray-800">
-                  {selectedAddress && typeof selectedAddress !== 'string'
-                    ? "Update Customer Details"
-                    : filteredAddresses.length === 0 && searchQuery.trim() 
-                      ? "Create New Customer" 
-                      : "Add New Customer"}
-                </h3>
-
-                {/* Name / Label */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Customer Name *
-                    {isLikelyPhoneNumber && searchQuery.trim() && (
-                      <span className="text-xs text-gray-500 ml-2">(Detected as phone number, please enter name)</span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Enter customer name"
-                    value={tempAddress.label || ""}
-                    onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Phone */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.phone} *
-                    {!isLikelyPhoneNumber && searchQuery.trim() && (
-                      <span className="text-xs text-gray-500 ml-2">(Detected as name, please enter phone number)</span>
-                    )}
-                  </label>
-                  <input
-                    type="tel"
-                    placeholder="Customer phone number"
-                    value={tempAddress.phone || ""}
-                    onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Address Details */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.details} *
-                  </label>
-                  <div className="flex justify-between items-center gap-2">
-                    <textarea
-                      placeholder="#123, Sen Sok"
-                      value={tempAddress.details || ""}
-                      onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
-                      className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      rows={3}
-                    />
-                    <input
-                      type="button"
-                      readOnly
-                      value={t.clickToSelectLocation}
-                      onClick={() => setShowMap(true)}
-                      className="p-2 border rounded-lg text-white cursor-pointer bg-blue-500 hover:bg-blue-600"
-                      placeholder={t.clickToSelectLocation}
-                    />
-                  </div>
-                </div>
-
-                {/* Location Picker */}
-                <div>
-                  {!tempAddress.coordinates && (
-                    <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
-                  )}
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={handleSaveNewAddress}
-                    className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-                    disabled={
-                      !tempAddress.details?.trim() ||
-                      !tempAddress.coordinates ||
-                      !tempAddress.label?.trim() ||
-                      !tempAddress.phone?.trim()
-                    }
-                  >
-                    {selectedAddress && typeof selectedAddress !== 'string' ? "Update Customer" : "Save Customer"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsAdding(false);
-                      setSearchQuery("");
-                      setShowSearchResults(false);
-                      setTempAddress({
-                        label: "",
-                        phone: "",
-                        details: "",
-                        coordinates: { lat: 11.567, lng: 104.928 },
-                        api_user_id: user?.id,
-                      });
-                    }}
-                    className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-                  >
-                    {t.cancel}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Regular Users: Add New Address Button / Form */}
-        {user?.role !== "sale" && isAdding ? (
-          <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
-            {/* Name / Label */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Label *
-              </label>
-              <input
-                type="text"
-                placeholder="Home, Work, etc."
-                value={tempAddress.label || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.phone} *
-              </label>
-              <div className="w-full p-3 border rounded-lg bg-gray-50 text-gray-700">
-                {userPhone ? `${userPhone} (from account)` : "No phone in profile"}
-              </div>
-            </div>
-
-            {/* Address Details */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.details || "Address Details"} *
-              </label>
-              <textarea
-                placeholder="Street, building, floor, notes..."
-                value={tempAddress.details || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                rows={3}
-              />
-            </div>
-
-            {/* Location Picker */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.clickToSelectLocation} *
-              </label>
-              <input
-                type="text"
-                readOnly
-                value={
-                  tempAddress.coordinates
-                    ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
-                    : ""
-                }
-                onClick={() => setShowMap(true)}
-                className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                placeholder={t.clickToSelectLocation}
-              />
-              {!tempAddress.coordinates && (
-                <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleSaveNewAddress}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={
-                  !tempAddress.details?.trim() ||
-                  !tempAddress.coordinates ||
-                  !tempAddress.label?.trim() ||
-                  !userPhone?.trim()
-                }
-              >
-                {t.saveAddress}
-              </button>
-              <button
-                onClick={() => {
-                  setIsAdding(false);
-                  setTempAddress({
-                    label: "",
-                    phone: userPhone || "",
-                    details: "",
-                    coordinates: { lat: 11.567, lng: 104.928 },
-                    api_user_id: user?.id,
-                  });
-                }}
-                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-              >
-                {t.cancel}
-              </button>
-            </div>
-          </div>
-        ) : user?.role !== "sale" ? (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
-          >
-            <span className="text-xl">+</span>
-            {t.addNewAddress}
-          </button>
-        ) : null}
-      </section>
-
-      {/* Map Modal */}
-      {showMap && (
-        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg max-h-[90vh] overflow-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">{t.selectLocation}</h3>
-              <button
-                onClick={() => setShowMap(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <GoogleMap
-              mapContainerStyle={containerStyle}
-              center={tempAddress.coordinates || { lat: 11.567, lng: 104.928 }}
-              zoom={15}
-              onClick={handleMapClick}
-            >
-              {tempAddress.coordinates && (
-                <Marker
-                  position={tempAddress.coordinates}
-                  draggable
-                  onDragEnd={handleMarkerDragEnd}
-                />
-              )}
-            </GoogleMap>
-
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700">{t.selectedCoordinates}:</p>
-              {tempAddress.coordinates ? (
-                <p className="text-sm text-gray-600 mt-1">
-                  Lat: {tempAddress.coordinates.lat.toFixed(6)}
-                  <br />
-                  Lng: {tempAddress.coordinates.lng.toFixed(6)}
-                </p>
-              ) : (
-                <p className="text-sm text-gray-500 mt-1">{t.clickToSelectLocation}</p>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => setTempAddress({ ...tempAddress, coordinates: undefined })}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-              >
-                {t.clear}
-              </button>
-              <button
-                onClick={() => {
-                  setShowMap(false);
-                  toast.success("Location selected successfully!");
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                disabled={!tempAddress.coordinates}
-              >
-                {t.select}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Payment Method */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-2xl font-semibold text-gray-800">{t.paymentMethod}</h2>
-        {paymentMethods.map((method) => (
-          <div
-            key={method.name}
-            onClick={() => handlePaymentMethodSelect(method.name)}
-            className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow ${paymentMethod === method.name
-                ? "border-blue-500 bg-blue-50 shadow-lg"
-                : "border-gray-200 hover:shadow-md"
-              }`}
-          >
-            <div className="flex items-center gap-4">
-              <img
-                src={method.image}
-                alt={method.name}
-                className="w-12 h-12 object-contain"
-                onError={(e) => (e.currentTarget.src = "https://syspro.asia/img/default.png")}
-              />
-              <p className="font-semibold text-gray-700">{method.name}</p>
-            </div>
-            {paymentMethod === method.name && method.name !== "QR" && (
-              <p className="text-sm text-gray-500 mt-2">
-                You will pay with cash upon delivery
-              </p>
-            )}
-          </div>
-        ))}
-      </section>
-
-      {/* QR Popup */}
-      {showQRPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-800">Scan QR Code</h3>
-                <p className="text-sm text-gray-500">Scan with your bank app to pay</p>
-              </div>
-              <button
-                onClick={() => setShowQRPopup(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl p-1"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="text-center mb-6">
-              <div className="mb-4 p-4 border rounded-lg bg-white inline-block">
-                <img
-                  src="/qr.jpg"
-                  alt="Payment QR Code"
-                  className="w-64 h-64 mx-auto"
-                  onError={(e) => (e.currentTarget.src = "https://syspro.asia/img/default.png")}
-                />
-                <p className="text-xs text-gray-500 mt-2">Amount: ${total.toFixed(2)}</p>
-              </div>
-
-              <button
-                onClick={handleDownloadQR}
-                className="py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 w-full flex items-center justify-center"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Download QR
-              </button>
-            </div>
-
-            <div className="text-center">
-              <button
-                onClick={() => setShowQRPopup(false)}
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <CheckoutContext.Provider
+      value={{
+        cart,
+        total,
+        addToCart,
+        updateItemQty,
+        removeItem,
+        rewards,
+        totalPoints,
+        addReward,
+        updateRewardQty,
+        removeReward,
+        selectedAddress,
+        setSelectedAddress,
+        currentAddress,
+        setCurrentAddress,
+        detectCurrentLocation,
+        paymentMethod,
+        setPaymentMethod,
+        placeOrder,
+        placeRewardOrder,
+        isSalesMode,
+        salespersonName,
+        customerInfo,
+        setCustomerInfo,
+      }}
+    >
+      {children}
+    </CheckoutContext.Provider>
   );
 };
 
-export default CombinedCheckoutPage;
+export const useCheckout = () => {
+  const context = useContext(CheckoutContext);
+  if (!context) throw new Error("useCheckout must be used within CheckoutProvider");
+  return context;
+};
