@@ -27,9 +27,15 @@ type ExtendedAddress = ContextAddress & {
   api_user_id?: number;
 };
 
-const containerStyle = { width: "100%", height: "400px" };
+// Payment Method Interface
+type PaymentMethodType = {
+  id: string;
+  name: string;
+  image: string;
+  type: 'default' | 'custom';
+};
 
-// Pagination configuration
+const containerStyle = { width: "100%", height: "400px" };
 const ITEMS_PER_PAGE = 5;
 
 const CombinedCheckoutPage = () => {
@@ -76,14 +82,67 @@ const CombinedCheckoutPage = () => {
   // State to control when to show search results
   const [showSearchResults, setShowSearchResults] = useState(false);
 
-  const paymentMethods = [
-    { name: t.QR, image: "/qr.jpg" },
-    { name: t.cash, image: "/cash.jpg" },
-  ];
+  // Payment methods state - FIXED: Initialize with proper structure
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodType[]>([
+    { id: 'qr', name: t.QR || 'QR', image: "/qr.jpg", type: 'default' },
+    { id: 'cash', name: t.cash || 'Cash', image: "/cash.jpg", type: 'default' },
+  ]);
 
   const IMAGE_URL = process.env.NEXT_PUBLIC_IMAGE_URL!;
-
   const currentSelectedAddress = selectedAddress === "current" ? currentAddress : selectedAddress;
+
+  // ==================== FIXED: Custom Payment Methods Fetch ====================
+  useEffect(() => {
+    const fetchCustomPaymentMethods = async () => {
+      try {
+        setLoading(true);
+        // Call your Laravel API
+        const response = await api.get('/business/1/custom-payments');
+        
+        if (response.data.success && response.data.custom_payments) {
+          const customPayments = response.data.custom_payments;
+          const customMethods: PaymentMethodType[] = [];
+          
+          // Process custom_pay_1 through custom_pay_7
+          for (let i = 1; i <= 7; i++) {
+            const key = `custom_pay_${i}` as keyof typeof customPayments;
+            const paymentName = customPayments[key];
+            
+            // Only add if payment name exists and is not null
+            if (paymentName && paymentName !== null) {
+              customMethods.push({
+                id: key as string,
+                name: paymentName,
+                image: `/${key as string}.jpg` || '/payment-default.jpg',
+                type: 'custom' as const
+              });
+            }
+          }
+          
+          // Update payment methods state - FIXED: Add custom methods to existing defaults
+          setPaymentMethods(prev => [
+            ...prev, // Keep default methods (QR, Cash)
+            ...customMethods // Add custom methods
+          ]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch payment methods:', error);
+        toast.error('Failed to load custom payment methods');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Only fetch if user exists
+    if (user) {
+      fetchCustomPaymentMethods();
+    }
+  }, [user, setLoading]); // FIXED: Added dependencies
+
+  // Check if user is actively searching or has search results
+  const isSearching = useMemo(() => {
+    return searchQuery.trim().length > 0 || showSearchResults;
+  }, [searchQuery, showSearchResults]);
 
   // Filter saved addresses based on search query
   const filteredAddresses = useMemo(() => {
@@ -105,7 +164,6 @@ const CombinedCheckoutPage = () => {
   const isLikelyPhoneNumber = useMemo(() => {
     if (!searchQuery.trim()) return false;
     const firstChar = searchQuery.trim().charAt(0);
-    // Check if first character is a digit (0-9)
     return /^\d/.test(firstChar);
   }, [searchQuery]);
 
@@ -154,20 +212,16 @@ const CombinedCheckoutPage = () => {
   // Update form fields in real-time as user types in search
   useEffect(() => {
     if (searchQuery.trim() && user?.role === "sale") {
-      // If it starts with a number → phone number field
       if (isLikelyPhoneNumber) {
         setTempAddress(prev => ({
           ...prev,
           phone: searchQuery.trim(),
-          // Don't clear label if user already typed something there
           label: prev.label || ""
         }));
       } else {
-        // If it starts with letter or other character → name field
         setTempAddress(prev => ({
           ...prev,
           label: searchQuery.trim(),
-          // Don't clear phone if user already typed something there
           phone: prev.phone || ""
         }));
       }
@@ -217,7 +271,6 @@ const CombinedCheckoutPage = () => {
   const handleSelectSavedAddress = (addr: ExtendedAddress) => {
     setSelectedAddress(addr);
     setIsAdding(false);
-    // Keep search query to show selected customer
     setShowSearchResults(true);
   };
 
@@ -244,19 +297,17 @@ const CombinedCheckoutPage = () => {
     const value = e.target.value;
     setSearchQuery(value);
 
-    // Show search results when user starts typing
     if (value.trim()) {
       setShowSearchResults(true);
-      setIsAdding(true); // Always show form when searching
+      setIsAdding(true);
     } else {
       setShowSearchResults(false);
       setIsAdding(false);
     }
   };
 
-  // Save new address - label is customer name for sales, address label for regular users
+  // Save new address
   const handleSaveNewAddress = async () => {
-    // Validate label (customer name for sales, address label for regular users)
     if (!tempAddress.label?.trim()) {
       toast.error(
         user?.role === "sale"
@@ -266,7 +317,6 @@ const CombinedCheckoutPage = () => {
       return;
     }
 
-    // Validate phone
     if (user?.role === "sale") {
       if (!tempAddress.phone?.trim()) {
         toast.error("Please enter customer phone number");
@@ -279,7 +329,6 @@ const CombinedCheckoutPage = () => {
       }
     }
 
-    // Validate address details
     if (!tempAddress.details?.trim()) {
       toast.error("Please enter address details");
       return;
@@ -290,7 +339,6 @@ const CombinedCheckoutPage = () => {
       return;
     }
 
-    // Determine phone number to use
     const finalPhone = user?.role === "sale"
       ? (tempAddress.phone || "").trim()
       : userPhone?.trim();
@@ -312,7 +360,6 @@ const CombinedCheckoutPage = () => {
     setLoading(true);
 
     try {
-      // Prepare address data
       const addressData: APIAddress = {
         label: (tempAddress.label || "").trim(),
         phone: finalPhone,
@@ -339,11 +386,11 @@ const CombinedCheckoutPage = () => {
       setSavedAddresses((prev) => [...prev, newAddress]);
       setSelectedAddress(newAddress);
       setIsAdding(false);
-      setSearchQuery(newAddress.label || ""); // Set search query to the new customer name
+      setSearchQuery(newAddress.label || "");
       setShowSearchResults(true);
       setCurrentPage(1);
 
-      // Reset form fields after successful save
+      // Reset form fields
       setTempAddress({
         label: "",
         phone: user?.role === "sale" ? "" : userPhone || "",
@@ -361,10 +408,18 @@ const CombinedCheckoutPage = () => {
     }
   };
 
+  // FIXED: Handle payment method selection
   const handlePaymentMethodSelect = (methodName: string) => {
-    setPaymentMethod(methodName);
-    if (methodName === "QR") {
-      setShowQRPopup(true);
+    const selectedMethod = paymentMethods.find(m => m.name === methodName);
+    
+    if (selectedMethod) {
+      setPaymentMethod(methodName);
+      
+      if (methodName === (t.QR || 'QR')) {
+        setShowQRPopup(true);
+      } else if (selectedMethod.type === 'custom') {
+        toast.info(`Selected custom payment: ${methodName}`);
+      }
     }
   };
 
@@ -646,7 +701,7 @@ const CombinedCheckoutPage = () => {
                     className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     rows={3}
                   />
-                  {salesUser?.role === 'salesOnline' &&<input
+                  {salesUser?.role === 'salesOnline' && <input
                     type="button"
                     readOnly
                     value={t.clickToSelectLocation}
@@ -654,7 +709,7 @@ const CombinedCheckoutPage = () => {
                     className="p-2 border rounded-lg text-white cursor-pointer bg-blue-500 hover:bg-blue-600"
                     placeholder={t.clickToSelectLocation}
                   />}
-                  {salesUser?.role === 'salesOnPlace' &&<input
+                  {salesUser?.role === 'salesOnField' && <input
                     type="button"
                     readOnly
                     value={t.currentLocation}
@@ -709,208 +764,304 @@ const CombinedCheckoutPage = () => {
         </div>
       )}
 
-      {/* Order Summary */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-2xl font-semibold text-gray-800">{t.orderSummary}</h2>
-        {cart.length === 0 && <p>{t.yourCartIsEmpty}</p>}
+      {/* Hide other sections when searching */}
+      {!isSearching && (
+        <>
+          {/* Order Summary */}
+          <section className="flex flex-col gap-3">
+            <h2 className="text-2xl font-semibold text-gray-800">{t.orderSummary}</h2>
+            {cart.length === 0 && <p>{t.yourCartIsEmpty}</p>}
 
-        {cart.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center justify-between border-b border-gray-300 p-3 gap-3"
-          >
-            <img
-              src={item.image && item.image.trim() ? IMAGE_URL + item.image : "https://syspro.asia/img/default.png"}
-              alt={item.title}
-              className="w-16 h-16 object-cover rounded"
-            />
-            <div className="flex-1">
-              <p className="font-medium">{item.title}</p>
-              <p className="text-gray-600">
-                ${item.price.toFixed(2)} × {item.qty} = ${(item.price * item.qty).toFixed(2)}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => updateItemQty(item.id, Math.max(1, item.qty - 1))}
-                className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              >
-                -
-              </button>
-              <span className="w-6 text-center">{item.qty}</span>
-              <button
-                onClick={() => updateItemQty(item.id, item.qty + 1)}
-                className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              >
-                +
-              </button>
-            </div>
-          </div>
-        ))}
-      </section>
-
-      {/* Shipping Address Section */}
-      <section className="flex flex-col gap-3">
-        {user?.role !== "sale" && <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>}
-
-        {/* Current Location */}
-        {user?.role !== "sale" && (
-          <div
-            onClick={handleDetectCurrentLocation}
-            className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${selectedAddress === "current" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
-              } ${isDetectingLocation ? "opacity-70" : ""}`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-blue-500 text-xl">📍</span>
-              <div>
-                <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
-                <p className="text-sm text-gray-500">
-                  {isDetectingLocation
-                    ? t.detectingYourCurrentLocation
-                    : currentAddress
-                      ? t.clickToUseYourCurrentLocation
-                      : t.clickToDetectYourCurrentLocation}
-                </p>
-              </div>
-            </div>
-            {isDetectingLocation && (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-            )}
-          </div>
-        )}
-
-        {/* Regular Users: Saved Addresses List */}
-        {user?.role !== "sale" && !isAdding && savedAddresses.length > 0 && (
-          <div className="flex flex-col gap-3">
-            {savedAddresses.map((addr) => (
+            {cart.map((item) => (
               <div
-                key={addr.id}
-                onClick={() => setSelectedAddress(addr)}
-                className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${selectedAddress && typeof selectedAddress !== 'string' && (selectedAddress as ExtendedAddress).id === addr.id
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:bg-gray-50"
-                  }`}
+                key={item.id}
+                className="flex items-center justify-between border-b border-gray-300 p-3 gap-3"
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-400 text-xl">🏠</span>
-                  <div>
-                    <p className="font-semibold">{addr.label}</p>
-                    <p className="text-sm text-gray-600">{addr.details}</p>
-                    <p className="text-xs text-gray-500 mt-1">{addr.phone}</p>
-                  </div>
+                <img
+                  src={item.image && item.image.trim() ? IMAGE_URL + item.image : "https://syspro.asia/img/default.png"}
+                  alt={item.title}
+                  className="w-16 h-16 object-cover rounded"
+                />
+                <div className="flex-1">
+                  <p className="font-medium">{item.title}</p>
+                  <p className="text-gray-600">
+                    ${item.price.toFixed(2)} × {item.qty} = ${(item.price * item.qty).toFixed(2)}
+                  </p>
                 </div>
-                {selectedAddress && typeof selectedAddress !== 'string' && (selectedAddress as ExtendedAddress).id === addr.id && (
-                  <span className="text-blue-500 font-bold">✓</span>
-                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateItemQty(item.id, Math.max(1, item.qty - 1))}
+                    className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    -
+                  </button>
+                  <span className="w-6 text-center">{item.qty}</span>
+                  <button
+                    onClick={() => updateItemQty(item.id, item.qty + 1)}
+                    className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             ))}
-          </div>
-        )}
+          </section>
 
-        {/* Regular Users: Add New Address Button / Form */}
-        {user?.role !== "sale" && isAdding ? (
-          <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
-            {/* Name / Label */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Label *
-              </label>
-              <input
-                type="text"
-                placeholder="Home, Work, etc."
-                value={tempAddress.label || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+          {/* Shipping Address Section */}
+          <section className="flex flex-col gap-3">
+            {user?.role !== "sale" && <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>}
 
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.phone} *
-              </label>
-              <div className="w-full p-3 border rounded-lg bg-gray-50 text-gray-700">
-                {userPhone ? `${userPhone} (from account)` : "No phone in profile"}
+            {/* Current Location */}
+            {user?.role !== "sale" && (
+              <div
+                onClick={handleDetectCurrentLocation}
+                className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${selectedAddress === "current" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
+                  } ${isDetectingLocation ? "opacity-70" : ""}`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-blue-500 text-xl">📍</span>
+                  <div>
+                    <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
+                    <p className="text-sm text-gray-500">
+                      {isDetectingLocation
+                        ? t.detectingYourCurrentLocation
+                        : currentAddress
+                          ? t.clickToUseYourCurrentLocation
+                          : t.clickToDetectYourCurrentLocation}
+                    </p>
+                  </div>
+                </div>
+                {isDetectingLocation && (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                )}
               </div>
-            </div>
+            )}
 
-            {/* Address Details */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.details || "Address Details"} *
-              </label>
-              <textarea
-                placeholder="Street, building, floor, notes..."
-                value={tempAddress.details || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                rows={3}
-              />
-            </div>
+            {/* Regular Users: Saved Addresses List */}
+            {user?.role !== "sale" && !isAdding && savedAddresses.length > 0 && (
+              <div className="flex flex-col gap-3">
+                {savedAddresses.map((addr) => (
+                  <div
+                    key={addr.id}
+                    onClick={() => setSelectedAddress(addr)}
+                    className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${selectedAddress && typeof selectedAddress !== 'string' && (selectedAddress as ExtendedAddress).id === addr.id
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:bg-gray-50"
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-gray-400 text-xl">🏠</span>
+                      <div>
+                        <p className="font-semibold">{addr.label}</p>
+                        <p className="text-sm text-gray-600">{addr.details}</p>
+                        <p className="text-xs text-gray-500 mt-1">{addr.phone}</p>
+                      </div>
+                    </div>
+                    {selectedAddress && typeof selectedAddress !== 'string' && (selectedAddress as ExtendedAddress).id === addr.id && (
+                      <span className="text-blue-500 font-bold">✓</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
-            {/* Location Picker */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.clickToSelectLocation} *
-              </label>
-              <input
-                type="text"
-                readOnly
-                value={
-                  tempAddress.coordinates
-                    ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
-                    : ""
-                }
-                onClick={() => setShowMap(true)}
-                className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                placeholder={t.clickToSelectLocation}
-              />
-              {!tempAddress.coordinates && (
-                <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
+            {/* Regular Users: Add New Address Button / Form */}
+            {user?.role !== "sale" && isAdding ? (
+              <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
+                {/* Name / Label */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Label *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Home, Work, etc."
+                    value={tempAddress.label || ""}
+                    onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.phone} *
+                  </label>
+                  <div className="w-full p-3 border rounded-lg bg-gray-50 text-gray-700">
+                    {userPhone ? `${userPhone} (from account)` : "No phone in profile"}
+                  </div>
+                </div>
+
+                {/* Address Details */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.details || "Address Details"} *
+                  </label>
+                  <textarea
+                    placeholder="Street, building, floor, notes..."
+                    value={tempAddress.details || ""}
+                    onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={3}
+                  />
+                </div>
+
+                {/* Location Picker */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.clickToSelectLocation} *
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={
+                      tempAddress.coordinates
+                        ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
+                        : ""
+                    }
+                    onClick={() => setShowMap(true)}
+                    className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                    placeholder={t.clickToSelectLocation}
+                  />
+                  {!tempAddress.coordinates && (
+                    <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={handleSaveNewAddress}
+                    className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
+                    disabled={
+                      !tempAddress.details?.trim() ||
+                      !tempAddress.coordinates ||
+                      !tempAddress.label?.trim() ||
+                      !userPhone?.trim()
+                    }
+                  >
+                    {t.saveAddress}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAdding(false);
+                      setTempAddress({
+                        label: "",
+                        phone: userPhone || "",
+                        details: "",
+                        coordinates: { lat: 0, lng: 0 },
+                        api_user_id: user?.id,
+                      });
+                    }}
+                    className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+                  >
+                    {t.cancel}
+                  </button>
+                </div>
+              </div>
+            ) : user?.role !== "sale" ? (
+              <button
+                onClick={() => setIsAdding(true)}
+                className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
+              >
+                <span className="text-xl">+</span>
+                {t.addNewAddress}
+              </button>
+            ) : null}
+          </section>
+
+          {/* ==================== FIXED: Payment Method Section ==================== */}
+          <section className="flex flex-col gap-3">
+            <h2 className="text-2xl font-semibold text-gray-800">{t.paymentMethod}</h2>
+            
+            {/* QR Payment Method */}
+            <div
+              onClick={() => handlePaymentMethodSelect(t.QR || 'QR')}
+              className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow ${
+                paymentMethod === t.QR ? "border-blue-500 bg-blue-50 shadow-lg" : "border-gray-200 hover:shadow-md"
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <img
+                  src="/qr.jpg"
+                  alt="QR"
+                  className="w-12 h-12 object-contain"
+                  onError={(e) => (e.currentTarget.src = "https://syspro.asia/img/default.png")}
+                />
+                <div>
+                  <p className="font-semibold text-gray-700">{t.QR || 'QR'}</p>
+                  <p className="text-xs text-gray-500">Scan QR code to pay</p>
+                </div>
+              </div>
+              {paymentMethod === t.QR && (
+                <p className="text-sm text-gray-500 mt-2">
+                  You will scan a QR code for payment
+                </p>
               )}
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleSaveNewAddress}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={
-                  !tempAddress.details?.trim() ||
-                  !tempAddress.coordinates ||
-                  !tempAddress.label?.trim() ||
-                  !userPhone?.trim()
-                }
-              >
-                {t.saveAddress}
-              </button>
-              <button
-                onClick={() => {
-                  setIsAdding(false);
-                  setTempAddress({
-                    label: "",
-                    phone: userPhone || "",
-                    details: "",
-                    coordinates: { lat: 0, lng: 0 },
-                    api_user_id: user?.id,
-                  });
-                }}
-                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-              >
-                {t.cancel}
-              </button>
+            {/* Cash Payment Method */}
+            <div
+              onClick={() => handlePaymentMethodSelect(t.cash || 'Cash')}
+              className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow ${
+                paymentMethod === t.cash ? "border-blue-500 bg-blue-50 shadow-lg" : "border-gray-200 hover:shadow-md"
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <img
+                  src="/cash.jpg"
+                  alt="Cash"
+                  className="w-12 h-12 object-contain"
+                  onError={(e) => (e.currentTarget.src = "https://syspro.asia/img/default.png")}
+                />
+                <div>
+                  <p className="font-semibold text-gray-700">{t.cash || 'Cash'}</p>
+                  <p className="text-xs text-gray-500">Pay with cash on delivery</p>
+                </div>
+              </div>
+              {paymentMethod === t.cash && (
+                <p className="text-sm text-gray-500 mt-2">
+                  You will pay with cash upon delivery
+                </p>
+              )}
             </div>
-          </div>
-        ) : user?.role !== "sale" ? (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
-          >
-            <span className="text-xl">+</span>
-            {t.addNewAddress}
-          </button>
-        ) : null}
-      </section>
+
+            {/* Custom Payment Methods */}
+            {paymentMethods
+              .filter(method => method.type === 'custom')
+              .map((method) => (
+                <div
+                  key={method.id}
+                  onClick={() => handlePaymentMethodSelect(method.name)}
+                  className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow ${
+                    paymentMethod === method.name
+                      ? "border-green-500 bg-green-50 shadow-lg"
+                      : "border-gray-200 hover:shadow-md"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={method.image}
+                      alt={method.name}
+                      className="w-12 h-12 object-contain"
+                      onError={(e) => (e.currentTarget.src = "https://syspro.asia/img/default.png")}
+                    />
+                    <div>
+                      <p className="font-semibold text-gray-700">{method.name}</p>
+                      <p className="text-xs text-gray-500">Custom Payment Method</p>
+                    </div>
+                  </div>
+                  {paymentMethod === method.name && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Pay with {method.name}
+                    </p>
+                  )}
+                </div>
+              ))
+            }
+          </section>
+        </>
+      )}
 
       {/* Map Modal */}
       {showMap && (
@@ -975,36 +1126,6 @@ const CombinedCheckoutPage = () => {
           </div>
         </div>
       )}
-
-      {/* Payment Method */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-2xl font-semibold text-gray-800">{t.paymentMethod}</h2>
-        {paymentMethods.map((method) => (
-          <div
-            key={method.name}
-            onClick={() => handlePaymentMethodSelect(method.name)}
-            className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow ${paymentMethod === method.name
-              ? "border-blue-500 bg-blue-50 shadow-lg"
-              : "border-gray-200 hover:shadow-md"
-              }`}
-          >
-            <div className="flex items-center gap-4">
-              <img
-                src={method.image}
-                alt={method.name}
-                className="w-12 h-12 object-contain"
-                onError={(e) => (e.currentTarget.src = "https://syspro.asia/img/default.png")}
-              />
-              <p className="font-semibold text-gray-700">{method.name}</p>
-            </div>
-            {paymentMethod === method.name && method.name !== "QR" && (
-              <p className="text-sm text-gray-500 mt-2">
-                You will pay with cash upon delivery
-              </p>
-            )}
-          </div>
-        ))}
-      </section>
 
       {/* QR Popup */}
       {showQRPopup && (
