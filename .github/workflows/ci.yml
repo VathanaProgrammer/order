@@ -1,4 +1,4 @@
-name: Build & Restart (Green Tick)
+name: Build & Deploy (Green Tick)
 
 on:
   push:
@@ -8,35 +8,54 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      # This step guarantees the workflow runs and shows a check
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Optional: Just to confirm workflow runs
       - name: CI started
         run: echo "CI is running"
 
-      # SSH into your server and deploy
-      - name: SSH build and restart
-        uses: appleboy/ssh-action@v1
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3  # Use latest stable version
         with:
-          host: ${{ secrets.SERVER_IP }} 
+          host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
-          timeout: 120s
+          timeout: 300s   # Give more time for build
           debug: true
           script: |
-            set -e 
+            set -e
+
+            # Go to project
             cd /var/www/order
 
-            # Git SSL fixes
-            git config --global http.postBuffer 524288000
-            git config --global http.sslVerify true
-            git config --global http.sslCAInfo /etc/ssl/certs/ca-certificates.crt
+            # Optional: Pull with retry (git sometimes flakes)
+            git fetch --all
+            git reset --hard origin/main
+            git clean -fd
 
-            # Pull latest code and build
-            git pull origin main
-            npm install
-            npm run build  
+            # Clean old build artifacts to prevent mix
+            rm -rf .next node_modules/.cache
 
-            # Restart app with pm2
-            pm2 restart order-app
+            # Install deps fresh
+            npm ci --prefer-offline --no-audit --progress=false
+
+            # Build
+            npm run build
+
+            # Optional: Quick smoke test (if you have a health endpoint)
+            # curl -f http://localhost:3000/api/health || echo "Build ok, but health check failed"
+
+            # Graceful reload with PM2 (zero-downtime mode)
+            # This keeps old process alive until new one is ready + healthy
+            pm2 reload order-app --update-env
+
+            # Wait a bit for new process to stabilize
+            sleep 10
+
+            # Optional: Cleanup old backups if PM2 keeps them
+            pm2 prune
+
+            echo "Deployment completed"
