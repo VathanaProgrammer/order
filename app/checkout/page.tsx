@@ -91,53 +91,43 @@ const CombinedCheckoutPage = () => {
   const IMAGE_URL = process.env.NEXT_PUBLIC_IMAGE_URL!;
   const currentSelectedAddress = selectedAddress === "current" ? currentAddress : selectedAddress;
 
-  // ==================== FIXED: Custom Payment Methods Fetch ====================
-  useEffect(() => {
-    const fetchCustomPaymentMethods = async () => {
-      try {
-        setLoading(true);
-        // Call your Laravel API
-        const response = await api.get('/business/1/custom-payments');
+// FIXED VERSION of the custom payment fetch:
+useEffect(() => {
+  const fetchCustomPaymentMethods = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/business/1/custom-payments');
+      
+      if (response.data.success && response.data.custom_payments) {
+        const customPayments = response.data.custom_payments;
+        const customMethods: any[] = [];
         
-        if (response.data.success && response.data.custom_payments) {
-          const customPayments = response.data.custom_payments;
-          const customMethods: PaymentMethodType[] = [];
-          
-          // Process custom_pay_1 through custom_pay_7
-          for (let i = 1; i <= 7; i++) {
-            const key = `custom_pay_${i}` as keyof typeof customPayments;
-            const paymentName = customPayments[key];
-            
-            // Only add if payment name exists and is not null
-            if (paymentName && paymentName !== null) {
-              customMethods.push({
-                id: key as string,
-                name: paymentName,
-                image: `/${key as string}.jpg` || '/payment-default.jpg',
-                type: 'custom' as const
-              });
-            }
+        // SAFER: Use Object.entries instead of keyof
+        Object.entries(customPayments).forEach(([key, value]) => {
+          if (key.startsWith('custom_pay_') && value && value !== null) {
+            customMethods.push({
+              id: key,
+              name: value,
+              image: `/${key}.jpg` || '/payment-default.jpg',
+              type: 'custom' as const
+            });
           }
-          
-          // Update payment methods state - FIXED: Add custom methods to existing defaults
-          setPaymentMethods(prev => [
-            ...prev, // Keep default methods (QR, Cash)
-            ...customMethods // Add custom methods
-          ]);
-        }
-      } catch (error) {
-        console.error('Failed to fetch payment methods:', error);
-        toast.error('Failed to load custom payment methods');
-      } finally {
-        setLoading(false);
+        });
+        
+        setPaymentMethods(prev => [...prev, ...customMethods]);
       }
-    };
-
-    // Only fetch if user exists
-    if (user) {
-      fetchCustomPaymentMethods();
+    } catch (error) {
+      console.error('Failed to fetch payment methods:', error);
+      toast.error('Failed to load custom payment methods');
+    } finally {
+      setLoading(false);
     }
-  }, [user, setLoading]); // FIXED: Added dependencies
+  };
+
+  if (user) {
+    fetchCustomPaymentMethods();
+  }
+}, [user, setLoading]);
 
   // Check if user is actively searching or has search results
   const isSearching = useMemo(() => {
