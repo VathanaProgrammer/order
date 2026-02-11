@@ -50,6 +50,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "barista.sobkh.com" },
     ],
   },
+
+  assetPrefix: process.env.NODE_ENV === 'production' ? '/' : '',
 };
 
 export default nextConfig;
