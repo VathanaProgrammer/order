@@ -429,67 +429,19 @@ const CombinedCheckoutPage = () => {
         )}
       </section>
 
-      {/* Shipping Address */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>
-
-        {/* Current Location Option */}
-        <div className="flex flex-col gap-3">
-          {/* Current Location Button */}
-          <div
-            onClick={handleDetectCurrentLocation}
-            className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${
-              selectedAddress === "current"
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-200 hover:bg-gray-50"
-            } ${isDetectingLocation ? "opacity-70" : ""}`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-blue-500 text-xl">📍</span>
-              <div>
-                <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
-                <p className="text-sm text-gray-500">
-                  {isDetectingLocation 
-                    ? t.detectingYourCurrentLocation
-                    : currentAddress 
-                    ? t.clickToUseYourCurrentLocation
-                    : t.clickToDetectYourCurrentLocation}
-                </p>
-              </div>
-            </div>
-            {isDetectingLocation && (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-            )}
-          </div>
-        </div>
-
-        {/* Saved Addresses */}
-        {savedAddresses.map((addr) => (
-          <div
-            key={addr.id}
-            onClick={() => handleSelectSavedAddress(addr)}
-            className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${
-              currentSelectedAddress && (currentSelectedAddress as ExtendedAddress).id === addr.id
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-200 hover:bg-gray-50"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold">{addr.label}</p>
-                <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
-                {addr.phone && (
-                  <p className="text-sm text-gray-600 mt-1">{t.phone}: {addr.phone}</p>
-                )}
-              </div>
-              <span className="text-blue-500 text-lg">📍</span>
-            </div>
-          </div>
-        ))}
-
-        {/* Add New Address Form */}
-        {isAdding ? (
           <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
+          <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t.customerName} * || {"customer's name"}
+              </label>
+              <input
+                type="text"
+                placeholder={t.labelHomeWork}
+                value={tempAddress.label || ""}
+                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {t.label} *
@@ -508,9 +460,7 @@ const CombinedCheckoutPage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {t.phone}
                 </label>
-                <div className="w-full p-3 border rounded-lg bg-gray-50">
-                  {userPhone} (from your account)
-                </div>
+                <input type="text" name="phone" id="phone" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="Customer's Phone Number"/>
               </div>
             ) : (
               <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -581,16 +531,9 @@ const CombinedCheckoutPage = () => {
               </button>
             </div>
           </div>
-        ) : (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
-          >
-            <span className="text-xl">+</span>
-            {t.addNewAddress}
-          </button>
-        )}
-      </section>
+
+      {/* Shipping Address */}
+
 
       {/* Map Modal */}
       {showMap && (

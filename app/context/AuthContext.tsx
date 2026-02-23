@@ -16,6 +16,7 @@ interface User {
   phone?: string | null;
   mobile?: string | null;
   profile_url?: string | null;
+  role?: string;
   reward_points: {
     total: number;
     used: number;
@@ -82,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userData = extractUserFromResponse(res.data);
         
         if (userData) {
-          console.log('✅ User found');
+          console.log('✅ User found', userData);
           setUser(userData);
         } else {
           console.log('❌ No valid user data');
