@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Header from "@/components/layouts/Header";
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import { useCheckout, Address as ContextAddress } from "@/context/CheckOutContext";
@@ -11,7 +11,7 @@ import { toast } from "react-toastify";
 import { useLanguage } from "@/context/LanguageContext";
 import { useRouter } from "next/navigation";
 
-// Define the API Address type based on your ShippingAddressPage
+// Define the API Address type
 type APIAddress = {
   id?: number;
   api_user_id: number | undefined;
@@ -28,6 +28,17 @@ type ExtendedAddress = ContextAddress & {
 
 const containerStyle = { width: "100%", height: "400px" };
 
+// Pagination configuration
+const ITEMS_PER_PAGE = 5;
+
+// Add this interface for payment method
+type PaymentMethodType = {
+  id: string;
+  name: string;
+  image: string;
+  type: 'default' | 'custom';
+};
+
 const CombinedCheckoutPage = () => {
   const { user } = useAuth();
   const router = useRouter();
@@ -42,6 +53,7 @@ const CombinedCheckoutPage = () => {
     detectCurrentLocation,
     paymentMethod,
     setPaymentMethod,
+    placeOrder,
   } = useCheckout();
 
   const { setLoading } = useLoading();
@@ -53,24 +65,104 @@ const CombinedCheckoutPage = () => {
     label: "",
     phone: "",
     details: "",
-    coordinates: { lat: 11.567, lng: 104.928 },
+    coordinates: { lat: 0, lng: 0 },
     api_user_id: user?.id,
   });
+
   const [showQRPopup, setShowQRPopup] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { t } = useLanguage();
 
-  const paymentMethods = [
-    { name: t.QR, image: "/qr.jpg" },
-    { name: t.cash, image: "/cash.jpg" },
-  ];
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(ITEMS_PER_PAGE);
+
+  // State to control when to show search results
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   const IMAGE_URL = process.env.NEXT_PUBLIC_IMAGE_URL!;
-  
-  const currentSelectedAddress = selectedAddress === "current" 
-    ? currentAddress 
-    : selectedAddress;
+
+  const currentSelectedAddress = selectedAddress === "current" ? currentAddress : selectedAddress;
+
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodType[]>([
+    { name: t.QR, image: "/qr.jpg", id: 'qr', type: 'default' },
+    { name: t.cash, image: "/cash.jpg", id: 'cash', type: 'default' },
+  ]);
+
+  useEffect(() => {
+    const fetchCustomPaymentMethods = async () => {
+      try {
+        setLoading(true);
+        // Call your Laravel API
+        const response = await api.get('/business/1/custom-payments');
+        
+        if (response.data.success && response.data.payment_methods) {
+          // Combine default and custom payment methods
+          const customMethods = response.data.payment_methods
+            .filter((method: any) => method.type === 'custom' && method.name)
+            .map((method: any) => ({
+              id: method.id,
+              name: method.name,
+              image: method.image || '/payment-default.jpg',
+              type: 'custom' as const
+            }));
+          
+          // Update payment methods state
+          setPaymentMethods(prev => [
+            ...prev.filter(m => m.type === 'default'), // Keep default methods
+            ...customMethods // Add custom methods
+          ]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch payment methods:', error);
+        toast.error('Failed to load payment methods');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCustomPaymentMethods();
+  }, []);
+
+  // Check if user is actively searching or has search results
+  const isSearching = useMemo(() => {
+    return searchQuery.trim().length > 0 || showSearchResults;
+  }, [searchQuery, showSearchResults]);
+
+  // Filter saved addresses based on search query
+  const filteredAddresses = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return [];
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    return savedAddresses.filter(address => {
+      const labelMatch = address.label?.toLowerCase().includes(query) || false;
+      const phoneMatch = address.phone?.toLowerCase().includes(query) || false;
+      const detailsMatch = address.details?.toLowerCase().includes(query) || false;
+
+      return labelMatch || phoneMatch || detailsMatch;
+    });
+  }, [savedAddresses, searchQuery]);
+
+  // Determine if search query starts with a number (phone) or not (name)
+  const isLikelyPhoneNumber = useMemo(() => {
+    if (!searchQuery.trim()) return false;
+    const firstChar = searchQuery.trim().charAt(0);
+    // Check if first character is a digit (0-9)
+    return /^\d/.test(firstChar);
+  }, [searchQuery]);
+
+  // Calculate pagination data
+  const paginatedAddresses = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredAddresses.slice(startIndex, endIndex);
+  }, [filteredAddresses, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredAddresses.length / itemsPerPage);
 
   // Fetch saved addresses
   useEffect(() => {
@@ -78,10 +170,8 @@ const CombinedCheckoutPage = () => {
       setLoading(true);
       try {
         const res = await api.get("/addresses/all");
-        // Map API response to ExtendedAddress type
         const addresses: ExtendedAddress[] = res.data?.data.map((addr: any) => ({
           ...addr,
-          // Add any missing properties needed by ContextAddress
         })) || [];
         setSavedAddresses(addresses);
       } catch (err) {
@@ -96,46 +186,66 @@ const CombinedCheckoutPage = () => {
     }
   }, [setLoading, user]);
 
+  // Update tempAddress when user changes
   useEffect(() => {
-    // Update tempAddress with user ID when user is available
     if (user && !tempAddress.api_user_id) {
-      setTempAddress(prev => ({
+      setTempAddress((prev) => ({
         ...prev,
         api_user_id: user.id,
-        phone: getPhoneFromUser(user) || ""
+        phone: user?.role === "sale" ? "" : getPhoneFromUser(user) || "",
       }));
     }
   }, [user]);
 
-  // Helper function to get phone from user
+  // Update form fields in real-time as user types in search
+  useEffect(() => {
+    if (searchQuery.trim() && user?.role === "sale") {
+      // If it starts with a number → phone number field
+      if (isLikelyPhoneNumber) {
+        setTempAddress(prev => ({
+          ...prev,
+          phone: searchQuery.trim(),
+          // Don't clear label if user already typed something there
+          label: prev.label || ""
+        }));
+      } else {
+        // If it starts with letter or other character → name field
+        setTempAddress(prev => ({
+          ...prev,
+          label: searchQuery.trim(),
+          // Don't clear phone if user already typed something there
+          phone: prev.phone || ""
+        }));
+      }
+    }
+  }, [searchQuery, isLikelyPhoneNumber, user?.role]);
+
+  // Clear form fields when form disappears
+  useEffect(() => {
+    if (!isAdding && !searchQuery.trim() && user?.role === "sale") {
+      setTempAddress({
+        label: "",
+        phone: user?.role === "sale" ? "" : getPhoneFromUser(user) || "",
+        details: "",
+        coordinates: { lat: 0, lng: 0 },
+        api_user_id: user?.id,
+      });
+    }
+  }, [isAdding, searchQuery, user]);
+
+  // Helper to extract phone from user object
   const getPhoneFromUser = (userData: any): string | null => {
-    console.log("User object for phone extraction:", userData);
-    
-    // Try different possible phone fields
-    if (userData.phone && userData.phone.trim() !== "") {
-      console.log("Found phone in user.phone:", userData.phone);
-      return userData.phone;
-    }
-    
-    if (userData.mobile && userData.mobile.trim() !== "") {
-      console.log("Found phone in user.mobile:", userData.mobile);
-      return userData.mobile;
-    }
-    
-    // Check if contact object exists
-    if (userData.contact?.mobile && userData.contact.mobile.trim() !== "") {
-      console.log("Found phone in user.contact.mobile:", userData.contact.mobile);
-      return userData.contact.mobile;
-    }
-    
-    if (userData.contact?.phone && userData.contact.phone.trim() !== "") {
-      console.log("Found phone in user.contact.phone:", userData.contact.phone);
-      return userData.contact.phone;
-    }
-    
-    console.log("No phone found in user object");
+    if (!userData) return null;
+
+    if (userData.phone && userData.phone.trim()) return userData.phone.trim();
+    if (userData.mobile && userData.mobile.trim()) return userData.mobile.trim();
+    if (userData.contact?.mobile && userData.contact.mobile.trim()) return userData.contact.mobile.trim();
+    if (userData.contact?.phone && userData.contact.phone.trim()) return userData.contact.phone.trim();
+
     return null;
   };
+
+  const userPhone = getPhoneFromUser(user);
 
   const handleDetectCurrentLocation = async () => {
     setIsDetectingLocation(true);
@@ -153,9 +263,10 @@ const CombinedCheckoutPage = () => {
   const handleSelectSavedAddress = (addr: ExtendedAddress) => {
     setSelectedAddress(addr);
     setIsAdding(false);
+    // Keep search query to show selected customer
+    setShowSearchResults(true);
   };
 
-  // Handle map click to select coordinates
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
       setTempAddress({
@@ -165,7 +276,6 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Handle marker drag
   const handleMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
       setTempAddress({
@@ -175,10 +285,49 @@ const CombinedCheckoutPage = () => {
     }
   };
 
-  // Save new address to backend
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+
+    // Show search results when user starts typing
+    if (value.trim()) {
+      setShowSearchResults(true);
+      setIsAdding(true); // Always show form when searching
+    } else {
+      setShowSearchResults(false);
+      setIsAdding(false);
+    }
+  };
+
+  // Save new address - label is customer name for sales, address label for regular users
   const handleSaveNewAddress = async () => {
-    if (!tempAddress.label?.trim() || !tempAddress.details?.trim()) {
-      toast.error("Please fill all required fields");
+    // Validate label (customer name for sales, address label for regular users)
+    if (!tempAddress.label?.trim()) {
+      toast.error(
+        user?.role === "sale"
+          ? "Please enter customer name"
+          : "Please enter a name/label for the address"
+      );
+      return;
+    }
+
+    // Validate phone
+    if (user?.role === "sale") {
+      if (!tempAddress.phone?.trim()) {
+        toast.error("Please enter customer phone number");
+        return;
+      }
+    } else {
+      if (!userPhone?.trim()) {
+        toast.error("Please add your phone number in account settings");
+        return;
+      }
+    }
+
+    // Validate address details
+    if (!tempAddress.details?.trim()) {
+      toast.error("Please enter address details");
       return;
     }
 
@@ -187,36 +336,42 @@ const CombinedCheckoutPage = () => {
       return;
     }
 
+    // Determine phone number to use
+    const finalPhone = user?.role === "sale"
+      ? (tempAddress.phone || "").trim()
+      : userPhone?.trim();
+
+    if (!finalPhone) {
+      toast.error(
+        user?.role === "sale"
+          ? "Please enter customer's phone number"
+          : "Please add your phone number in account settings"
+      );
+      return;
+    }
+
     if (!tempAddress.api_user_id) {
       toast.error("User not authenticated");
       return;
     }
 
-    // Get user's phone number
-    const userPhone = getPhoneFromUser(user);
-    if (!userPhone) {
-      toast.error("Please add your phone number in your account settings");
-      return;
-    }
-
     setLoading(true);
+
     try {
-      // Prepare the address data - use user's phone from account
+      // Prepare address data
       const addressData: APIAddress = {
-        label: tempAddress.label,
-        phone: userPhone,
-        details: tempAddress.details,
+        label: (tempAddress.label || "").trim(),
+        phone: finalPhone,
+        details: (tempAddress.details || "").trim(),
         coordinates: tempAddress.coordinates,
         api_user_id: tempAddress.api_user_id,
       };
 
-      console.log("Saving address with data:", addressData);
+      console.log("Saving address:", addressData);
 
-      // Save address to backend
       const res = await api.post("/addresses", addressData);
-      
-      // Convert API response to ExtendedAddress
       const apiResponse = res.data?.data;
+
       const newAddress: ExtendedAddress = {
         ...apiResponse,
         id: apiResponse.id,
@@ -226,22 +381,24 @@ const CombinedCheckoutPage = () => {
         coordinates: apiResponse.coordinates,
         api_user_id: apiResponse.api_user_id,
       };
-      
-      // Update saved addresses list
-      setSavedAddresses(prev => [...prev, newAddress]);
-      
-      // Select the newly saved address
+
+      setSavedAddresses((prev) => [...prev, newAddress]);
       setSelectedAddress(newAddress);
       setIsAdding(false);
-      
-      // Reset temp address
+      setSearchQuery(newAddress.label || ""); // Set search query to the new customer name
+      setShowSearchResults(true);
+      setCurrentPage(1);
+
+      // Reset form fields after successful save
       setTempAddress({
         label: "",
-        phone: userPhone,
+        phone: user?.role === "sale" ? "" : userPhone || "",
         details: "",
-        coordinates: { lat: 11.567, lng: 104.928 },
+        coordinates: { lat: 0, lng: 0 },
         api_user_id: user?.id,
       });
+
+      toast.success("Address saved successfully");
     } catch (err: any) {
       console.error("Save address error:", err);
       toast.error(err.response?.data?.message || "Failed to save address");
@@ -251,298 +408,598 @@ const CombinedCheckoutPage = () => {
   };
 
   const handlePaymentMethodSelect = (methodName: string) => {
-    setPaymentMethod(methodName);
-    if (methodName === "QR") {
-      setShowQRPopup(true);
+    const selectedMethod = paymentMethods.find(m => m.name === methodName);
+    
+    if (selectedMethod) {
+      setPaymentMethod(methodName);
+      
+      if (methodName === "QR") {
+        setShowQRPopup(true);
+      } else if (selectedMethod.type === 'custom') {
+        // Handle custom payment method selection
+        toast.info(`Selected custom payment: ${methodName}`);
+      }
     }
   };
 
   const handleDownloadQR = () => {
     try {
-      const qrImageUrl = "/qr.jpg";
       const link = document.createElement("a");
       link.download = "payment-qr-code.png";
-      link.href = qrImageUrl;
+      link.href = "/qr.jpg";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("QR code downloaded successfully!");
+      toast.success("QR code downloaded");
     } catch (error) {
-      console.error("Download failed:", error);
       toast.error("Failed to download QR code");
     }
   };
 
-  // Handle checkout button click - Direct API call
-  const handleCheckout = async () => {
-    if (cart.length === 0) {
-      toast.error("Your cart is empty");
-      return;
-    }
+  // Pagination handlers
+  const goToPage = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
 
-    if (!selectedAddress) {
-      toast.error("Please select a shipping address");
-      return;
-    }
-
-    if (!paymentMethod) {
-      toast.error("Please select a payment method");
-      return;
-    }
-
-    setIsSubmittingOrder(true);
-    setLoading(true);
-    try {
-      // Get user's phone number
-      const userPhone = getPhoneFromUser(user);
-      
-      // Prepare order data based on backend requirements
-      const orderData: any = {
-        api_user_id: user?.id,
-        address_type: selectedAddress === "current" ? "current" : "saved",
-        paymentMethod: paymentMethod,
-        total_qty: cart.reduce((sum, item) => sum + item.qty, 0),
-        total: total,
-        items: cart.map(item => ({
-          product_id: item.id,
-          qty: item.qty,
-          price_at_order: item.price,
-          total_line: item.price * item.qty,
-          image_url: item.image || null,
-        })),
-      };
-
-      // Handle address data based on selection
-      if (selectedAddress === "current") {
-        // For current address, send address data directly
-        if (!currentAddress?.coordinates) {
-          toast.error("Please detect your current location first");
-          setIsSubmittingOrder(false);
-          setLoading(false);
-          return;
-        }
-
-        if (!userPhone) {
-          toast.error("Please add your phone number in your account settings");
-          setIsSubmittingOrder(false);
-          setLoading(false);
-          return;
-        }
-
-        orderData.address = {
-          label: "Current Location",
-          phone: userPhone, // Make sure this is NOT null
-          details: `Current location at ${currentAddress.coordinates.lat.toFixed(6)}, ${currentAddress.coordinates.lng.toFixed(6)}`,
-          coordinates: currentAddress.coordinates,
-        };
-
-        console.log("Order data with current address:", {
-          ...orderData,
-          address: {
-            ...orderData.address,
-            phone: userPhone // Log phone to verify
-          }
-        });
-      } else {
-        // For saved address, send the saved address ID
-        orderData.saved_address_id = (selectedAddress as ExtendedAddress).id;
-      }
-
-      console.log("Submitting order with data:", orderData);
-
-      // Direct API call to place order
-      const response = await api.post("/orders", orderData);
-      
-      if (response.data.success) {
-        toast.success("Order placed successfully!");
-        // Redirect to order confirmation page
-        if (response.data.order_id) {
-          router.push(`/order-confirmation/${response.data.order_id}`);
-        } else {
-          router.push("/order-confirmation");
-        }
-      } else {
-        toast.error(response.data.message || "Failed to place order");
-      }
-    } catch (error: any) {
-      console.error("Checkout error:", error);
-      toast.error(error.response?.data?.message || "Failed to place order");
-    } finally {
-      setIsSubmittingOrder(false);
-      setLoading(false);
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
     }
   };
 
-  // Get user's phone for display
-  const userPhone = getPhoneFromUser(user);
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = parseInt(e.target.value);
+    setItemsPerPage(value);
+    setCurrentPage(1);
+  };
+
+  // Handle adding new customer for sales
+  const handleAddNewCustomer = () => {
+    setIsAdding(true);
+    setSearchQuery("");
+    setShowSearchResults(false);
+    setTempAddress({
+      label: "",
+      phone: "",
+      details: "",
+      coordinates: { lat: 0, lng: 0 },
+      api_user_id: user?.id,
+    });
+  };
+
+  // Clear search and reset form
+  const handleClearSearch = () => {
+    setSearchQuery("");
+    setShowSearchResults(false);
+    setIsAdding(false);
+    setSelectedAddress('current');
+    setTempAddress({
+      label: "",
+      phone: user?.role === "sale" ? "" : userPhone || "",
+      details: "",
+      coordinates: { lat: 0, lng: 0 },
+      api_user_id: user?.id,
+    });
+  };
 
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar pb-24">
       <Header title={t.checkout} />
 
-      {/* ===== Order Summary ===== */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-2xl font-semibold text-gray-800">{t.orderSummary}</h2>
-        {cart.length === 0 && <p>{t.yourCartIsEmpty}</p>}
-        {cart.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center justify-between border-b border-gray-300 p-3 gap-3"
-          >
-            <img
-              src={item.image && item.image.trim() !== "" ? IMAGE_URL + item.image : "https://syspro.asia/img/default.png"}
-              alt={item.title}
-              className="w-16 h-16 object-cover rounded"
+      {/* Sales Mode: Search and Customer Management */}
+      {user?.role === "sale" && (
+        <div className="space-y-3">
+          {/* Search Bar */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search customer by name or phone number..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
-            <div className="flex-1">
-              <p className="font-medium">{item.title}</p>
-              <p className="text-gray-600">
-                ${item.price.toFixed(2)} x {item.qty} = ${(item.price * item.qty).toFixed(2)}
-              </p>
+            <div className="absolute left-3 top-3 text-gray-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
-            <div className="flex items-center gap-2">
+            {searchQuery && (
               <button
-                onClick={() => updateItemQty(item.id, Math.max(1, item.qty - 1))}
-                className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                onClick={handleClearSearch}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
               >
-                -
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
-              <span className="w-6 text-center">{item.qty}</span>
-              <button
-                onClick={() => updateItemQty(item.id, item.qty + 1)}
-                className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              >
-                +
-              </button>
-            </div>
-          </div>
-        ))}
-        
-        {/* Total Section */}
-        {cart.length > 0 && (
-          <div className="pt-4 border-t border-gray-300">
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-semibold">{t.total}:</span>
-              <span className="text-2xl font-bold text-blue-600">${total.toFixed(2)}</span>
-            </div>
-          </div>
-        )}
-      </section>
-
-          <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
-          <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.customerName} * || {"customer's name"}
-              </label>
-              <input
-                type="text"
-                placeholder={t.labelHomeWork}
-                value={tempAddress.label || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.label} *
-              </label>
-              <input
-                type="text"
-                placeholder={t.labelHomeWork}
-                value={tempAddress.label || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            
-            {userPhone ? (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t.phone}
-                </label>
-                <input type="text" name="phone" id="phone" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="Customer's Phone Number"/>
-              </div>
-            ) : (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-yellow-700 text-sm">
-                  ⚠️ Please add your phone number in your account settings
-                </p>
-              </div>
             )}
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.details || "Address Details"} *
-              </label>
-              <textarea
-                placeholder={t.details}
-                value={tempAddress.details || ""}
-                onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                rows={3}
-              />
+          </div>
+
+          {/* Selected Customer Display */}
+          {selectedAddress && typeof selectedAddress !== 'string' && (
+            <div className="p-4 border border-green-300 bg-green-50 rounded-xl">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-semibold text-gray-800 mb-2">Selected Customer:</h3>
+                  <div className="space-y-1">
+                    <p className="font-medium text-gray-900">{(selectedAddress as ExtendedAddress).label}</p>
+                    <p className="text-sm text-gray-600">Phone: {(selectedAddress as ExtendedAddress).phone}</p>
+                    <p className="text-sm text-gray-600">Address: {(selectedAddress as ExtendedAddress).details}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedAddress('current');
+                    setSearchQuery("");
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.clickToSelectLocation} *
-              </label>
-              <input
-                type="text"
-                readOnly
-                value={
-                  tempAddress.coordinates
-                    ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
-                    : ""
-                }
-                onClick={() => setShowMap(true)}
-                className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                placeholder={t.clickToSelectLocation}
-              />
-              {!tempAddress.coordinates && (
-                <p className="text-sm text-red-500 mt-1">
-                  {t.pleaseSelectALocationOnTheMap}
-                </p>
+          )}
+
+          {/* Show search results when searching OR when a customer is selected */}
+          {(showSearchResults || (selectedAddress && typeof selectedAddress !== 'string')) && searchQuery.trim() && (
+            <div className="space-y-3">
+              {/* Search Results Header */}
+              <div className="text-sm text-gray-500">
+                {filteredAddresses.length > 0 ? (
+                  <div className="flex justify-between items-center">
+                    <span>Found {filteredAddresses.length} customer(s)</span>
+                    {selectedAddress && typeof selectedAddress !== 'string' && (
+                      <span className="text-blue-600 font-medium">
+                        ✓ Selected
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center">
+                    <span>No customer found with "{searchQuery}"</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Search Results - Customer List */}
+              {paginatedAddresses.map((addr) => (
+                <div
+                  key={addr.id}
+                  onClick={() => handleSelectSavedAddress(addr)}
+                  className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${selectedAddress &&
+                    typeof selectedAddress !== 'string' &&
+                    (selectedAddress as ExtendedAddress).id === addr.id
+                    ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
+                    : "border-gray-200 hover:bg-gray-50"
+                    }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold">{addr.label}</p>
+                        {selectedAddress &&
+                          typeof selectedAddress !== 'string' &&
+                          (selectedAddress as ExtendedAddress).id === addr.id && (
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                              Selected
+                            </span>
+                          )}
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">Phone: {addr.phone}</p>
+                      <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
+                    </div>
+                    <span className="text-blue-500 text-lg">📍</span>
+                  </div>
+                </div>
+              ))}
+
+              {/* Pagination Controls for Search Results */}
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 p-4 border border-gray-200 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={goToPreviousPage}
+                      disabled={currentPage === 1}
+                      className={`px-3 py-1 border rounded ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+                    >
+                      ← Previous
+                    </button>
+
+                    <div className="flex gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => goToPage(page)}
+                          className={`w-8 h-8 rounded-full ${currentPage === page ? 'bg-blue-600 text-white' : 'border hover:bg-gray-50'}`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={goToNextPage}
+                      disabled={currentPage === totalPages}
+                      className={`px-3 py-1 border rounded ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+                    >
+                      Next →
+                    </button>
+                  </div>
+
+                  <div className="text-sm text-gray-600">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                </div>
               )}
             </div>
-            
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleSaveNewAddress}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={!tempAddress.label?.trim() || !tempAddress.details?.trim() || !tempAddress.coordinates || !userPhone}
-              >
-                {t.saveAddress}
-              </button>
-              <button
-                onClick={() => {
-                  setIsAdding(false);
-                  setTempAddress({
-                    label: "",
-                    phone: userPhone || "",
-                    details: "",
-                    coordinates: { lat: 11.567, lng: 104.928 },
-                    api_user_id: user?.id,
-                  });
-                }}
-                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-              >
-                {t.cancel}
-              </button>
+          )}
+
+          {/* Customer Form - Show when actively adding OR when searching with no results */}
+          {(isAdding || (searchQuery.trim() && filteredAddresses.length === 0)) && (
+            <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl mt-3">
+              <h3 className="text-lg font-semibold text-gray-800">
+                {selectedAddress && typeof selectedAddress !== 'string'
+                  ? "Update Customer Details"
+                  : filteredAddresses.length === 0 && searchQuery.trim()
+                    ? "Create New Customer"
+                    : "Add New Customer"}
+              </h3>
+
+              {/* Name / Label */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer Name *
+                  {isLikelyPhoneNumber && searchQuery.trim() && (
+                    <span className="text-xs text-gray-500 ml-2">(Detected as phone number, please enter name)</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter customer name"
+                  value={tempAddress.label || ""}
+                  onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t.phone} *
+                  {!isLikelyPhoneNumber && searchQuery.trim() && (
+                    <span className="text-xs text-gray-500 ml-2">(Detected as name, please enter phone number)</span>
+                  )}
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Customer phone number"
+                  value={tempAddress.phone || ""}
+                  onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Address Details */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t.details} *
+                </label>
+                <div className="flex justify-between items-center gap-2">
+                  <textarea
+                    placeholder="#123, Sen Sok"
+                    value={tempAddress.details || ""}
+                    onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Location Picker */}
+              <div>
+                {!tempAddress.coordinates && (
+                  <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleSaveNewAddress}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
+                  disabled={
+                    !tempAddress.details?.trim() ||
+                    !tempAddress.coordinates ||
+                    !tempAddress.label?.trim() ||
+                    !tempAddress.phone?.trim()
+                  }
+                >
+                  {selectedAddress && typeof selectedAddress !== 'string' ? "Update Customer" : "Save Customer"}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsAdding(false);
+                    setSearchQuery("");
+                    setShowSearchResults(false);
+                    setTempAddress({
+                      label: "",
+                      phone: "",
+                      details: "",
+                      coordinates: { lat: 0, lng: 0 },
+                      api_user_id: user?.id,
+                    });
+                  }}
+                  className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+                >
+                  {t.cancel}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+        </div>
+      )}
 
-      {/* Shipping Address */}
+      {/* Hide other sections when searching */}
+      {!isSearching && (
+        <>
+          {/* Order Summary */}
+          <section className="flex flex-col gap-3">
+            <h2 className="text-2xl font-semibold text-gray-800">{t.orderSummary}</h2>
+            {cart.length === 0 && <p>{t.yourCartIsEmpty}</p>}
 
+            {cart.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between border-b border-gray-300 p-3 gap-3"
+              >
+                <img
+                  src={item.image && item.image.trim() ? IMAGE_URL + item.image : "https://syspro.asia/img/default.png"}
+                  alt={item.title}
+                  className="w-16 h-16 object-cover rounded"
+                />
+                <div className="flex-1">
+                  <p className="font-medium">{item.title}</p>
+                  <p className="text-gray-600">
+                    ${item.price.toFixed(2)} × {item.qty} = ${(item.price * item.qty).toFixed(2)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateItemQty(item.id, Math.max(1, item.qty - 1))}
+                    className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    -
+                  </button>
+                  <span className="w-6 text-center">{item.qty}</span>
+                  <button
+                    onClick={() => updateItemQty(item.id, item.qty + 1)}
+                    className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            ))}
+          </section>
+
+          {/* Shipping Address Section */}
+          <section className="flex flex-col gap-3">
+            {user?.role !== "sale" && <h2 className="text-2xl font-semibold text-gray-800">{t.shippingAddress}</h2>}
+
+            {/* Current Location */}
+            {user?.role !== "sale" && (
+              <div
+                onClick={handleDetectCurrentLocation}
+                className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${selectedAddress === "current" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
+                  } ${isDetectingLocation ? "opacity-70" : ""}`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-blue-500 text-xl">📍</span>
+                  <div>
+                    <p className="font-semibold">{t.currentLocation || "Current Location"}</p>
+                    <p className="text-sm text-gray-500">
+                      {isDetectingLocation
+                        ? t.detectingYourCurrentLocation
+                        : currentAddress
+                          ? t.clickToUseYourCurrentLocation
+                          : t.clickToDetectYourCurrentLocation}
+                    </p>
+                  </div>
+                </div>
+                {isDetectingLocation && (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                )}
+              </div>
+            )}
+
+            {/* Regular Users: Saved Addresses List */}
+            {user?.role !== "sale" && !isAdding && savedAddresses.length > 0 && (
+              <div className="flex flex-col gap-3">
+                {savedAddresses.map((addr) => (
+                  <div
+                    key={addr.id}
+                    onClick={() => setSelectedAddress(addr)}
+                    className={`p-4 rounded-xl border cursor-pointer flex items-center justify-between transition ${selectedAddress && typeof selectedAddress !== 'string' && (selectedAddress as ExtendedAddress).id === addr.id
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:bg-gray-50"
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-gray-400 text-xl">🏠</span>
+                      <div>
+                        <p className="font-semibold">{addr.label}</p>
+                        <p className="text-sm text-gray-600">{addr.details}</p>
+                        <p className="text-xs text-gray-500 mt-1">{addr.phone}</p>
+                      </div>
+                    </div>
+                    {selectedAddress && typeof selectedAddress !== 'string' && (selectedAddress as ExtendedAddress).id === addr.id && (
+                      <span className="text-blue-500 font-bold">✓</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Regular Users: Add New Address Button / Form */}
+            {user?.role !== "sale" && isAdding ? (
+              <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl">
+                {/* Name / Label */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Label *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Home, Work, etc."
+                    value={tempAddress.label || ""}
+                    onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.phone} *
+                  </label>
+                  <div className="w-full p-3 border rounded-lg bg-gray-50 text-gray-700">
+                    {userPhone ? `${userPhone} (from account)` : "No phone in profile"}
+                  </div>
+                </div>
+
+                {/* Address Details */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.details || "Address Details"} *
+                  </label>
+                  <textarea
+                    placeholder="Street, building, floor, notes..."
+                    value={tempAddress.details || ""}
+                    onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={3}
+                  />
+                </div>
+
+                {/* Location Picker */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.clickToSelectLocation} *
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={
+                      tempAddress.coordinates
+                        ? `Lat: ${tempAddress.coordinates.lat.toFixed(5)}, Lng: ${tempAddress.coordinates.lng.toFixed(5)}`
+                        : ""
+                    }
+                    onClick={() => setShowMap(true)}
+                    className="w-full p-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                    placeholder={t.clickToSelectLocation}
+                  />
+                  {!tempAddress.coordinates && (
+                    <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={handleSaveNewAddress}
+                    className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
+                    disabled={
+                      !tempAddress.details?.trim() ||
+                      !tempAddress.coordinates ||
+                      !tempAddress.label?.trim() ||
+                      !userPhone?.trim()
+                    }
+                  >
+                    {t.saveAddress}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAdding(false);
+                      setTempAddress({
+                        label: "",
+                        phone: userPhone || "",
+                        details: "",
+                        coordinates: { lat: 0, lng: 0 },
+                        api_user_id: user?.id,
+                      });
+                    }}
+                    className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+                  >
+                    {t.cancel}
+                  </button>
+                </div>
+              </div>
+            ) : user?.role !== "sale" ? (
+              <button
+                onClick={() => setIsAdding(true)}
+                className="mt-2 w-full py-3 bg-gray-100 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 font-medium flex items-center justify-center gap-2"
+              >
+                <span className="text-xl">+</span>
+                {t.addNewAddress}
+              </button>
+            ) : null}
+          </section>
+
+          {/* Payment Method */}
+          <section className="flex flex-col gap-3">
+            <h2 className="text-2xl font-semibold text-gray-800">{t.paymentMethod}</h2>
+
+                {/* Custom Payment Methods */}
+                {paymentMethods
+                  .filter(method => method.type === 'custom')
+                  .map((method) => (
+                    <div
+                      key={method.id}
+                      onClick={() => handlePaymentMethodSelect(method.name)}
+                      className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow ${
+                        paymentMethod === method.name
+                          ? "border-green-500 bg-green-50 shadow-lg"
+                          : "border-gray-200 hover:shadow-md"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <img
+                          src={method.image}
+                          alt={method.name}
+                          className="w-12 h-12 object-contain"
+                          onError={(e) => (e.currentTarget.src = "https://syspro.asia/img/default.png")}
+                        />
+                        <div>
+                          <p className="font-semibold text-gray-700">{method.name}</p>
+                          <p className="text-xs text-gray-500">Custom Payment Method</p>
+                        </div>
+                      </div>
+                      {paymentMethod === method.name && (
+                        <p className="text-sm text-gray-500 mt-2">
+                          Pay with {method.name}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                }
+          </section>
+        </>
+      )}
 
       {/* Map Modal */}
       {showMap && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-lg p-4 w-[90%] max-w-lg max-h-[90vh] overflow-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">
-                {t.selectLocation}
-              </h3>
+              <h3 className="text-lg font-semibold">{t.selectLocation}</h3>
               <button
                 onClick={() => setShowMap(false)}
                 className="text-gray-500 hover:text-gray-700 text-xl p-1"
@@ -550,10 +1007,10 @@ const CombinedCheckoutPage = () => {
                 ✕
               </button>
             </div>
-            
+
             <GoogleMap
               mapContainerStyle={containerStyle}
-              center={tempAddress.coordinates || { lat: 11.567, lng: 104.928 }}
+              center={tempAddress.coordinates || { lat: 0, lng: 0 }}
               zoom={15}
               onClick={handleMapClick}
             >
@@ -567,37 +1024,32 @@ const CombinedCheckoutPage = () => {
             </GoogleMap>
 
             <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700">
-                {t.selectedCoordinates}:
-              </p>
+              <p className="text-sm font-medium text-gray-700">{t.selectedCoordinates}:</p>
               {tempAddress.coordinates ? (
                 <p className="text-sm text-gray-600 mt-1">
-                  {t.latitude}: {tempAddress.coordinates.lat.toFixed(6)}
+                  Lat: {tempAddress.coordinates.lat.toFixed(6)}
                   <br />
-                  {t.longtitude}: {tempAddress.coordinates.lng.toFixed(6)}
+                  Lng: {tempAddress.coordinates.lng.toFixed(6)}
                 </p>
               ) : (
-                <p className="text-sm text-gray-500 mt-1">
-                  {t.clickToSelectLocation}
-                </p>
+                <p className="text-sm text-gray-500 mt-1">{t.clickToSelectLocation}</p>
               )}
             </div>
 
             <div className="flex justify-end gap-2 mt-4">
               <button
-                onClick={() => {
-                  setTempAddress({
-                    ...tempAddress,
-                    coordinates: undefined,
-                  });
-                }}
+                onClick={() => setTempAddress({ ...tempAddress, coordinates: undefined })}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
               >
                 {t.clear}
               </button>
               <button
-                onClick={() => setShowMap(false)}
+                onClick={() => {
+                  setShowMap(false);
+                  toast.success("Location selected successfully!");
+                }}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                disabled={!tempAddress.coordinates}
               >
                 {t.select}
               </button>
@@ -606,94 +1058,51 @@ const CombinedCheckoutPage = () => {
         </div>
       )}
 
-      {/* Payment Method */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-2xl font-semibold text-gray-800">{t.paymentMethod}</h2>
-        {paymentMethods.map((method) => (
-          <div
-            key={method.name}
-            onClick={() => handlePaymentMethodSelect(method.name)}
-            className={`cursor-pointer border rounded-xl p-5 flex flex-col gap-2 transition-shadow duration-200 ${
-              paymentMethod === method.name 
-                ? "border-blue-500 bg-blue-50 shadow-lg" 
-                : "border-gray-200 hover:shadow-md"
-            }`}
-          >
-            <div className="flex items-center gap-4">
-              <img 
-                src={method.image} 
-                alt={method.name} 
-                className="w-12 h-12 object-contain"
-                onError={(e) => {
-                  e.currentTarget.src = "https://syspro.asia/img/default.png";
-                }}
-              />
-              <p className="font-semibold text-gray-700">{method.name}</p>
-            </div>
-            {paymentMethod === method.name && method.name !== "QR" && (
-              <p className="text-sm text-gray-500 mt-2">
-                {t.YouWillPayWithCashUponDelivery || "You will pay with cash upon delivery"}
-              </p>
-            )}
-          </div>
-        ))}
-      </section>
-
-      {/* QR Popup Modal */}
+      {/* QR Popup */}
       {showQRPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-xl font-semibold text-gray-800">
-                  {t.scanQRCode || "Scan QR Code"}
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {t.scanWithYourBankApp || "Scan with your bank app to pay"}
-                </p>
+                <h3 className="text-xl font-semibold text-gray-800">Scan QR Code</h3>
+                <p className="text-sm text-gray-500">Scan with your bank app to pay</p>
               </div>
-              <button 
+              <button
                 onClick={() => setShowQRPopup(false)}
                 className="text-gray-400 hover:text-gray-600 text-2xl p-1"
               >
-                &times;
+                ×
               </button>
             </div>
-            
+
             <div className="text-center mb-6">
               <div className="mb-4 p-4 border rounded-lg bg-white inline-block">
-                <img 
+                <img
                   src="/qr.jpg"
                   alt="Payment QR Code"
                   className="w-64 h-64 mx-auto"
-                  onError={(e) => {
-                    e.currentTarget.src = "https://syspro.asia/img/default.png";
-                  }}
+                  onError={(e) => (e.currentTarget.src = "https://syspro.asia/img/default.png")}
                 />
-                <p className="text-xs text-gray-500 mt-2">
-                  {t.amount || "Amount"}: ${total.toFixed(2)}
-                </p>
+                <p className="text-xs text-gray-500 mt-2">Amount: ${total.toFixed(2)}</p>
               </div>
-              
-              <div className="flex flex-col space-y-3">
-                <button
-                  onClick={handleDownloadQR}
-                  className="py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 flex items-center justify-center"
-                >
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  {t.downloadQR || "Download QR"}
-                </button>
-              </div>
+
+              <button
+                onClick={handleDownloadQR}
+                className="py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 w-full flex items-center justify-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download QR
+              </button>
             </div>
-            
+
             <div className="text-center">
               <button
                 onClick={() => setShowQRPopup(false)}
                 className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
-                {t.close || "Close"}
+                Close
               </button>
             </div>
           </div>

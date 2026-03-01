@@ -71,7 +71,7 @@ const TopNav = () => {
   return (
     <section className="flex flex-col gap-1">
       <div className="flex flex-row justify-between items-center">
-        <h1 className="text-[18px] font-bold main-text">SOB (for sales)</h1>
+        <h1 className="text-[18px] font-bold main-text">SOB</h1>
 
         <div className="flex flex-row gap-2">
           <button onClick={handleWheelClick} className="p-1 flex items-center rounded-[10px] cursor-pointer transition">
