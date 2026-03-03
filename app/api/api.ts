@@ -50,20 +50,46 @@ if (typeof window !== 'undefined') {
 api.interceptors.request.use(
   (config) => {
     const safari = isSafari();
-    const token = currentToken || localStorage.getItem('auth_token');
-
+    
+    // Get token from multiple sources
+    let token = null;
+    
+    // Priority 1: Check axios defaults (set after login)
+    if (api.defaults.headers.common['Authorization']) {
+      const authHeader = api.defaults.headers.common['Authorization'] as string;
+      token = authHeader.replace('Bearer ', '');
+      console.log('🔑 Using token from axios defaults');
+    }
+    
+    // Priority 2: Check localStorage (for Safari)
+    if (!token && safari) {
+      token = localStorage.getItem('auth_token');
+      if (token) {
+        console.log('🔑 Using token from localStorage');
+      }
+    }
+    
     console.log(`📤 [${config.method?.toUpperCase()}] ${config.baseURL}${config.url || ''}`);
+    console.log('🔧 Token present:', !!token);
 
     if (token) {
+      // YOUR MIDDLEWARE EXPECTS AUTHORIZATION HEADER FIRST
+      // This is the most reliable method across all browsers
+      config.headers.set('Authorization', `Bearer ${token}`);
+      
+      // For Safari GET requests, also add as query parameter as fallback
+      // Your middleware checks for '_token' query param
       if (safari && config.method?.toLowerCase() === 'get') {
-        // Safari/iOS GET workaround for Axios header-dropping bug
-        config.params = { ...config.params, token };
-        console.log('🦁 Safari GET workaround: added ?token=...');
-      } else {
-        // Use .set() because config.headers is AxiosHeaders
-        config.headers.set('Authorization', `Bearer ${token}`);
-        console.log('→ Using Bearer header');
+        config.params = { 
+          ...config.params, 
+          _token: token  // Using '_token' as your middleware expects
+        };
+        console.log('🦁 Safari GET workaround: added ?_token=...');
       }
+      
+      // Also set as cookie? No, cookies are handled by the browser
+      // But we can ensure withCredentials is true
+      config.withCredentials = true;
     } else {
       console.log('⚠️ No auth token found for this request');
     }
@@ -73,18 +99,11 @@ api.interceptors.request.use(
       isSafari: safari,
       hasToken: !!token,
       method: config.method,
-      usingQueryToken: !!config.params?.token,
       authHeaderSent: config.headers.get('Authorization'),
-      params: config.params,
+      queryTokenSent: config.params?._token ? 'yes' : 'no',
       withCredentials: config.withCredentials,
+      url: config.url
     });
-
-    // POST/PUT content type
-    if (config.method === 'post' || config.method === 'put') {
-      if (!config.headers.get('Content-Type')) {
-        config.headers.set('Content-Type', 'application/json');
-      }
-    }
 
     return config;
   },

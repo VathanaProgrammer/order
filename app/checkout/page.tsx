@@ -747,9 +747,6 @@ const CombinedCheckoutPage = () => {
         </div>
       )}
 
-      {/* Hide other sections when searching */}
-      {!isSearching && (
-        <>
           {/* Order Summary */}
           <section className="flex flex-col gap-3">
             <h2 className="text-2xl font-semibold text-gray-800">{t.orderSummary}</h2>
@@ -991,8 +988,6 @@ const CombinedCheckoutPage = () => {
                   ))
                 }
           </section>
-        </>
-      )}
 
       {/* Map Modal */}
       {showMap && (
