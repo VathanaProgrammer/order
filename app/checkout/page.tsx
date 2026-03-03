@@ -91,47 +91,47 @@ const CombinedCheckoutPage = () => {
     { name: t.cash, image: "/cash.jpg", id: 'cash', type: 'default' },
   ]);
 
+  // Fetch payment methods
   useEffect(() => {
-    const fetchCustomPaymentMethods = async () => {
+    const fetchAllPaymentMethods = async () => {
       try {
         setLoading(true);
-        // Call your Laravel API
+        
+        const allMethods: PaymentMethodType[] = [
+          { id: 'qr', name: t.QR || 'QR', image: "/qr.jpg", type: 'default' },
+          { id: 'cash', name: t.cash || 'Cash', image: "/cash.jpg", type: 'default' },
+        ];
+        
         const response = await api.get('/business/1/custom-payments');
         
-        console.log('API Response:', response.data);
-        
         if (response.data.success && response.data.custom_payments) {
-          // Convert the custom_payments object to an array
-          const customPaymentsObj = response.data.custom_payments;
+          const customPayments = response.data.custom_payments;
           
-          // Filter out null values and map to your payment method format
-          const customMethods = Object.entries(customPaymentsObj)
-            .filter(([key, value]) => value !== null) // Remove entries with null values
-            .map(([key, value], index) => ({
-              id: index + 1, // Generate a unique ID
-              name: value as string, // The payment method name (e.g., "Acleda", "ABA")
-              image: '/payment-default.jpg', // Default image since your API doesn't provide images
-              type: 'custom' as const
-            }));
-          
-          console.log('Mapped custom methods:', customMethods);
-          
-          // Update payment methods state
-          setPaymentMethods(prev => [
-            ...prev.filter(m => m.type === 'default'), // Keep default methods
-            ...customMethods // Add custom methods
-          ]);
+          Object.entries(customPayments).forEach(([key, value]) => {
+            if (key.startsWith('custom_pay_') && value && value !== null) {
+              allMethods.push({
+                id: key,
+                name: String(value),
+                image: `/${key}.jpg` || '/payment-default.jpg',
+                type: 'custom' as const
+              });
+            }
+          });
         }
+        
+        setPaymentMethods(allMethods);
       } catch (error) {
         console.error('Failed to fetch payment methods:', error);
-        toast.error('Failed to load payment methods');
+        toast.error('Failed to load custom payment methods');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCustomPaymentMethods();
-  }, []);
+    if (user) {
+      fetchAllPaymentMethods();
+    }
+  }, [user, setLoading, t.QR, t.cash]);
 
   // Check if user is actively searching or has search results
   const isSearching = useMemo(() => {
