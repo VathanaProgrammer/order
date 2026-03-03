@@ -98,16 +98,23 @@ const CombinedCheckoutPage = () => {
         // Call your Laravel API
         const response = await api.get('/business/1/custom-payments');
         
-        if (response.data.success && response.data.payment_methods) {
-          // Combine default and custom payment methods
-          const customMethods = response.data.payment_methods
-            .filter((method: any) => method.type === 'custom' && method.name)
-            .map((method: any) => ({
-              id: method.id,
-              name: method.name,
-              image: method.image || '/payment-default.jpg',
+        console.log('API Response:', response.data);
+        
+        if (response.data.success && response.data.custom_payments) {
+          // Convert the custom_payments object to an array
+          const customPaymentsObj = response.data.custom_payments;
+          
+          // Filter out null values and map to your payment method format
+          const customMethods = Object.entries(customPaymentsObj)
+            .filter(([key, value]) => value !== null) // Remove entries with null values
+            .map(([key, value], index) => ({
+              id: index + 1, // Generate a unique ID
+              name: value as string, // The payment method name (e.g., "Acleda", "ABA")
+              image: '/payment-default.jpg', // Default image since your API doesn't provide images
               type: 'custom' as const
             }));
+          
+          console.log('Mapped custom methods:', customMethods);
           
           // Update payment methods state
           setPaymentMethods(prev => [
@@ -491,261 +498,6 @@ const CombinedCheckoutPage = () => {
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto hide-scrollbar pb-24">
       <Header title={t.checkout} />
-
-      {/* Sales Mode: Search and Customer Management */}
-      {user?.role === "sale" && (
-        <div className="space-y-3">
-          {/* Search Bar */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search customer by name or phone number..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            <div className="absolute left-3 top-3 text-gray-400">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            {searchQuery && (
-              <button
-                onClick={handleClearSearch}
-                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* Selected Customer Display */}
-          {selectedAddress && typeof selectedAddress !== 'string' && (
-            <div className="p-4 border border-green-300 bg-green-50 rounded-xl">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold text-gray-800 mb-2">Selected Customer:</h3>
-                  <div className="space-y-1">
-                    <p className="font-medium text-gray-900">{(selectedAddress as ExtendedAddress).label}</p>
-                    <p className="text-sm text-gray-600">Phone: {(selectedAddress as ExtendedAddress).phone}</p>
-                    <p className="text-sm text-gray-600">Address: {(selectedAddress as ExtendedAddress).details}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setSelectedAddress('current');
-                    setSearchQuery("");
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Show search results when searching OR when a customer is selected */}
-          {(showSearchResults || (selectedAddress && typeof selectedAddress !== 'string')) && searchQuery.trim() && (
-            <div className="space-y-3">
-              {/* Search Results Header */}
-              <div className="text-sm text-gray-500">
-                {filteredAddresses.length > 0 ? (
-                  <div className="flex justify-between items-center">
-                    <span>Found {filteredAddresses.length} customer(s)</span>
-                    {selectedAddress && typeof selectedAddress !== 'string' && (
-                      <span className="text-blue-600 font-medium">
-                        ✓ Selected
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex justify-between items-center">
-                    <span>No customer found with "{searchQuery}"</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Search Results - Customer List */}
-              {paginatedAddresses.map((addr) => (
-                <div
-                  key={addr.id}
-                  onClick={() => handleSelectSavedAddress(addr)}
-                  className={`p-4 rounded-xl border cursor-pointer flex flex-col transition ${selectedAddress &&
-                    typeof selectedAddress !== 'string' &&
-                    (selectedAddress as ExtendedAddress).id === addr.id
-                    ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
-                    : "border-gray-200 hover:bg-gray-50"
-                    }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold">{addr.label}</p>
-                        {selectedAddress &&
-                          typeof selectedAddress !== 'string' &&
-                          (selectedAddress as ExtendedAddress).id === addr.id && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                              Selected
-                            </span>
-                          )}
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">Phone: {addr.phone}</p>
-                      <p className="text-sm text-gray-600 mt-1">{addr.details}</p>
-                    </div>
-                    <span className="text-blue-500 text-lg">📍</span>
-                  </div>
-                </div>
-              ))}
-
-              {/* Pagination Controls for Search Results */}
-              {totalPages > 1 && (
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 p-4 border border-gray-200 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={goToPreviousPage}
-                      disabled={currentPage === 1}
-                      className={`px-3 py-1 border rounded ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
-                    >
-                      ← Previous
-                    </button>
-
-                    <div className="flex gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <button
-                          key={page}
-                          onClick={() => goToPage(page)}
-                          className={`w-8 h-8 rounded-full ${currentPage === page ? 'bg-blue-600 text-white' : 'border hover:bg-gray-50'}`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={goToNextPage}
-                      disabled={currentPage === totalPages}
-                      className={`px-3 py-1 border rounded ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`}
-                    >
-                      Next →
-                    </button>
-                  </div>
-
-                  <div className="text-sm text-gray-600">
-                    Page {currentPage} of {totalPages}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Customer Form - Show when actively adding OR when searching with no results */}
-          {(isAdding || (searchQuery.trim() && filteredAddresses.length === 0)) && (
-            <div className="bg-white flex flex-col gap-4 p-4 border border-gray-200 rounded-xl mt-3">
-              <h3 className="text-lg font-semibold text-gray-800">
-                {selectedAddress && typeof selectedAddress !== 'string'
-                  ? "Update Customer Details"
-                  : filteredAddresses.length === 0 && searchQuery.trim()
-                    ? "Create New Customer"
-                    : "Add New Customer"}
-              </h3>
-
-              {/* Name / Label */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Customer Name *
-                  {isLikelyPhoneNumber && searchQuery.trim() && (
-                    <span className="text-xs text-gray-500 ml-2">(Detected as phone number, please enter name)</span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter customer name"
-                  value={tempAddress.label || ""}
-                  onChange={(e) => setTempAddress({ ...tempAddress, label: e.target.value })}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              {/* Phone */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t.phone} *
-                  {!isLikelyPhoneNumber && searchQuery.trim() && (
-                    <span className="text-xs text-gray-500 ml-2">(Detected as name, please enter phone number)</span>
-                  )}
-                </label>
-                <input
-                  type="tel"
-                  placeholder="Customer phone number"
-                  value={tempAddress.phone || ""}
-                  onChange={(e) => setTempAddress({ ...tempAddress, phone: e.target.value })}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              {/* Address Details */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t.details} *
-                </label>
-                <div className="flex justify-between items-center gap-2">
-                  <textarea
-                    placeholder="#123, Sen Sok"
-                    value={tempAddress.details || ""}
-                    onChange={(e) => setTempAddress({ ...tempAddress, details: e.target.value })}
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    rows={3}
-                  />
-                </div>
-              </div>
-
-              {/* Location Picker */}
-              <div>
-                {!tempAddress.coordinates && (
-                  <p className="text-sm text-red-500 mt-1">{t.pleaseSelectALocationOnTheMap}</p>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={handleSaveNewAddress}
-                  className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-300 disabled:cursor-not-allowed"
-                  disabled={
-                    !tempAddress.details?.trim() ||
-                    !tempAddress.coordinates ||
-                    !tempAddress.label?.trim() ||
-                    !tempAddress.phone?.trim()
-                  }
-                >
-                  {selectedAddress && typeof selectedAddress !== 'string' ? "Update Customer" : "Save Customer"}
-                </button>
-                <button
-                  onClick={() => {
-                    setIsAdding(false);
-                    setSearchQuery("");
-                    setShowSearchResults(false);
-                    setTempAddress({
-                      label: "",
-                      phone: "",
-                      details: "",
-                      coordinates: { lat: 0, lng: 0 },
-                      api_user_id: user?.id,
-                    });
-                  }}
-                  className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-                >
-                  {t.cancel}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
           {/* Order Summary */}
           <section className="flex flex-col gap-3">
