@@ -15,7 +15,7 @@ const Page = () => {
   // Get language context
   const { t } = useLanguage();
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setError("");
 

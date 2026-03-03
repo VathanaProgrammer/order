@@ -207,29 +207,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // 🔹 Logout
-// 🔹 Enhanced Logout
-  const logout = async () => {
-    try {
-      await api.post("/logout");
-      
-      // Clean up Safari token
-      if (isSafari()) {
-        localStorage.removeItem('auth_token');
-        delete api.defaults.headers.common['Authorization'];
-      }
-    } catch (error: any) {
-      console.error("Logout error:", error);
-      // Still clean up locally even if API fails
-      if (isSafari()) {
-        localStorage.removeItem('auth_token');
-        delete api.defaults.headers.common['Authorization'];
-      }
-    }
+const logout = async () => {
+  try {
+    console.log('Attempting logout with cookie-based auth');
+    
+    // For cookie-based auth, we don't need to manually add token to headers
+    // The browser will automatically send the cookie with the request
+    // if credentials: 'include' is set
+    
+    await api.post("/logout", {}, {
+      withCredentials: true // Important: This ensures cookies are sent
+    });
+    
+    console.log('Logout API call successful');
+    
+  } catch (error: any) {
+    console.error("Logout API error:", error);
+    // Log the error but continue with cleanup
+  } finally {
+    // Still clear any potential localStorage items (just in case)
+    localStorage.removeItem('token');
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    
+    sessionStorage.clear();
+    
+    // Clear cookies on client side too
+    document.cookie.split(";").forEach(function(c) {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    
+    // Clear axios headers
+    delete api.defaults.headers.common['Authorization'];
     
     setUser(null);
-    router.push("/sign-in");
-  };
+    
+    // Small delay to ensure cleanup completes
+    setTimeout(() => {
+      router.push("/sign-in");
+    }, 100);
+  }
+};
 
   return (
     <AuthContext.Provider value={{ 
